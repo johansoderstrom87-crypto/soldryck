@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { type WeatherData, getSymbolInfo, hasSunshine } from "../lib/weather";
 
 interface HeaderProps {
@@ -10,6 +11,61 @@ interface HeaderProps {
   weather: WeatherData | null;
   weatherLoading: boolean;
   hour: number;
+}
+
+const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: string; activeClass: string }[] = [
+  { value: "all", label: "Alla", icon: "◉", activeClass: "bg-slate-900 text-white" },
+  { value: "sun", label: "Sol", icon: "☀️", activeClass: "bg-amber-500 text-white" },
+  { value: "shade", label: "Skugga", icon: "☁️", activeClass: "bg-slate-500 text-white" },
+];
+
+function FilterButton({ filter, onFilterChange }: { filter: "all" | "sun" | "shade"; onFilterChange: (f: "all" | "sun" | "shade") => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const current = FILTER_OPTIONS.find((o) => o.value === filter)!;
+
+  return (
+    <div ref={ref} className="pointer-events-auto relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className={`rounded-xl shadow-lg backdrop-blur-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 transition-all bg-white/95 ${current.activeClass}`}
+      >
+        <span className="text-[10px]">{current.icon}</span>
+        {current.label}
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" className={`transition-transform ${open ? "rotate-180" : ""}`}>
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute top-full right-0 mt-1 bg-white/95 backdrop-blur-md rounded-xl shadow-lg p-1 flex flex-col gap-0.5 min-w-[90px]">
+          {FILTER_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              onClick={() => { onFilterChange(o.value); setOpen(false); }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center gap-1.5 transition-all ${
+                filter === o.value ? o.activeClass : "text-slate-500 hover:bg-slate-100"
+              }`}
+            >
+              <span className="text-[10px]">{o.icon}</span>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Header({
@@ -116,26 +172,8 @@ export default function Header({
           )}
         </div>
 
-        {/* Right: Filter buttons */}
-        <div className="pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl shadow-lg p-1 flex gap-0.5">
-          {(["all", "sun", "shade"] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => onFilterChange(f)}
-              className={`px-2.5 py-1 rounded-xl text-xs font-medium transition-all ${
-                filter === f
-                  ? f === "sun"
-                    ? "bg-amber-500 text-white"
-                    : f === "shade"
-                    ? "bg-slate-500 text-white"
-                    : "bg-slate-900 text-white"
-                  : "text-slate-500 hover:bg-slate-100"
-              }`}
-            >
-              {f === "all" ? "Alla" : f === "sun" ? "Sol" : "Skugga"}
-            </button>
-          ))}
-        </div>
+        {/* Right: Filter dropdown */}
+        <FilterButton filter={filter} onFilterChange={onFilterChange} />
       </div>
     </div>
   );
