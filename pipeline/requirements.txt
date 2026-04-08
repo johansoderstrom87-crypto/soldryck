@@ -1,0 +1,4 @@
+requests>=2.31
+pysolar>=0.11
+shapely>=2.0
+numpy>=1.26
