@@ -1,1 +1,9 @@
-node_modules/\n.next/\n__pycache__/\n*.pyc\npipeline/data/
+node_modules/
+.next/
+__pycache__/
+*.pyc
+pipeline/data/raw/
+pipeline/data/buildings.gpkg
+pipeline/data/shadow_results.json
+pipeline/data/venues.geojson
+.claude/

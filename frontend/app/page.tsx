@@ -4,11 +4,20 @@ import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import TimeSlider from "./components/TimeSlider";
 import Header from "./components/Header";
-import {
-  mockVenues,
-  getClosestDateKey,
-  getVenueStatus,
-} from "./data/mock-venues";
+
+// Try computed data first, fall back to mock
+let venueData: typeof import("./data/venues-computed") | null = null;
+try {
+  venueData = require("./data/venues-computed");
+} catch {
+  // venues-computed.ts doesn't exist yet — use mock data
+}
+
+const mockData = require("./data/mock-venues");
+
+const allVenues = venueData?.venues ?? mockData.mockVenues;
+const getDateKey = venueData?.getClosestDateKey ?? mockData.getClosestDateKey;
+const getStatus = venueData?.getVenueStatus ?? mockData.getVenueStatus;
 
 // Leaflet must be loaded client-side only
 const SunMap = dynamic(() => import("./components/SunMap"), {
@@ -26,12 +35,13 @@ export default function Home() {
   const [date, setDate] = useState(now);
   const [filter, setFilter] = useState<"all" | "sun" | "shade">("all");
 
-  const dateKey = useMemo(() => getClosestDateKey(date), [date]);
+  const dateKey = useMemo(() => getDateKey(date), [date]);
 
   const sunCount = useMemo(
     () =>
-      mockVenues.filter((v) => getVenueStatus(v, dateKey, hour) === "sun")
-        .length,
+      allVenues.filter(
+        (v: any) => getStatus(v, dateKey, hour) === "sun" || getStatus(v, dateKey, hour) === "s"
+      ).length,
     [dateKey, hour]
   );
 
@@ -41,7 +51,7 @@ export default function Home() {
         filter={filter}
         onFilterChange={setFilter}
         sunCount={sunCount}
-        totalCount={mockVenues.length}
+        totalCount={allVenues.length}
       />
 
       <SunMap hour={hour} date={date} filter={filter} />

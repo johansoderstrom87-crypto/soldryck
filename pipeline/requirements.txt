@@ -1,4 +1,6 @@
 requests>=2.31
-pysolar>=0.11
+geopandas>=1.0
 shapely>=2.0
+pysolar>=0.11
+pyproj>=3.6
 numpy>=1.26

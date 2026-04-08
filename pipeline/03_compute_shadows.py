@@ -1,178 +1,253 @@
 """
-Steg 3: Beräkna skuggstatus för varje uteservering, timme för timme.
+Steg 3: Beräkna skuggstatus för varje uteservering.
 
 Logik:
-1. För varje uteservering och tidpunkt, räkna ut solens position (azimut, elevation)
-2. Beräkna skuggans riktning och längd från varje närliggande byggnad
-3. Kolla om serveringspunkten hamnar i skugga
+1. För varje uteservering och tidpunkt → solens position (azimut, elevation)
+2. Projicera skuggpolygoner från närliggande byggnader
+3. Kolla om serveringspunkten hamnar i skuggpolygon
 
-Datum: 1:a och 15:e varje månad, mars-november
-Timmar: 08:00 - 22:00
+Datum: 1:a och 15:e varje månad, april-oktober (14 datapunkter)
+Timmar: 07:00-22:00 (16 timmar per dag)
+Totalt: venues × 14 × 16 beräkningar
+
+Resultat: data/shadow_results.json
 """
 
 import json
 import math
+import os
+import time
 from datetime import datetime, timezone, timedelta
+from collections import defaultdict
+
+import geopandas as gpd
 import numpy as np
+from shapely.geometry import Point, Polygon, MultiPolygon, box
+from shapely.ops import unary_union
 from pysolar.solar import get_altitude, get_azimuth
-from shapely.geometry import Point, Polygon, LineString
 
-# Stockholm timezone offset (CEST = UTC+2, CET = UTC+1)
-# Vi förenklar med UTC+2 (sommartid) för mars-nov
-TZ_OFFSET = timedelta(hours=2)
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+VENUES_FILE = os.path.join(DATA_DIR, "venues.geojson")
+BUILDINGS_FILE = os.path.join(DATA_DIR, "buildings.gpkg")
+OUTPUT_FILE = os.path.join(DATA_DIR, "shadow_results.json")
 
-# Sökradie runt varje servering (meter) — byggnader längre bort kan inte skugga
-SEARCH_RADIUS_DEG = 0.002  # ~200 meter i Stockholm
+# Tidszon: Sverige sommartid (CEST = UTC+2)
+# Vi hanterar CET/CEST mer exakt per datum
+def get_utc_offset(month: int) -> timedelta:
+    """Returnera UTC-offset för Sverige baserat på månad."""
+    # Sommartid (CEST): sista söndagen i mars → sista söndagen i oktober
+    # Förenkling: april-oktober = UTC+2, annars UTC+1
+    if 4 <= month <= 10:
+        return timedelta(hours=2)
+    return timedelta(hours=1)
+
 
 # Datum att beräkna
 DATES = []
-for month in range(3, 12):  # Mars - November
+for month in range(4, 11):  # April-Oktober
     for day in [1, 15]:
         DATES.append((2025, month, day))
 
-HOURS = list(range(8, 23))  # 08:00 - 22:00
+HOURS = list(range(7, 23))  # 07:00-22:00
+
+# Sökradie runt varje servering (grader ≈ ~300m)
+SEARCH_RADIUS = 0.003
+
+# Meter per grad i Stockholm (lat ≈ 59.33)
+M_PER_DEG_LAT = 111320.0
+M_PER_DEG_LNG = 111320.0 * math.cos(math.radians(59.33))
 
 
-def deg_to_meters(dlat: float, dlng: float, ref_lat: float) -> tuple[float, float]:
-    """Konvertera grader till ungefärliga meter."""
-    m_per_deg_lat = 111320
-    m_per_deg_lng = 111320 * math.cos(math.radians(ref_lat))
-    return dlat * m_per_deg_lat, dlng * m_per_deg_lng
-
-
-def is_in_shadow(
-    venue_lat: float,
-    venue_lng: float,
-    buildings: list[dict],
-    sun_altitude: float,
-    sun_azimuth: float,
-) -> str:
+def project_building_shadow(
+    building_geom, building_height: float, ground_elevation: float,
+    sun_azimuth: float, sun_altitude: float
+) -> Polygon | None:
     """
-    Kolla om en punkt skuggas av någon byggnad.
-    Returnerar 'sun', 'partial' eller 'shade'.
+    Projicera en byggnads skuggpolygon givet solens position.
+
+    Skugglängd = höjd / tan(solhöjd)
+    Skuggriktning = solens azimut + 180° (skuggan faller bort från solen)
     """
-    if sun_altitude <= 0:
-        return "shade"  # Solen under horisonten
+    if sun_altitude <= 2:
+        return None  # Sol under horisonten eller för låg
 
-    if sun_altitude < 5:
-        return "shade"  # Solen för låg, generellt skuggigt
+    # Skugglängd i meter
+    shadow_length_m = building_height / math.tan(math.radians(sun_altitude))
 
-    venue_point = Point(venue_lng, venue_lat)
+    # Begränsa till rimligt avstånd (en 30m byggnad vid 5° solhöjd → 343m skugga)
+    shadow_length_m = min(shadow_length_m, 500)
 
-    # Skuggriktning = motsatt solens azimut
-    shadow_dir_rad = math.radians(sun_azimuth)
-    # Enhetsvektorn i skuggans riktning (lng, lat-komponent)
-    dx = math.sin(shadow_dir_rad)
-    dy = math.cos(shadow_dir_rad)
+    # Skuggans riktning (solen lyser från azimut, skuggan faller åt motsatt håll)
+    shadow_azimuth_rad = math.radians(sun_azimuth)
 
-    shadow_count = 0
+    # Offset i grader (skuggan pekar BORT från solen)
+    dx_deg = math.sin(shadow_azimuth_rad) * shadow_length_m / M_PER_DEG_LNG
+    dy_deg = math.cos(shadow_azimuth_rad) * shadow_length_m / M_PER_DEG_LAT
+    # Skuggan faller bort, så vi vänder riktningen
+    dx_deg = -dx_deg
+    dy_deg = -dy_deg
 
-    for building in buildings:
-        poly_coords = building["polygon"]
-        height = building["height"]
+    # Hantera MultiPolygon
+    if isinstance(building_geom, MultiPolygon):
+        polys = list(building_geom.geoms)
+    else:
+        polys = [building_geom]
 
-        building_poly = Polygon(poly_coords)
-        if not building_poly.is_valid:
+    shadow_parts = []
+    for poly in polys:
+        if not poly.is_valid or poly.is_empty:
             continue
 
-        # Skippa om byggnaden är för långt bort
-        centroid = building_poly.centroid
-        dist_deg = math.sqrt(
-            (venue_lat - centroid.y) ** 2 + (venue_lng - centroid.x) ** 2
-        )
-        if dist_deg > SEARCH_RADIUS_DEG:
-            continue
+        # Projicera varje punkt i polygonen längs skuggriktningen
+        exterior_coords = list(poly.exterior.coords)
+        shadow_coords = [(x + dx_deg, y + dy_deg) for x, y in exterior_coords]
 
-        # Beräkna skugglängd (i meter)
-        shadow_length = height / math.tan(math.radians(sun_altitude))
-
-        # Konvertera till grader
-        m_per_deg_lat = 111320
-        m_per_deg_lng = 111320 * math.cos(math.radians(venue_lat))
-
-        shadow_length_lat = shadow_length / m_per_deg_lat
-        shadow_length_lng = shadow_length / m_per_deg_lng
-
-        # Projicera varje hörn av byggnaden + skugga
-        shadow_points = []
-        for lng, lat in poly_coords:
-            shadow_lng = lng + dx * shadow_length_lng
-            shadow_lat = lat - dy * shadow_length_lat  # Minus för att norr = positiv lat
-            shadow_points.append((shadow_lng, shadow_lat))
-
-        # Skuggpolygon = byggnad + projicerade punkter
-        all_points = list(poly_coords) + shadow_points
+        # Skuggpolygon = union av original + projicerad polygon
         try:
-            shadow_poly = Polygon(all_points).convex_hull
-            if shadow_poly.contains(venue_point):
-                shadow_count += 1
+            original = Polygon(exterior_coords)
+            shadow_poly = Polygon(shadow_coords)
+            combined = unary_union([original, shadow_poly]).convex_hull
+            if combined.is_valid and not combined.is_empty:
+                shadow_parts.append(combined)
         except Exception:
             continue
 
-    if shadow_count >= 2:
-        return "shade"
-    elif shadow_count == 1:
-        return "partial"
-    else:
-        return "sun"
+    if not shadow_parts:
+        return None
+
+    try:
+        return unary_union(shadow_parts)
+    except Exception:
+        return shadow_parts[0] if shadow_parts else None
 
 
-def compute_all():
-    print("Laddar data...")
-    with open("data/venues.json", "r", encoding="utf-8") as f:
-        venues = json.load(f)
+def precompute_sun_positions(ref_lat: float, ref_lng: float) -> dict:
+    """Förberäkna solpositioner — samma för hela Stockholm (variation <0.01°)."""
+    print("Förberäknar solpositioner...")
+    positions = {}
+    for year, month, day in DATES:
+        date_key = f"{month:02d}-{day:02d}"
+        utc_offset = get_utc_offset(month)
+        positions[date_key] = {}
+        for hour in HOURS:
+            utc_dt = datetime(year, month, day, hour, 0, 0, tzinfo=timezone.utc) - utc_offset
+            alt = get_altitude(ref_lat, ref_lng, utc_dt)
+            az = get_azimuth(ref_lat, ref_lng, utc_dt)
+            positions[date_key][hour] = (alt, az)
+    print(f"  {len(DATES)} datum × {len(HOURS)} timmar = {len(DATES)*len(HOURS)} positioner")
+    return positions
 
-    with open("data/buildings.json", "r", encoding="utf-8") as f:
-        buildings = json.load(f)
 
-    print(f"Beräknar skuggor för {len(venues)} serveringar...")
-    print(f"Datum: {len(DATES)} dagar, Timmar: {len(HOURS)} per dag")
-    print(f"Totalt: {len(venues) * len(DATES) * len(HOURS)} beräkningar")
+def compute_shadows():
+    print("=== Steg 3: Beräkna skuggor ===")
+
+    # Ladda data
+    print("Laddar uteserveringar...")
+    venues_gdf = gpd.read_file(VENUES_FILE)
+    print(f"  {len(venues_gdf)} uteserveringar")
+
+    print("Laddar byggnader...")
+    buildings_gdf = gpd.read_file(BUILDINGS_FILE)
+    print(f"  {len(buildings_gdf)} byggnader")
+
+    # Bygg spatial index
+    print("Bygger rumsligt index...")
+    buildings_sindex = buildings_gdf.sindex
+
+    # Förberäkna solpositioner (alla venues i Stockholm har i princip samma sol)
+    sun_positions = precompute_sun_positions(59.33, 18.07)
+
+    total_venues = len(venues_gdf)
+    total_calcs = total_venues * len(DATES) * len(HOURS)
+    print(f"\nBeräknar {total_calcs:,} sol/skugga-värden...")
 
     results = {}
+    start_time = time.time()
 
-    for i, venue in enumerate(venues):
+    for vi in range(total_venues):
+        venue = venues_gdf.iloc[vi]
         venue_id = venue["id"]
+        venue_point = venue.geometry
+        venue_lng, venue_lat = venue_point.x, venue_point.y
+
+        # Hitta närliggande byggnader
+        search_box = box(
+            venue_lng - SEARCH_RADIUS,
+            venue_lat - SEARCH_RADIUS,
+            venue_lng + SEARCH_RADIUS,
+            venue_lat + SEARCH_RADIUS,
+        )
+        candidate_idxs = list(buildings_sindex.intersection(search_box.bounds))
+        nearby_buildings = buildings_gdf.iloc[candidate_idxs]
+
+        # Förbered byggnadsdata som lista (snabbare iteration)
+        nearby_list = [
+            (row.geometry, row["BYGG_H"])
+            for _, row in nearby_buildings.iterrows()
+        ]
+
         results[venue_id] = {
-            "name": venue["name"],
-            "lat": venue["lat"],
-            "lng": venue["lng"],
-            "type": venue["type"],
+            "name": venue.get("name", "Okänd"),
+            "lat": venue_lat,
+            "lng": venue_lng,
+            "type": venue.get("amenity", "restaurant"),
+            "address": f"{venue.get('addr_street', '')} {venue.get('addr_housenumber', '')}".strip(),
             "schedule": {},
         }
 
-        # Hitta närliggande byggnader (för prestanda)
-        nearby = [
-            b
-            for b in buildings
-            if abs(Polygon(b["polygon"]).centroid.y - venue["lat"]) < SEARCH_RADIUS_DEG
-            and abs(Polygon(b["polygon"]).centroid.x - venue["lng"])
-            < SEARCH_RADIUS_DEG
-        ]
-
-        for year, month, day in DATES:
-            date_key = f"{month:02d}-{day:02d}"
+        for date_key, hours_data in sun_positions.items():
             results[venue_id]["schedule"][date_key] = {}
 
-            for hour in HOURS:
-                dt = datetime(year, month, day, hour, 0, 0, tzinfo=timezone.utc) - TZ_OFFSET
+            for hour, (sun_alt, sun_az) in hours_data.items():
+                if sun_alt <= 0:
+                    results[venue_id]["schedule"][date_key][str(hour)] = "night"
+                    continue
 
-                altitude = get_altitude(venue["lat"], venue["lng"], dt)
-                azimuth = get_azimuth(venue["lat"], venue["lng"], dt)
+                if sun_alt < 3:
+                    results[venue_id]["schedule"][date_key][str(hour)] = "shade"
+                    continue
 
-                status = is_in_shadow(
-                    venue["lat"], venue["lng"], nearby, altitude, azimuth
-                )
-                results[venue_id]["schedule"][date_key][hour] = status
+                # Kolla skugga från närliggande byggnader
+                in_shadow = False
+                for bgeom, bheight in nearby_list:
+                    shadow_poly = project_building_shadow(
+                        bgeom, bheight, 0, sun_az, sun_alt,
+                    )
+                    if shadow_poly and shadow_poly.contains(venue_point):
+                        in_shadow = True
+                        break
 
-        if (i + 1) % 10 == 0:
-            print(f"  {i + 1}/{len(venues)} klara...")
+                results[venue_id]["schedule"][date_key][str(hour)] = "shade" if in_shadow else "sun"
 
-    with open("data/shadow_results.json", "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2)
+        # Progress
+        if (vi + 1) % 50 == 0 or vi + 1 == total_venues:
+            elapsed = time.time() - start_time
+            rate = (vi + 1) / elapsed
+            remaining = (total_venues - vi - 1) / rate if rate > 0 else 0
+            print(f"  {vi + 1}/{total_venues} platser ({elapsed:.0f}s, ~{remaining:.0f}s kvar)")
 
-    print("Klart! Resultat sparade i data/shadow_results.json")
+    # Spara
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+
+    elapsed = time.time() - start_time
+    print(f"\nKlart! {len(results)} platser beräknade på {elapsed:.1f}s")
+    print(f"Sparat till {OUTPUT_FILE}")
+
+    # Statistik
+    sun_counts = defaultdict(int)
+    total_points = 0
+    for venue_data in results.values():
+        for date_data in venue_data["schedule"].values():
+            for status in date_data.values():
+                sun_counts[status] += 1
+                total_points += 1
+
+    print(f"\nStatistik ({total_points:,} datapunkter):")
+    for status, count in sorted(sun_counts.items()):
+        pct = count / total_points * 100
+        print(f"  {status}: {count:,} ({pct:.1f}%)")
 
 
 if __name__ == "__main__":
-    compute_all()
+    compute_shadows()
