@@ -138,6 +138,14 @@ export default function SunMap({ hour, date, filter, weather }: SunMapProps) {
 
       // Hourly timeline — dual rows: shadow + weather
       const hours = Array.from({ length: 16 }, (_, i) => i + 7);
+
+      const hourLabels = hours
+        .map((h) => {
+          const bold = h === hour ? "font-weight:700;color:#0f172a" : "";
+          return `<div style="width:14px;text-align:center;font-size:8px;color:#94a3b8;flex-shrink:0;${bold}">${h}</div>`;
+        })
+        .join("");
+
       const shadowTimeline = hours
         .map((h) => {
           const s = normalize(getStatus(venue, dateKey, h));
@@ -192,13 +200,11 @@ export default function SunMap({ hour, date, filter, weather }: SunMapProps) {
           <div style="background:#f8fafc;border-radius:8px;padding:8px;margin-top:4px">
             <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">SOL / SKUGGA</div>
             <div style="display:flex;gap:2px;flex-wrap:nowrap;overflow-x:auto">${shadowTimeline}</div>
+            <div style="display:flex;gap:2px;flex-wrap:nowrap;margin-top:1px">${hourLabels}</div>
             ${weatherTimeline ? `
               <div style="font-size:10px;color:#94a3b8;margin-bottom:2px;margin-top:6px">VÄDER</div>
               <div style="display:flex;gap:2px;flex-wrap:nowrap;overflow-x:auto">${weatherTimeline}</div>
             ` : ""}
-            <div style="display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;margin-top:2px">
-              <span>07</span><span>14</span><span>22</span>
-            </div>
           </div>
           ${weatherLine}
           <div style="font-size:12px;color:#64748b;margin-top:6px">${sunHours} soltimmar (vid klart väder)</div>
