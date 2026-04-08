@@ -53,33 +53,8 @@ export default function TimeSlider({
   return (
     <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg">
       <div className="max-w-4xl mx-auto px-4 py-3">
-        {/* Month selector */}
-        <div className="flex items-center gap-1 mb-3 overflow-x-auto pb-1">
-          {MONTHS.map((name, i) => {
-            const monthIndex = i + 2; // March = 2
-            const isSelected = selectedMonth === monthIndex;
-            return (
-              <button
-                key={name}
-                onClick={() => {
-                  const newDate = new Date(date);
-                  newDate.setMonth(monthIndex);
-                  onDateChange(newDate);
-                }}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
-                  isSelected
-                    ? "bg-amber-500 text-white shadow-sm"
-                    : "text-slate-500 hover:bg-slate-100"
-                }`}
-              >
-                {name}
-              </button>
-            );
-          })}
-        </div>
-
         {/* Time slider */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-3">
           <button
             onClick={handlePlay}
             className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center hover:bg-amber-600 transition-colors shadow-sm"
@@ -129,6 +104,31 @@ export default function TimeSlider({
             </span>
             <span className="text-lg text-slate-400">:00</span>
           </div>
+        </div>
+
+        {/* Month selector */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+          {MONTHS.map((name, i) => {
+            const monthIndex = i + 2; // March = 2
+            const isSelected = selectedMonth === monthIndex;
+            return (
+              <button
+                key={name}
+                onClick={() => {
+                  const newDate = new Date(date);
+                  newDate.setMonth(monthIndex);
+                  onDateChange(newDate);
+                }}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+                  isSelected
+                    ? "bg-amber-500 text-white shadow-sm"
+                    : "text-slate-500 hover:bg-slate-100"
+                }`}
+              >
+                {name}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

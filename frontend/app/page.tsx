@@ -4,7 +4,9 @@ import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import TimeSlider from "./components/TimeSlider";
 import Header from "./components/Header";
+import FeedbackModal from "./components/FeedbackModal";
 import { fetchWeather, type WeatherData } from "./lib/weather";
+import type { FeedbackVenue } from "./components/SunMap";
 
 // Try computed data first, fall back to mock
 let venueData: typeof import("./data/venues-computed") | null = null;
@@ -36,6 +38,7 @@ export default function Home() {
   const [filter, setFilter] = useState<"all" | "sun" | "shade">("all");
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
+  const [feedbackVenue, setFeedbackVenue] = useState<FeedbackVenue | null>(null);
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
 
@@ -69,7 +72,7 @@ export default function Home() {
         hour={hour}
       />
 
-      <SunMap hour={hour} date={date} filter={filter} weather={weather} />
+      <SunMap hour={hour} date={date} filter={filter} weather={weather} onFeedback={setFeedbackVenue} />
 
       <TimeSlider
         hour={hour}
@@ -77,6 +80,13 @@ export default function Home() {
         date={date}
         onDateChange={setDate}
       />
+
+      {feedbackVenue && (
+        <FeedbackModal
+          venue={feedbackVenue}
+          onClose={() => setFeedbackVenue(null)}
+        />
+      )}
     </div>
   );
 }

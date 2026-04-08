@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useCallback } from "react";
 import L from "leaflet";
 
 // Load computed data if available, otherwise mock
@@ -13,11 +13,19 @@ try {
 
 import { type WeatherData, getSymbolInfo, getCombinedStatus } from "../lib/weather";
 
+export interface FeedbackVenue {
+  id: string;
+  name: string;
+  type: string;
+  currentSchedule: Record<number, "sun" | "shade" | "night">;
+}
+
 interface SunMapProps {
   hour: number;
   date: Date;
   filter: "all" | "sun" | "shade";
   weather: WeatherData | null;
+  onFeedback?: (venue: FeedbackVenue) => void;
 }
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
@@ -50,7 +58,7 @@ const getStatus = venueModule.getVenueStatus ?? venueModule.getVenueStatus;
 const getSunHrs = venueModule.getSunHours;
 const allVenues = venueModule.venues ?? venueModule.mockVenues;
 
-export default function SunMap({ hour, date, filter, weather }: SunMapProps) {
+export default function SunMap({ hour, date, filter, weather, onFeedback }: SunMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -207,13 +215,38 @@ export default function SunMap({ hour, date, filter, weather }: SunMapProps) {
             ` : ""}
           </div>
           ${weatherLine}
-          <div style="font-size:12px;color:#64748b;margin-top:6px">${sunHours} soltimmar (vid klart väder)</div>
+          <div style="font-size:12px;color:#64748b;margin-top:6px">${sunHours} soltimmar (vid klart v&auml;der)</div>
+          <button
+            class="feedback-btn"
+            data-venue-id="${venue.id}"
+            style="margin-top:8px;padding:4px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#94a3b8;font-size:11px;cursor:pointer;width:100%;text-align:center"
+          >St&auml;mmer inte?</button>
         </div>
       `);
 
       const marker = L.marker([venue.lat, venue.lng], { icon })
         .addTo(map)
         .bindPopup(popup);
+
+      marker.on("popupopen", () => {
+        const btn = document.querySelector(`.feedback-btn[data-venue-id="${venue.id}"]`);
+        if (btn && onFeedback) {
+          (btn as HTMLElement).onclick = () => {
+            const currentSchedule: Record<number, "sun" | "shade" | "night"> = {};
+            for (const h of hours) {
+              currentSchedule[h] = normalize(getStatus(venue, dateKey, h)) as "sun" | "shade" | "night";
+            }
+            onFeedback({
+              id: venue.id,
+              name: venue.name,
+              type: venue.type,
+              currentSchedule,
+            });
+            map.closePopup();
+          };
+        }
+      });
+
       markersRef.current.push(marker);
     });
   }, [hour, dateKey, filter, weather]);
