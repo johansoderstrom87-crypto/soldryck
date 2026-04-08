@@ -36,20 +36,23 @@ function FilterButton({ filter, onFilterChange }: { filter: "all" | "sun" | "sha
   const current = FILTER_OPTIONS.find((o) => o.value === filter)!;
 
   return (
-    <div ref={ref} className="pointer-events-auto relative">
+    <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className={`rounded-xl shadow-lg backdrop-blur-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 transition-all bg-white/95 ${current.activeClass}`}
+        className="rounded-xl shadow-lg backdrop-blur-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all bg-white/95 text-slate-600 hover:bg-white"
       >
-        <span className="text-[10px]">{current.icon}</span>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <line x1="1" y1="4" x2="15" y2="4" /><line x1="1" y1="8" x2="11" y2="8" /><line x1="1" y1="12" x2="13" y2="12" />
+          <circle cx="13" cy="4" r="1.5" fill="currentColor" /><circle cx="5" cy="8" r="1.5" fill="currentColor" /><circle cx="9" cy="12" r="1.5" fill="currentColor" />
+        </svg>
         {current.label}
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" className={`transition-transform ${open ? "rotate-180" : ""}`}>
+        <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${open ? "rotate-180" : ""}`}>
           <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
         </svg>
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 mt-1 bg-white/95 backdrop-blur-md rounded-xl shadow-lg p-1 flex flex-col gap-0.5 min-w-[90px]">
+        <div className="absolute top-full left-0 mt-1 bg-white/95 backdrop-blur-md rounded-xl shadow-lg p-1 flex flex-col gap-0.5 min-w-[100px] z-10">
           {FILTER_OPTIONS.map((o) => (
             <button
               key={o.value}
@@ -85,8 +88,8 @@ export default function Header({
 
   return (
     <div className="absolute top-0 left-0 right-0 z-[1000] pointer-events-none">
-      <div className="flex items-start justify-between p-3 gap-2">
-        {/* Left: Combined weather + branding card */}
+      <div className="p-3">
+        {/* Weather + branding + filter */}
         <div className="flex flex-col gap-1.5 pointer-events-auto max-w-[260px]">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-lg px-3.5 py-2.5">
             {/* Top row: weather left, branding right */}
@@ -149,6 +152,9 @@ export default function Header({
             )}
           </div>
 
+          {/* Filter button */}
+          <FilterButton filter={filter} onFilterChange={onFilterChange} />
+
           {/* Weather warning — compact */}
           {currentWeather && !actualSun && symbolInfo && (
             <div
@@ -171,9 +177,6 @@ export default function Header({
             </div>
           )}
         </div>
-
-        {/* Right: Filter dropdown */}
-        <FilterButton filter={filter} onFilterChange={onFilterChange} />
       </div>
     </div>
   );
