@@ -11,10 +11,13 @@ try {
   venueModule = require("../data/mock-venues");
 }
 
+import { type WeatherData, getSymbolInfo, getCombinedStatus } from "../lib/weather";
+
 interface SunMapProps {
   hour: number;
   date: Date;
   filter: "all" | "sun" | "shade";
+  weather: WeatherData | null;
 }
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
@@ -47,7 +50,7 @@ const getStatus = venueModule.getVenueStatus ?? venueModule.getVenueStatus;
 const getSunHrs = venueModule.getSunHours;
 const allVenues = venueModule.venues ?? venueModule.mockVenues;
 
-export default function SunMap({ hour, date, filter }: SunMapProps) {
+export default function SunMap({ hour, date, filter, weather }: SunMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,6 +93,9 @@ export default function SunMap({ hour, date, filter }: SunMapProps) {
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
+    const currentWeather = weather?.hourly[hour];
+    const weatherSymbol = currentWeather?.symbolCode;
+
     allVenues.forEach((venue: any) => {
       const rawStatus = getStatus(venue, dateKey, hour);
       const status = normalize(rawStatus);
@@ -99,18 +105,40 @@ export default function SunMap({ hour, date, filter }: SunMapProps) {
       if (filter === "sun" && status !== "sun") return;
       if (filter === "shade" && status !== "shade" && status !== "night") return;
 
-      const size = status === "sun" ? 18 : status === "partial" ? 15 : 12;
+      // Determine marker style based on combined shadow + weather
+      const combined = getCombinedStatus(rawStatus, weatherSymbol);
+      const isRain = weatherSymbol && getSymbolInfo(weatherSymbol).category === "rain";
+      const isActuallySunny = status === "sun" && weatherSymbol !== undefined && weatherSymbol <= 2;
+
+      let markerClass: string;
+      let size: number;
+      if (isRain) {
+        markerClass = "marker-rain";
+        size = 12;
+      } else if (isActuallySunny) {
+        markerClass = "marker-sun";
+        size = 18;
+      } else if (status === "sun" && weatherSymbol && weatherSymbol <= 4) {
+        markerClass = "marker-partial";
+        size = 15;
+      } else if (status === "sun") {
+        markerClass = "marker-sun";
+        size = 18;
+      } else {
+        markerClass = "marker-shade";
+        size = 12;
+      }
 
       const icon = L.divIcon({
-        className: `marker-${status === "night" ? "shade" : status}`,
+        className: markerClass,
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
         popupAnchor: [0, -size / 2 - 4],
       });
 
-      // Hourly timeline
+      // Hourly timeline — dual rows: shadow + weather
       const hours = Array.from({ length: 16 }, (_, i) => i + 7);
-      const timeline = hours
+      const shadowTimeline = hours
         .map((h) => {
           const s = normalize(getStatus(venue, dateKey, h));
           const bg =
@@ -123,17 +151,36 @@ export default function SunMap({ hour, date, filter }: SunMapProps) {
         })
         .join("");
 
-      const statusColor =
-        status === "sun" ? "#d97706"
-        : status === "partial" ? "#ea580c"
-        : "#475569";
+      const weatherTimeline = weather
+        ? hours.map((h) => {
+            const hw = weather.hourly[h];
+            if (!hw) return `<div style="width:14px;height:14px;border-radius:3px;background:#f1f5f9;flex-shrink:0"></div>`;
+            const si = getSymbolInfo(hw.symbolCode);
+            const bg =
+              si.category === "clear" ? "background:#fbbf24"
+              : si.category === "clouds" ? "background:#cbd5e1"
+              : si.category === "rain" ? "background:#60a5fa"
+              : si.category === "thunder" ? "background:#a78bfa"
+              : "background:#c4b5fd";
+            const border = h === hour ? "border:2px solid #0f172a" : "";
+            return `<div style="width:14px;height:14px;border-radius:3px;${bg};${border};flex-shrink:0" title="${h}:00 — ${si.label} ${Math.round(hw.temperature)}°C"></div>`;
+          }).join("")
+        : "";
+
+      // Weather line for current hour
+      const weatherLine = currentWeather
+        ? `<div style="font-size:11px;color:#64748b;margin-top:6px;display:flex;align-items:center;gap:4px">
+            <span>${getSymbolInfo(currentWeather.symbolCode).icon}</span>
+            <span>${Math.round(currentWeather.temperature)}°C — ${combined.label}</span>
+          </div>`
+        : "";
 
       const address = venue.address || venue.addr_street
         ? `<div style="color:#94a3b8;font-size:11px;margin-top:1px">${venue.address || ""}</div>`
         : "";
 
       const popup = L.popup({ maxWidth: 300 }).setContent(`
-        <div style="min-width:250px">
+        <div style="min-width:260px">
           <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
             <div>
               <strong style="font-size:15px">${venue.name}</strong>
@@ -143,13 +190,18 @@ export default function SunMap({ hour, date, filter }: SunMapProps) {
             <span style="font-size:24px">${statusToEmoji(status)}</span>
           </div>
           <div style="background:#f8fafc;border-radius:8px;padding:8px;margin-top:4px">
-            <div style="font-size:11px;color:#64748b;margin-bottom:4px">Kl ${hour}:00 — <strong style="color:${statusColor}">${statusToLabel(status)}</strong></div>
-            <div style="display:flex;gap:2px;flex-wrap:nowrap;overflow-x:auto">${timeline}</div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">SOL / SKUGGA</div>
+            <div style="display:flex;gap:2px;flex-wrap:nowrap;overflow-x:auto">${shadowTimeline}</div>
+            ${weatherTimeline ? `
+              <div style="font-size:10px;color:#94a3b8;margin-bottom:2px;margin-top:6px">VÄDER</div>
+              <div style="display:flex;gap:2px;flex-wrap:nowrap;overflow-x:auto">${weatherTimeline}</div>
+            ` : ""}
             <div style="display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;margin-top:2px">
               <span>07</span><span>14</span><span>22</span>
             </div>
           </div>
-          <div style="font-size:12px;color:#64748b;margin-top:8px">${sunHours} soltimmar denna dag</div>
+          ${weatherLine}
+          <div style="font-size:12px;color:#64748b;margin-top:6px">${sunHours} soltimmar (vid klart väder)</div>
         </div>
       `);
 
@@ -158,7 +210,7 @@ export default function SunMap({ hour, date, filter }: SunMapProps) {
         .bindPopup(popup);
       markersRef.current.push(marker);
     });
-  }, [hour, dateKey, filter]);
+  }, [hour, dateKey, filter, weather]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }

@@ -58,3 +58,10 @@ body {
   border-radius: 50%;
   box-shadow: 0 0 8px rgba(251, 146, 60, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
+
+.marker-rain {
+  background: #60a5fa;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
