@@ -180,11 +180,23 @@ def compute_shadows():
         candidate_idxs = list(buildings_sindex.intersection(search_box.bounds))
         nearby_buildings = buildings_gdf.iloc[candidate_idxs]
 
-        # Förbered byggnadsdata som lista (snabbare iteration)
-        nearby_list = [
-            (row.geometry, row["BYGG_H"])
-            for _, row in nearby_buildings.iterrows()
-        ]
+        # Förbered byggnadsdata — exkludera byggnader som venue-punkten
+        # ligger väldigt nära (< 2m), dvs den egna byggnaden
+        nearby_list = []
+        for _, row in nearby_buildings.iterrows():
+            dist_m = row.geometry.distance(venue_point) * M_PER_DEG_LAT
+            if dist_m < 0.5:
+                # Skippa byggnaden som restaurangen sitter i/vid
+                # (den skuggar inte sin egen uteservering)
+                continue
+            nearby_list.append((row.geometry, row["BYGG_H"], row.get("MARK_Z", 0)))
+
+        # Venue markhöjd (ta från närmaste byggnad)
+        venue_ground_z = 0
+        for _, row in nearby_buildings.iterrows():
+            if row.geometry.distance(venue_point) * M_PER_DEG_LAT < 5:
+                venue_ground_z = row.get("MARK_Z", 0)
+                break
 
         results[venue_id] = {
             "name": venue.get("name", "Okänd"),
@@ -209,9 +221,11 @@ def compute_shadows():
 
                 # Kolla skugga från närliggande byggnader
                 in_shadow = False
-                for bgeom, bheight in nearby_list:
+                for bgeom, bheight, bground in nearby_list:
+                    # Effektiv höjd = byggnadshöjd + (byggnadens markhöjd - venuens markhöjd)
+                    effective_height = bheight + max(0, bground - venue_ground_z)
                     shadow_poly = project_building_shadow(
-                        bgeom, bheight, 0, sun_az, sun_alt,
+                        bgeom, effective_height, 0, sun_az, sun_alt,
                     )
                     if shadow_poly and shadow_poly.contains(venue_point):
                         in_shadow = True
