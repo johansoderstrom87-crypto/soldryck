@@ -198,6 +198,9 @@ def compute_shadows():
                 venue_ground_z = row.get("MARK_Z", 0)
                 break
 
+        # Venue elevation (rooftop terraces etc.)
+        venue_elevation = venue.get("venue_elevation_m", 0) or 0
+
         results[venue_id] = {
             "name": venue.get("name", "Okänd"),
             "lat": venue_lat,
@@ -222,8 +225,11 @@ def compute_shadows():
                 # Kolla skugga från närliggande byggnader
                 in_shadow = False
                 for bgeom, bheight, bground in nearby_list:
-                    # Effektiv höjd = byggnadshöjd + (byggnadens markhöjd - venuens markhöjd)
-                    effective_height = bheight + max(0, bground - venue_ground_z)
+                    # Effektiv höjd = byggnadshöjd + (byggnadens markhöjd - venuens markhöjd) - venue elevation
+                    # A rooftop at 40m is not shadowed by a 30m building
+                    effective_height = bheight + max(0, bground - venue_ground_z) - venue_elevation
+                    if effective_height <= 0:
+                        continue  # Building is shorter than venue elevation
                     shadow_poly = project_building_shadow(
                         bgeom, effective_height, 0, sun_az, sun_alt,
                     )
