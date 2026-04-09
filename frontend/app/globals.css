@@ -70,10 +70,6 @@ body {
 .marker-badge {
   display: none;
   position: absolute;
-  left: 50%;
-  bottom: 100%;
-  transform: translateX(-50%);
-  margin-bottom: 6px;
   white-space: nowrap;
   background: rgba(255, 255, 255, 0.65);
   backdrop-filter: blur(12px) saturate(1.2);
@@ -90,6 +86,20 @@ body {
 
 .show-badges .marker-badge {
   display: flex;
+}
+
+/* Position variants */
+.marker-badge.badge-above {
+  left: 50%; bottom: 100%; transform: translateX(-50%); margin-bottom: 6px;
+}
+.marker-badge.badge-below {
+  left: 50%; top: 100%; transform: translateX(-50%); margin-top: 6px;
+}
+.marker-badge.badge-right {
+  left: 100%; top: 50%; transform: translateY(-50%); margin-left: 6px;
+}
+.marker-badge.badge-left {
+  right: 100%; top: 50%; transform: translateY(-50%); margin-right: 6px;
 }
 
 .marker-badge-icon {
@@ -122,16 +132,30 @@ body {
   color: #6b5630;
 }
 
-/* Arrow pointing down to the marker dot */
+/* Arrow — repositioned per badge placement */
 .marker-badge-arrow {
   position: absolute;
-  left: 50%;
-  top: 100%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 5px solid rgba(255, 255, 255, 0.65);
+  width: 0; height: 0;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.05));
+}
+
+.badge-above .marker-badge-arrow {
+  left: 50%; top: 100%; transform: translateX(-50%);
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 5px solid rgba(255, 255, 255, 0.65);
+}
+.badge-below .marker-badge-arrow {
+  left: 50%; bottom: 100%; transform: translateX(-50%);
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-bottom: 5px solid rgba(255, 255, 255, 0.65);
+}
+.badge-right .marker-badge-arrow {
+  top: 50%; right: 100%; transform: translateY(-50%);
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  border-right: 5px solid rgba(255, 255, 255, 0.65);
+}
+.badge-left .marker-badge-arrow {
+  top: 50%; left: 100%; transform: translateY(-50%);
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  border-left: 5px solid rgba(255, 255, 255, 0.65);
 }
