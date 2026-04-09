@@ -66,26 +66,72 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* Category badges — visible only when zoomed in (zoom >= 17) */
+/* Category badges — glassmorphism labels, visible at zoom >= 17 */
 .marker-badge {
   display: none;
   position: absolute;
   left: 50%;
-  top: 100%;
+  bottom: 100%;
   transform: translateX(-50%);
-  margin-top: 2px;
-  font-size: 11px;
-  line-height: 1;
+  margin-bottom: 6px;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 6px;
-  padding: 2px 5px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 0.5px solid rgba(0, 0, 0, 0.1);
+  border-radius: 999px;
+  padding: 4px 10px 4px 5px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
   pointer-events: none;
-  color: #334155;
-  font-weight: 500;
+  font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
+  align-items: center;
+  gap: 6px;
 }
 
 .show-badges .marker-badge {
-  display: block;
+  display: flex;
+}
+
+.marker-badge-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.marker-badge-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+  line-height: 1.2;
+}
+
+.marker-badge-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #222;
+}
+
+.marker-badge-sun {
+  font-size: 9px;
+  font-weight: 400;
+  color: #8b7355;
+}
+
+/* Arrow pointing down to the marker dot */
+.marker-badge-arrow {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid rgba(255, 255, 255, 0.8);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.05));
 }

@@ -58,8 +58,30 @@ function typeToLabel(type: string): string {
   return { restaurant: "Restaurang", cafe: "Café", bar: "Bar", pub: "Pub" }[type] ?? type;
 }
 
-function typeToEmoji(type: string): string {
-  return { restaurant: "🍽️", cafe: "☕", bar: "🍺", pub: "🍺" }[type] ?? "";
+function typeToSvgIcon(type: string): string {
+  const icons: Record<string, string> = {
+    restaurant: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>`,
+    cafe: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>`,
+    bar: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
+    pub: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
+  };
+  return icons[type] ?? "";
+}
+
+function getSunPeriod(venue: any, dateKey: string): string {
+  const hours = Array.from({ length: 16 }, (_, i) => i + 7);
+  let first = -1;
+  let last = -1;
+  for (const h of hours) {
+    const s = normalize(getStatus(venue, dateKey, h));
+    if (s === "sun") {
+      if (first === -1) first = h;
+      last = h;
+    }
+  }
+  if (first === -1) return "Ingen sol";
+  if (first === last) return `Sol kl ${first}`;
+  return `Sol ${first}–${last}`;
 }
 
 const getDateKey = venueModule.getClosestDateKey;
@@ -159,11 +181,21 @@ export default function SunMap({ hour, date, filter, typeFilter, weather, onFeed
         size = 12;
       }
 
-      const emoji = typeToEmoji(venue.type);
-      const shortName = venue.name.length > 18 ? venue.name.slice(0, 16) + "…" : venue.name;
+      const svgIcon = typeToSvgIcon(venue.type);
+      const shortName = venue.name.length > 20 ? venue.name.slice(0, 18) + "…" : venue.name;
+      const sunPeriod = getSunPeriod(venue, dateKey);
+      const badgeHtml = svgIcon ? `
+        <div class="marker-badge">
+          <div class="marker-badge-icon">${svgIcon}</div>
+          <div class="marker-badge-text">
+            <div class="marker-badge-name">${shortName}</div>
+            <div class="marker-badge-sun">${sunPeriod}</div>
+          </div>
+          <div class="marker-badge-arrow"></div>
+        </div>` : "";
       const icon = L.divIcon({
         className: markerClass,
-        html: emoji ? `<span class="marker-badge">${emoji} ${shortName}</span>` : "",
+        html: badgeHtml,
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
         popupAnchor: [0, -size / 2 - 4],
