@@ -11,6 +11,8 @@ interface HeaderProps {
   weather: WeatherData | null;
   weatherLoading: boolean;
   hour: number;
+  showShadows: boolean;
+  onToggleShadows: () => void;
 }
 
 const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: string; activeClass: string }[] = [
@@ -79,6 +81,8 @@ export default function Header({
   weather,
   weatherLoading,
   hour,
+  showShadows,
+  onToggleShadows,
 }: HeaderProps) {
   const currentWeather = weather?.hourly[hour];
   const actualSun = currentWeather ? hasSunshine(currentWeather.symbolCode) : true;
@@ -152,8 +156,25 @@ export default function Header({
             )}
           </div>
 
-          {/* Filter button */}
-          <FilterButton filter={filter} onFilterChange={onFilterChange} />
+          {/* Filter + shadow toggle */}
+          <div className="flex items-center gap-1.5">
+            <FilterButton filter={filter} onFilterChange={onFilterChange} />
+            <button
+              onClick={onToggleShadows}
+              className={`rounded-xl shadow-lg backdrop-blur-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all ${
+                showShadows
+                  ? "bg-slate-900 text-white"
+                  : "bg-white/95 text-slate-600 hover:bg-white"
+              }`}
+              title={showShadows ? "Dölj skuggor" : "Visa skuggor"}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="8" cy="8" r="4" />
+                <path d="M8 4v0a4 4 0 0 1 0 8v0" fill="currentColor" stroke="none" />
+              </svg>
+              Skuggor
+            </button>
+          </div>
 
           {/* Weather warning — compact */}
           {currentWeather && !actualSun && symbolInfo && (

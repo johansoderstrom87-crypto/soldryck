@@ -6,4 +6,7 @@ pipeline/data/raw/
 pipeline/data/buildings.gpkg
 pipeline/data/shadow_results.json
 pipeline/data/venues.geojson
+pipeline/data/shadows/
+frontend/public/shadows/
+shadow-data/
 .claude/

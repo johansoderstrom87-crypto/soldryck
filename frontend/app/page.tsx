@@ -39,6 +39,7 @@ export default function Home() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [feedbackVenue, setFeedbackVenue] = useState<FeedbackVenue | null>(null);
+  const [showShadows, setShowShadows] = useState(false);
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
 
@@ -70,9 +71,11 @@ export default function Home() {
         weather={weather}
         weatherLoading={weatherLoading}
         hour={hour}
+        showShadows={showShadows}
+        onToggleShadows={() => setShowShadows((s) => !s)}
       />
 
-      <SunMap hour={hour} date={date} filter={filter} weather={weather} onFeedback={setFeedbackVenue} />
+      <SunMap hour={hour} date={date} filter={filter} weather={weather} onFeedback={setFeedbackVenue} showShadows={showShadows} />
 
       <TimeSlider
         hour={hour}

@@ -26,6 +26,7 @@ interface SunMapProps {
   filter: "all" | "sun" | "shade";
   weather: WeatherData | null;
   onFeedback?: (venue: FeedbackVenue) => void;
+  showShadows?: boolean;
 }
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
@@ -53,14 +54,22 @@ function typeToLabel(type: string): string {
   return { restaurant: "Restaurang", cafe: "Café", bar: "Bar", pub: "Pub" }[type] ?? type;
 }
 
+function typeToEmoji(type: string): string {
+  return { restaurant: "🍽️", cafe: "☕", bar: "🍺", pub: "🍺" }[type] ?? "";
+}
+
 const getDateKey = venueModule.getClosestDateKey;
 const getStatus = venueModule.getVenueStatus ?? venueModule.getVenueStatus;
 const getSunHrs = venueModule.getSunHours;
 const allVenues = venueModule.venues ?? venueModule.mockVenues;
 
-export default function SunMap({ hour, date, filter, weather, onFeedback }: SunMapProps) {
+// Cache for loaded shadow GeoJSON
+const shadowCache = new Map<string, any>();
+
+export default function SunMap({ hour, date, filter, weather, onFeedback, showShadows }: SunMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
+  const shadowLayerRef = useRef<L.GeoJSON | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
@@ -85,6 +94,12 @@ export default function SunMap({ hour, date, filter, weather, onFeedback }: SunM
     ).addTo(map);
 
     L.control.zoom({ position: "topright" }).addTo(map);
+
+    map.on("zoomend", () => {
+      const container = map.getContainer();
+      container.classList.toggle("show-badges", map.getZoom() >= 15);
+    });
+
     mapRef.current = map;
 
     return () => {
@@ -137,8 +152,10 @@ export default function SunMap({ hour, date, filter, weather, onFeedback }: SunM
         size = 12;
       }
 
+      const badge = typeToEmoji(venue.type);
       const icon = L.divIcon({
         className: markerClass,
+        html: badge ? `<span class="marker-badge">${badge}</span>` : "",
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
         popupAnchor: [0, -size / 2 - 4],
@@ -250,6 +267,49 @@ export default function SunMap({ hour, date, filter, weather, onFeedback }: SunM
       markersRef.current.push(marker);
     });
   }, [hour, dateKey, filter, weather]);
+
+  // Shadow overlay layer
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Remove previous shadow layer
+    if (shadowLayerRef.current) {
+      shadowLayerRef.current.remove();
+      shadowLayerRef.current = null;
+    }
+
+    if (!showShadows) return;
+
+    const key = `${dateKey}_${String(hour).padStart(2, "0")}`;
+    const url = `/api/shadows?key=${key}`;
+
+    const cached = shadowCache.get(key);
+    if (cached) {
+      shadowLayerRef.current = L.geoJSON(cached, {
+        style: { color: "transparent", fillColor: "#1e293b", fillOpacity: 0.18, stroke: false },
+        interactive: false,
+      }).addTo(map);
+      return;
+    }
+
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((data) => {
+        if (!data || !mapRef.current) return;
+        shadowCache.set(key, data);
+        // Only add if still the current timepoint
+        if (shadowLayerRef.current) shadowLayerRef.current.remove();
+        shadowLayerRef.current = L.geoJSON(data, {
+          style: { color: "transparent", fillColor: "#1e293b", fillOpacity: 0.18, stroke: false },
+          interactive: false,
+        }).addTo(mapRef.current);
+      })
+      .catch(() => {});
+  }, [hour, dateKey, showShadows]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }
