@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { type WeatherData, getSymbolInfo, hasSunshine } from "../lib/weather";
-import { VENUE_TYPES, type VenueType } from "./SunMap";
+import { VENUE_TYPES, type VenueType, type SunRange } from "./SunMap";
 
 const TYPE_OPTIONS: { value: VenueType; label: string; icon: string }[] = [
   { value: "restaurant", label: "Restaurang", icon: "🍽️" },
@@ -16,6 +16,8 @@ interface HeaderProps {
   onFilterChange: (filter: "all" | "sun" | "shade") => void;
   typeFilter: Set<VenueType>;
   onTypeFilterChange: (types: Set<VenueType>) => void;
+  sunRange: SunRange;
+  onSunRangeChange: (range: SunRange) => void;
   sunCount: number;
   totalCount: number;
   weather: WeatherData | null;
@@ -32,12 +34,14 @@ const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: str
 ];
 
 function FilterButton({
-  filter, onFilterChange, typeFilter, onTypeFilterChange,
+  filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
 }: {
   filter: "all" | "sun" | "shade";
   onFilterChange: (f: "all" | "sun" | "shade") => void;
   typeFilter: Set<VenueType>;
   onTypeFilterChange: (types: Set<VenueType>) => void;
+  sunRange: SunRange;
+  onSunRangeChange: (range: SunRange) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -53,7 +57,7 @@ function FilterButton({
   }, [open]);
 
   const current = FILTER_OPTIONS.find((o) => o.value === filter)!;
-  const activeTypeCount = typeFilter.size;
+  const activeFilterCount = typeFilter.size + (sunRange ? 1 : 0);
 
   function toggleType(type: VenueType) {
     const next = new Set(typeFilter);
@@ -76,9 +80,9 @@ function FilterButton({
           <circle cx="13" cy="4" r="1.5" fill="currentColor" /><circle cx="5" cy="8" r="1.5" fill="currentColor" /><circle cx="9" cy="12" r="1.5" fill="currentColor" />
         </svg>
         {current.label}
-        {activeTypeCount > 0 && (
+        {activeFilterCount > 0 && (
           <span className="bg-amber-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold">
-            {activeTypeCount}
+            {activeFilterCount}
           </span>
         )}
         <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${open ? "rotate-180" : ""}`}>
@@ -126,6 +130,60 @@ function FilterButton({
               </label>
             ))}
           </div>
+
+          {/* Divider */}
+          <div className="border-t border-slate-200 my-1" />
+
+          {/* Sun time range filter */}
+          <div className="px-1.5 py-0.5">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">Sol mellan</div>
+              {sunRange && (
+                <button
+                  onClick={() => onSunRangeChange(null)}
+                  className="text-[9px] text-amber-500 hover:text-amber-600 font-medium"
+                >
+                  Rensa
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <select
+                value={sunRange?.from ?? ""}
+                onChange={(e) => {
+                  const from = Number(e.target.value);
+                  if (!from && from !== 0) { onSunRangeChange(null); return; }
+                  onSunRangeChange({ from, to: sunRange?.to ?? Math.min(from + 4, 22) });
+                }}
+                className="flex-1 px-1.5 py-1 rounded-lg text-xs border border-slate-200 bg-white text-slate-600 cursor-pointer"
+              >
+                <option value="">Från</option>
+                {Array.from({ length: 15 }, (_, i) => i + 8).map((h) => (
+                  <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
+                ))}
+              </select>
+              <span className="text-slate-400 text-xs">–</span>
+              <select
+                value={sunRange?.to ?? ""}
+                onChange={(e) => {
+                  const to = Number(e.target.value);
+                  if (!to) { onSunRangeChange(null); return; }
+                  onSunRangeChange({ from: sunRange?.from ?? 8, to });
+                }}
+                className="flex-1 px-1.5 py-1 rounded-lg text-xs border border-slate-200 bg-white text-slate-600 cursor-pointer"
+              >
+                <option value="">Till</option>
+                {Array.from({ length: 15 }, (_, i) => i + 8).map((h) => (
+                  <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
+                ))}
+              </select>
+            </div>
+            {sunRange && (
+              <div className="text-[9px] text-amber-600 mt-1">
+                Visar ställen med sol {String(sunRange.from).padStart(2, "0")}–{String(sunRange.to).padStart(2, "0")}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -137,6 +195,8 @@ export default function Header({
   onFilterChange,
   typeFilter,
   onTypeFilterChange,
+  sunRange,
+  onSunRangeChange,
   sunCount,
   totalCount,
   weather,
@@ -219,7 +279,7 @@ export default function Header({
 
           {/* Filter + shadow toggle */}
           <div className="flex items-center gap-1.5">
-            <FilterButton filter={filter} onFilterChange={onFilterChange} typeFilter={typeFilter} onTypeFilterChange={onTypeFilterChange} />
+            <FilterButton filter={filter} onFilterChange={onFilterChange} typeFilter={typeFilter} onTypeFilterChange={onTypeFilterChange} sunRange={sunRange} onSunRangeChange={onSunRangeChange} />
             <button
               onClick={onToggleShadows}
               className={`rounded-xl shadow-lg backdrop-blur-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all ${

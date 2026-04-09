@@ -7,7 +7,7 @@ import Header from "./components/Header";
 import FeedbackModal from "./components/FeedbackModal";
 import { fetchWeather, type WeatherData } from "./lib/weather";
 import type { FeedbackVenue } from "./components/SunMap";
-import type { VenueType } from "./components/SunMap";
+import type { VenueType, SunRange } from "./components/SunMap";
 
 // Try computed data first, fall back to mock
 let venueData: typeof import("./data/venues-computed") | null = null;
@@ -42,8 +42,18 @@ export default function Home() {
   const [feedbackVenue, setFeedbackVenue] = useState<FeedbackVenue | null>(null);
   const [showShadows, setShowShadows] = useState(false);
   const [typeFilter, setTypeFilter] = useState<Set<VenueType>>(new Set());
+  const [sunRange, setSunRange] = useState<SunRange>(null);
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
+  const dateStr = useMemo(() => date.toISOString().slice(0, 10), [date]);
+
+  // Weather for the selected date
+  const weatherForDate = useMemo(() => {
+    if (!weather) return null;
+    const dayWeather = weather.daily?.[dateStr];
+    if (!dayWeather) return null;
+    return { ...weather, hourly: dayWeather } as typeof weather;
+  }, [weather, dateStr]);
 
   const sunCount = useMemo(
     () =>
@@ -70,16 +80,18 @@ export default function Home() {
         onFilterChange={setFilter}
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
+        sunRange={sunRange}
+        onSunRangeChange={setSunRange}
         sunCount={sunCount}
         totalCount={allVenues.length}
-        weather={weather}
+        weather={weatherForDate}
         weatherLoading={weatherLoading}
         hour={hour}
         showShadows={showShadows}
         onToggleShadows={() => setShowShadows((s) => !s)}
       />
 
-      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} weather={weather} onFeedback={setFeedbackVenue} showShadows={showShadows} />
+      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} />
 
       <TimeSlider
         hour={hour}

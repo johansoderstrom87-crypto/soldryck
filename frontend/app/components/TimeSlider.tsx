@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 
 interface TimeSliderProps {
   hour: number;
@@ -9,17 +9,8 @@ interface TimeSliderProps {
   onDateChange: (date: Date) => void;
 }
 
-const MONTHS = [
-  "Mar",
-  "Apr",
-  "Maj",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Okt",
-  "Nov",
-];
+const DAY_NAMES = ["Sön", "Mån", "Tis", "Ons", "Tor", "Fre", "Lör"];
+const MONTH_NAMES_SHORT = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
 
 export default function TimeSlider({
   hour,
@@ -48,7 +39,18 @@ export default function TimeSlider({
     return () => clearInterval(interval);
   }, [hour, isPlaying, onHourChange]);
 
-  const selectedMonth = date.getMonth(); // 0-indexed
+  // Generate 8 days: today + 7 days forward
+  const days = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Array.from({ length: 8 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+  }, []);
+
+  const selectedDateStr = date.toISOString().slice(0, 10);
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg">
@@ -106,26 +108,25 @@ export default function TimeSlider({
           </div>
         </div>
 
-        {/* Month selector */}
+        {/* Day selector */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1">
-          {MONTHS.map((name, i) => {
-            const monthIndex = i + 2; // March = 2
-            const isSelected = selectedMonth === monthIndex;
+          {days.map((d, i) => {
+            const dStr = d.toISOString().slice(0, 10);
+            const isSelected = selectedDateStr === dStr;
+            const dayName = i === 0 ? "Idag" : i === 1 ? "Imorgon" : DAY_NAMES[d.getDay()];
+            const dateLabel = `${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
             return (
               <button
-                key={name}
-                onClick={() => {
-                  const newDate = new Date(date);
-                  newDate.setMonth(monthIndex);
-                  onDateChange(newDate);
-                }}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+                key={dStr}
+                onClick={() => onDateChange(d)}
+                className={`px-2.5 py-1 rounded-xl text-xs font-medium transition-all whitespace-nowrap flex flex-col items-center min-w-[52px] ${
                   isSelected
                     ? "bg-amber-500 text-white shadow-sm"
                     : "text-slate-500 hover:bg-slate-100"
                 }`}
               >
-                {name}
+                <span className="font-semibold">{dayName}</span>
+                <span className={`text-[9px] ${isSelected ? "text-amber-100" : "text-slate-400"}`}>{dateLabel}</span>
               </button>
             );
           })}

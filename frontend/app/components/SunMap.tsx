@@ -23,11 +23,14 @@ export interface FeedbackVenue {
 export const VENUE_TYPES = ["restaurant", "cafe", "bar", "pub"] as const;
 export type VenueType = (typeof VENUE_TYPES)[number];
 
+export type SunRange = { from: number; to: number } | null;
+
 interface SunMapProps {
   hour: number;
   date: Date;
   filter: "all" | "sun" | "shade";
   typeFilter: Set<VenueType>;
+  sunRange: SunRange;
   weather: WeatherData | null;
   onFeedback?: (venue: FeedbackVenue) => void;
   showShadows?: boolean;
@@ -146,7 +149,7 @@ function resolveBadgeCollisions(map: L.Map, markers: L.Marker[]) {
 // Cache for loaded shadow GeoJSON
 const shadowCache = new Map<string, any>();
 
-export default function SunMap({ hour, date, filter, typeFilter, weather, onFeedback, showShadows }: SunMapProps) {
+export default function SunMap({ hour, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows }: SunMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
@@ -210,6 +213,16 @@ export default function SunMap({ hour, date, filter, typeFilter, weather, onFeed
       // Filter by sun/shade
       if (filter === "sun" && status !== "sun") return;
       if (filter === "shade" && status !== "shade" && status !== "night") return;
+
+      // Filter by sun range — venue must have sun for every hour in the range
+      if (sunRange) {
+        let hasSunAllHours = true;
+        for (let h = sunRange.from; h <= sunRange.to; h++) {
+          const s = normalize(getStatus(venue, dateKey, h));
+          if (s !== "sun") { hasSunAllHours = false; break; }
+        }
+        if (!hasSunAllHours) return;
+      }
 
       // Determine marker style based on combined shadow + weather
       const combined = getCombinedStatus(rawStatus, weatherSymbol);
@@ -369,7 +382,7 @@ export default function SunMap({ hour, date, filter, typeFilter, weather, onFeed
     map.off("zoomend moveend", handleCollisions);
     function handleCollisions() { if (mapRef.current) resolveBadgeCollisions(mapRef.current, markersRef.current); }
     map.on("zoomend moveend", handleCollisions);
-  }, [hour, dateKey, filter, typeFilter, weather]);
+  }, [hour, dateKey, filter, typeFilter, sunRange, weather]);
 
   // Shadow overlay layer
   useEffect(() => {

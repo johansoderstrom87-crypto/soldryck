@@ -15,7 +15,8 @@ export interface HourlyWeather {
 
 export interface WeatherData {
   fetchedAt: string;
-  hourly: Record<number, HourlyWeather>; // keyed by hour (0-23)
+  hourly: Record<number, HourlyWeather>; // keyed by hour (0-23) — today (legacy compat)
+  daily: Record<string, Record<number, HourlyWeather>>; // keyed by "YYYY-MM-DD" then hour
   today: HourlyWeather[];
 }
 
@@ -129,6 +130,7 @@ export async function fetchWeather(): Promise<WeatherData | null> {
     const timeSeries = raw.timeSeries || [];
 
     const hourly: Record<number, HourlyWeather> = {};
+    const daily: Record<string, Record<number, HourlyWeather>> = {};
     const today: HourlyWeather[] = [];
     const nowDate = new Date().toISOString().slice(0, 10);
 
@@ -148,17 +150,28 @@ export async function fetchWeather(): Promise<WeatherData | null> {
         symbolCode: d.symbol_code ?? 1,
       };
 
-      // Store today's data keyed by hour
+      // Store by date + hour
       const entryDate = time.slice(0, 10);
-      if (entryDate === nowDate || Object.keys(hourly).length < 24) {
+      if (!daily[entryDate]) daily[entryDate] = {};
+      daily[entryDate][hour] = hw;
+
+      // Legacy: today's data keyed by hour
+      if (entryDate === nowDate) {
         hourly[hour] = hw;
         today.push(hw);
       }
     }
 
+    // Fallback: if hourly is empty, use first available day
+    if (Object.keys(hourly).length === 0) {
+      const firstDay = Object.keys(daily)[0];
+      if (firstDay) Object.assign(hourly, daily[firstDay]);
+    }
+
     const result: WeatherData = {
       fetchedAt: new Date().toISOString(),
       hourly,
+      daily,
       today,
     };
 
