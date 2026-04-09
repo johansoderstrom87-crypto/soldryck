@@ -7,6 +7,7 @@ import Header from "./components/Header";
 import FeedbackModal from "./components/FeedbackModal";
 import { fetchWeather, type WeatherData } from "./lib/weather";
 import type { FeedbackVenue } from "./components/SunMap";
+import type { VenueType } from "./components/SunMap";
 
 // Try computed data first, fall back to mock
 let venueData: typeof import("./data/venues-computed") | null = null;
@@ -40,6 +41,7 @@ export default function Home() {
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [feedbackVenue, setFeedbackVenue] = useState<FeedbackVenue | null>(null);
   const [showShadows, setShowShadows] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<Set<VenueType>>(new Set());
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
 
@@ -66,6 +68,8 @@ export default function Home() {
       <Header
         filter={filter}
         onFilterChange={setFilter}
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
         sunCount={sunCount}
         totalCount={allVenues.length}
         weather={weather}
@@ -75,7 +79,7 @@ export default function Home() {
         onToggleShadows={() => setShowShadows((s) => !s)}
       />
 
-      <SunMap hour={hour} date={date} filter={filter} weather={weather} onFeedback={setFeedbackVenue} showShadows={showShadows} />
+      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} weather={weather} onFeedback={setFeedbackVenue} showShadows={showShadows} />
 
       <TimeSlider
         hour={hour}

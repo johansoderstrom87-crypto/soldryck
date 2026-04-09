@@ -20,10 +20,14 @@ export interface FeedbackVenue {
   currentSchedule: Record<number, "sun" | "shade" | "night">;
 }
 
+export const VENUE_TYPES = ["restaurant", "cafe", "bar", "pub"] as const;
+export type VenueType = (typeof VENUE_TYPES)[number];
+
 interface SunMapProps {
   hour: number;
   date: Date;
   filter: "all" | "sun" | "shade";
+  typeFilter: Set<VenueType>;
   weather: WeatherData | null;
   onFeedback?: (venue: FeedbackVenue) => void;
   showShadows?: boolean;
@@ -66,7 +70,7 @@ const allVenues = venueModule.venues ?? venueModule.mockVenues;
 // Cache for loaded shadow GeoJSON
 const shadowCache = new Map<string, any>();
 
-export default function SunMap({ hour, date, filter, weather, onFeedback, showShadows }: SunMapProps) {
+export default function SunMap({ hour, date, filter, typeFilter, weather, onFeedback, showShadows }: SunMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
@@ -97,7 +101,7 @@ export default function SunMap({ hour, date, filter, weather, onFeedback, showSh
 
     map.on("zoomend", () => {
       const container = map.getContainer();
-      container.classList.toggle("show-badges", map.getZoom() >= 15);
+      container.classList.toggle("show-badges", map.getZoom() >= 17);
     });
 
     mapRef.current = map;
@@ -124,7 +128,10 @@ export default function SunMap({ hour, date, filter, weather, onFeedback, showSh
       const status = normalize(rawStatus);
       const sunHours = getSunHrs(venue, dateKey);
 
-      // Filter
+      // Filter by type
+      if (typeFilter.size > 0 && !typeFilter.has(venue.type)) return;
+
+      // Filter by sun/shade
       if (filter === "sun" && status !== "sun") return;
       if (filter === "shade" && status !== "shade" && status !== "night") return;
 
@@ -152,10 +159,11 @@ export default function SunMap({ hour, date, filter, weather, onFeedback, showSh
         size = 12;
       }
 
-      const badge = typeToEmoji(venue.type);
+      const emoji = typeToEmoji(venue.type);
+      const shortName = venue.name.length > 18 ? venue.name.slice(0, 16) + "…" : venue.name;
       const icon = L.divIcon({
         className: markerClass,
-        html: badge ? `<span class="marker-badge">${badge}</span>` : "",
+        html: emoji ? `<span class="marker-badge">${emoji} ${shortName}</span>` : "",
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
         popupAnchor: [0, -size / 2 - 4],
@@ -266,7 +274,7 @@ export default function SunMap({ hour, date, filter, weather, onFeedback, showSh
 
       markersRef.current.push(marker);
     });
-  }, [hour, dateKey, filter, weather]);
+  }, [hour, dateKey, filter, typeFilter, weather]);
 
   // Shadow overlay layer
   useEffect(() => {

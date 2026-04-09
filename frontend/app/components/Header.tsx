@@ -2,10 +2,20 @@
 
 import { useState, useRef, useEffect } from "react";
 import { type WeatherData, getSymbolInfo, hasSunshine } from "../lib/weather";
+import { VENUE_TYPES, type VenueType } from "./SunMap";
+
+const TYPE_OPTIONS: { value: VenueType; label: string; icon: string }[] = [
+  { value: "restaurant", label: "Restaurang", icon: "🍽️" },
+  { value: "cafe", label: "Café", icon: "☕" },
+  { value: "bar", label: "Bar", icon: "🍺" },
+  { value: "pub", label: "Pub", icon: "🍺" },
+];
 
 interface HeaderProps {
   filter: "all" | "sun" | "shade";
   onFilterChange: (filter: "all" | "sun" | "shade") => void;
+  typeFilter: Set<VenueType>;
+  onTypeFilterChange: (types: Set<VenueType>) => void;
   sunCount: number;
   totalCount: number;
   weather: WeatherData | null;
@@ -21,7 +31,14 @@ const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: str
   { value: "shade", label: "Skugga", icon: "☁️", activeClass: "bg-slate-500 text-white" },
 ];
 
-function FilterButton({ filter, onFilterChange }: { filter: "all" | "sun" | "shade"; onFilterChange: (f: "all" | "sun" | "shade") => void }) {
+function FilterButton({
+  filter, onFilterChange, typeFilter, onTypeFilterChange,
+}: {
+  filter: "all" | "sun" | "shade";
+  onFilterChange: (f: "all" | "sun" | "shade") => void;
+  typeFilter: Set<VenueType>;
+  onTypeFilterChange: (types: Set<VenueType>) => void;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -36,6 +53,17 @@ function FilterButton({ filter, onFilterChange }: { filter: "all" | "sun" | "sha
   }, [open]);
 
   const current = FILTER_OPTIONS.find((o) => o.value === filter)!;
+  const activeTypeCount = typeFilter.size;
+
+  function toggleType(type: VenueType) {
+    const next = new Set(typeFilter);
+    if (next.has(type)) {
+      next.delete(type);
+    } else {
+      next.add(type);
+    }
+    onTypeFilterChange(next);
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -48,25 +76,56 @@ function FilterButton({ filter, onFilterChange }: { filter: "all" | "sun" | "sha
           <circle cx="13" cy="4" r="1.5" fill="currentColor" /><circle cx="5" cy="8" r="1.5" fill="currentColor" /><circle cx="9" cy="12" r="1.5" fill="currentColor" />
         </svg>
         {current.label}
+        {activeTypeCount > 0 && (
+          <span className="bg-amber-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold">
+            {activeTypeCount}
+          </span>
+        )}
         <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${open ? "rotate-180" : ""}`}>
           <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
         </svg>
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 bg-white/95 backdrop-blur-md rounded-xl shadow-lg p-1 flex flex-col gap-0.5 min-w-[100px] z-10">
-          {FILTER_OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              onClick={() => { onFilterChange(o.value); setOpen(false); }}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center gap-1.5 transition-all ${
-                filter === o.value ? o.activeClass : "text-slate-500 hover:bg-slate-100"
-              }`}
-            >
-              <span className="text-[10px]">{o.icon}</span>
-              {o.label}
-            </button>
-          ))}
+        <div className="absolute top-full left-0 mt-1 bg-white/95 backdrop-blur-md rounded-xl shadow-lg p-1 min-w-[140px] z-10">
+          {/* Sun/shade filter */}
+          <div className="flex flex-col gap-0.5">
+            {FILTER_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                onClick={() => { onFilterChange(o.value); }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center gap-1.5 transition-all ${
+                  filter === o.value ? o.activeClass : "text-slate-500 hover:bg-slate-100"
+                }`}
+              >
+                <span className="text-[10px]">{o.icon}</span>
+                {o.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-slate-200 my-1" />
+
+          {/* Type filter checkboxes */}
+          <div className="px-1.5 py-0.5">
+            <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide mb-1">Typ av ställe</div>
+            {TYPE_OPTIONS.map((t) => (
+              <label
+                key={t.value}
+                className="flex items-center gap-2 px-1.5 py-1 rounded-lg text-xs cursor-pointer hover:bg-slate-50 transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={typeFilter.size === 0 || typeFilter.has(t.value)}
+                  onChange={() => toggleType(t.value)}
+                  className="rounded border-slate-300 text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
+                />
+                <span>{t.icon}</span>
+                <span className="text-slate-600">{t.label}</span>
+              </label>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -76,6 +135,8 @@ function FilterButton({ filter, onFilterChange }: { filter: "all" | "sun" | "sha
 export default function Header({
   filter,
   onFilterChange,
+  typeFilter,
+  onTypeFilterChange,
   sunCount,
   totalCount,
   weather,
@@ -158,7 +219,7 @@ export default function Header({
 
           {/* Filter + shadow toggle */}
           <div className="flex items-center gap-1.5">
-            <FilterButton filter={filter} onFilterChange={onFilterChange} />
+            <FilterButton filter={filter} onFilterChange={onFilterChange} typeFilter={typeFilter} onTypeFilterChange={onTypeFilterChange} />
             <button
               onClick={onToggleShadows}
               className={`rounded-xl shadow-lg backdrop-blur-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all ${
