@@ -146,6 +146,45 @@ function resolveBadgeCollisions(map: L.Map, markers: L.Marker[]) {
   }
 }
 
+/**
+ * Calculate ambient darkness (0 = bright daylight, 1 = dark night).
+ * Combines time-of-day (sunrise/sunset curve) with weather conditions.
+ * Stockholm approximate sunrise/sunset for April–October:
+ *   Sunrise ~5–7, Sunset ~18–22 depending on month.
+ *   We use a simplified model based on hour only.
+ */
+function getAmbientDarkness(hour: number, weatherSymbol?: number): number {
+  // Time-based darkness (golden hour curve)
+  let timeDark = 0;
+  if (hour <= 6) timeDark = 0.35 - (hour - 5) * 0.15;       // 5→0.5, 6→0.35, ramping down
+  else if (hour <= 8) timeDark = 0.05 + (8 - hour) * 0.05;   // gentle morning warmth
+  else if (hour <= 17) timeDark = 0;                           // full daylight
+  else if (hour <= 19) timeDark = (hour - 17) * 0.05;         // golden hour
+  else if (hour <= 21) timeDark = 0.1 + (hour - 19) * 0.12;  // dusk
+  else timeDark = 0.34 + (hour - 21) * 0.08;                  // late evening
+
+  timeDark = Math.max(0, Math.min(timeDark, 0.5));
+
+  // Weather-based darkness
+  let weatherDark = 0;
+  if (weatherSymbol) {
+    if (weatherSymbol >= 5 && weatherSymbol <= 7) weatherDark = 0.08;       // overcast/fog
+    else if (weatherSymbol === 3 || weatherSymbol === 4) weatherDark = 0.04; // partly cloudy
+    else if (weatherSymbol >= 8 && weatherSymbol <= 10) weatherDark = 0.1;  // rain showers
+    else if (weatherSymbol >= 18 && weatherSymbol <= 20) weatherDark = 0.12; // steady rain
+    else if (weatherSymbol === 11 || weatherSymbol === 21) weatherDark = 0.15; // thunder
+  }
+
+  return Math.min(timeDark + weatherDark, 0.55);
+}
+
+/** Get warm/cool tint color based on time of day */
+function getAmbientColor(hour: number): string {
+  if (hour <= 7 || hour >= 19) return "30, 20, 60";   // warm blue-purple for dawn/dusk
+  if (hour >= 17) return "40, 20, 10";                  // warm golden tint
+  return "15, 23, 42";                                   // neutral slate for midday clouds
+}
+
 // Cache for loaded shadow GeoJSON
 const shadowCache = new Map<string, any>();
 
@@ -427,5 +466,20 @@ export default function SunMap({ hour, date, filter, typeFilter, sunRange, weath
       .catch(() => {});
   }, [hour, dateKey, showShadows]);
 
-  return <div ref={containerRef} className="w-full h-full" />;
+  const currentWeatherSymbol = weather?.hourly[hour]?.symbolCode;
+  const darkness = getAmbientDarkness(hour, currentWeatherSymbol);
+  const ambientColor = getAmbientColor(hour);
+
+  return (
+    <div className="w-full h-full relative">
+      <div ref={containerRef} className="w-full h-full" />
+      <div
+        className="absolute inset-0 pointer-events-none z-[400]"
+        style={{
+          background: `rgba(${ambientColor}, ${darkness})`,
+          transition: "background 0.8s ease",
+        }}
+      />
+    </div>
+  );
 }
