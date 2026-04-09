@@ -2,7 +2,7 @@
 Steg 5: Generera skuggpolygoner som GeoJSON-filer for kartoverlay.
 
 For varje tidpunkt (datum + timme):
-1. Projicera alla byggnaders skuggor
+1. Projicera alla byggnaders skuggor (korrekt kant-extrusion)
 2. Union alla skuggpolygoner till en enda geometri
 3. Forenkla (simplify) for att minska filstorlek
 4. Spara som GeoJSON
@@ -16,19 +16,17 @@ import math
 import os
 import time
 from datetime import datetime, timezone, timedelta
-from multiprocessing import Pool as ProcessPool, cpu_count
 
 import geopandas as gpd
-import numpy as np
 from shapely.geometry import mapping, MultiPolygon, Polygon
 from shapely.ops import unary_union
+from shapely.validation import make_valid
 from pysolar.solar import get_altitude, get_azimuth
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 BUILDINGS_FILE = os.path.join(DATA_DIR, "buildings.gpkg")
 OUTPUT_DIR = os.path.join(DATA_DIR, "shadows")
 
-# Same dates/hours as 03_compute_shadows.py
 DATES = []
 for month in range(4, 11):
     for day in [1, 15]:
@@ -39,8 +37,7 @@ HOURS = list(range(7, 23))
 M_PER_DEG_LAT = 111320.0
 M_PER_DEG_LNG = 111320.0 * math.cos(math.radians(59.33))
 
-# Simplification tolerance in degrees (~5m)
-SIMPLIFY_TOLERANCE = 0.00005
+SIMPLIFY_TOLERANCE = 0.00005  # ~5m
 
 
 def get_utc_offset(month: int) -> timedelta:
@@ -50,7 +47,16 @@ def get_utc_offset(month: int) -> timedelta:
 
 
 def project_shadow(geom, height: float, sun_az: float, sun_alt: float):
-    """Project a single building's shadow polygon."""
+    """
+    Project a building's shadow using edge extrusion.
+
+    Instead of convex hull (which turns L-shapes into triangles),
+    we create the shadow by:
+    1. Taking the building footprint
+    2. Projecting it along the shadow direction
+    3. Creating quads for each edge (original edge + projected edge)
+    4. Union of footprint + projected footprint + all edge quads
+    """
     if sun_alt <= 2 or height <= 0:
         return None
 
@@ -61,14 +67,40 @@ def project_shadow(geom, height: float, sun_az: float, sun_alt: float):
 
     polys = list(geom.geoms) if isinstance(geom, MultiPolygon) else [geom]
     parts = []
+
     for poly in polys:
         if not poly.is_valid or poly.is_empty:
             continue
         try:
             coords = list(poly.exterior.coords)
-            shadow_coords = [(x + dx, y + dy) for x, y in coords]
-            combined = unary_union([Polygon(coords), Polygon(shadow_coords)]).convex_hull
-            if combined.is_valid and not combined.is_empty:
+            n = len(coords) - 1  # last coord = first coord (closed ring)
+            if n < 3:
+                continue
+
+            # Create quads connecting each original edge to its projected edge
+            quads = []
+            for i in range(n):
+                j = (i + 1) % n
+                quad = Polygon([
+                    coords[i],
+                    coords[j],
+                    (coords[j][0] + dx, coords[j][1] + dy),
+                    (coords[i][0] + dx, coords[i][1] + dy),
+                ])
+                if quad.is_valid and quad.area > 0:
+                    quads.append(quad)
+
+            # Also add the projected footprint itself
+            projected = Polygon([(x + dx, y + dy) for x, y in coords])
+
+            all_parts = [Polygon(coords)] + quads
+            if projected.is_valid and not projected.is_empty:
+                all_parts.append(projected)
+
+            combined = unary_union(all_parts)
+            if not combined.is_valid:
+                combined = make_valid(combined)
+            if not combined.is_empty:
                 parts.append(combined)
         except Exception:
             continue
@@ -88,10 +120,11 @@ def process_timepoint(args):
     if sun_alt <= 3:
         return None
 
+    from shapely import wkb as wkb_mod
+
     shadows = []
     for geom_wkb, height in buildings_data:
-        from shapely import wkb
-        geom = wkb.loads(geom_wkb)
+        geom = wkb_mod.loads(geom_wkb)
         shadow = project_shadow(geom, height, sun_az, sun_alt)
         if shadow:
             shadows.append(shadow)
@@ -109,6 +142,8 @@ def process_timepoint(args):
                 merged = unary_union(chunk)
                 if merged.is_valid and not merged.is_empty:
                     shadows.append(merged)
+                elif not merged.is_empty:
+                    shadows.append(make_valid(merged))
             except Exception:
                 shadows.extend(chunk)
 
@@ -120,9 +155,8 @@ def process_timepoint(args):
     # Simplify to reduce file size
     combined = combined.simplify(SIMPLIFY_TOLERANCE, preserve_topology=True)
 
-    # Buffer(0) to fix any topology issues
     if not combined.is_valid:
-        combined = combined.buffer(0)
+        combined = make_valid(combined)
 
     geojson = {
         "type": "FeatureCollection",
@@ -138,13 +172,12 @@ def process_timepoint(args):
     with open(filepath, "w") as f:
         json.dump(geojson, f)
 
-    # Report file size
     size_kb = os.path.getsize(filepath) / 1024
     return f"  {filename}: {size_kb:.0f} KB"
 
 
 def main():
-    print("=== Steg 5: Generera skugg-GeoJSON ===")
+    print("=== Steg 5: Generera skugg-GeoJSON (forbattrad) ===")
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -153,16 +186,14 @@ def main():
     print(f"  {len(buildings_gdf)} byggnader")
 
     # Pre-serialize building geometries + heights
+    # FIX: Use only BYGG_H (building height), NOT mark_z (absolute ground elevation)
     print("Forbereder byggnadsdata...")
     from shapely import wkb
     buildings_data = []
     for _, row in buildings_gdf.iterrows():
         h = row.get("BYGG_H", 10)
-        mark_z = row.get("MARK_Z", 0)
-        # Use full height including terrain
-        effective_h = h + max(0, mark_z)
-        if effective_h > 0:
-            buildings_data.append((row.geometry.wkb, effective_h))
+        if h and h > 0:
+            buildings_data.append((row.geometry.wkb, float(h)))
     print(f"  {len(buildings_data)} byggnader med hojd")
 
     # Precompute sun positions
@@ -181,7 +212,7 @@ def main():
     print(f"  {len(tasks)} tidpunkter med sol (av {len(DATES)*len(HOURS)} totalt)")
 
     start = time.time()
-    print(f"\nGenererar skuggpolygoner (sekventiellt)...")
+    print(f"\nGenererar skuggpolygoner...")
 
     results = []
     for i, task in enumerate(tasks):
@@ -197,7 +228,6 @@ def main():
     elapsed = time.time() - start
     print(f"\nKlart! {len(results)} filer genererade pa {elapsed:.1f}s")
 
-    # Summary
     total_size = sum(
         os.path.getsize(os.path.join(OUTPUT_DIR, f))
         for f in os.listdir(OUTPUT_DIR)
