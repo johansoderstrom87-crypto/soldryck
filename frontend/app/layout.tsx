@@ -16,6 +16,15 @@ export const metadata: Metadata = {
   title: "Soldryck — Hitta solen i Stockholm",
   description:
     "Se vilka uteserveringar i Stockholm som har sol just nu, timme för timme.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Soldryck",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({
@@ -32,8 +41,17 @@ export default function RootLayout({
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossOrigin=""
         />
+        <meta name="theme-color" content="#f59e0b" />
+        <link rel="apple-touch-icon" href="/icons/icon.svg" />
       </head>
-      <body className="h-full overflow-hidden">{children}</body>
+      <body className="h-full overflow-hidden">
+        {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js"))`,
+          }}
+        />
+      </body>
     </html>
   );
 }

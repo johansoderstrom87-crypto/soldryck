@@ -12,6 +12,7 @@ try {
 }
 
 import { type WeatherData, getSymbolInfo, getCombinedStatus } from "../lib/weather";
+import { type MetroStation, STATION_RADIUS_M, distanceM } from "../data/metro-stations";
 
 export interface FeedbackVenue {
   id: string;
@@ -34,6 +35,9 @@ interface SunMapProps {
   weather: WeatherData | null;
   onFeedback?: (venue: FeedbackVenue) => void;
   showShadows?: boolean;
+  focusVenueId?: string | null;
+  onFocusHandled?: () => void;
+  metroStation?: MetroStation | null;
 }
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
@@ -85,6 +89,50 @@ function getSunPeriod(venue: any, dateKey: string): string {
   if (first === -1) return "Ingen sol";
   if (first === last) return `Sol kl ${first}`;
   return `Sol ${first}–${last}`;
+}
+
+/** Find the best hour today: sun + best weather. Returns { hour, label } or null. */
+function getBestHour(venue: any, dateKey: string, weather: WeatherData | null): { hour: number; label: string } | null {
+  const hours = Array.from({ length: 16 }, (_, i) => i + 7);
+  let bestHour = -1;
+  let bestScore = -1;
+
+  for (const h of hours) {
+    const s = normalize(getStatus(venue, dateKey, h));
+    if (s !== "sun") continue;
+
+    // Score: sun = base 10, weather bonus
+    let score = 10;
+    if (weather?.hourly[h]) {
+      const sym = weather.hourly[h].symbolCode;
+      if (sym <= 2) score += 5;       // clear sky
+      else if (sym <= 4) score += 2;  // partly cloudy
+      else if (sym >= 8) score -= 10; // rain/thunder — disqualify
+
+      // Prefer comfortable temps (18-24)
+      const temp = weather.hourly[h].temperature;
+      if (temp >= 18 && temp <= 24) score += 3;
+      else if (temp >= 15 && temp <= 27) score += 1;
+
+      // Penalize strong wind
+      if (weather.hourly[h].windSpeed > 8) score -= 2;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestHour = h;
+    }
+  }
+
+  if (bestHour === -1) return null;
+
+  const w = weather?.hourly[bestHour];
+  let label = `Kl ${bestHour}:00`;
+  if (w) {
+    const sym = getSymbolInfo(w.symbolCode);
+    label += ` — ${sym.icon} ${Math.round(w.temperature)}\u00b0C`;
+  }
+  return { hour: bestHour, label };
 }
 
 const getDateKey = venueModule.getClosestDateKey;
@@ -193,7 +241,7 @@ function getAmbientColor(hour: number, weatherSymbol?: number): string {
 // Cache for loaded shadow GeoJSON
 const shadowCache = new Map<string, any>();
 
-export default function SunMap({ hour, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows }: SunMapProps) {
+export default function SunMap({ hour, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, focusVenueId, onFocusHandled, metroStation }: SunMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
@@ -250,6 +298,12 @@ export default function SunMap({ hour, date, filter, typeFilter, sunRange, weath
       const rawStatus = getStatus(venue, dateKey, hour);
       const status = normalize(rawStatus);
       const sunHours = getSunHrs(venue, dateKey);
+
+      // Filter by metro station proximity
+      if (metroStation) {
+        const dist = distanceM(venue.lat, venue.lng, metroStation.lat, metroStation.lng);
+        if (dist > STATION_RADIUS_M) return;
+      }
 
       // Filter by type
       if (typeFilter.size > 0 && !typeFilter.has(venue.type)) return;
@@ -354,6 +408,18 @@ export default function SunMap({ hour, date, filter, typeFilter, sunRange, weath
           }).join("")
         : "";
 
+      // Best hour recommendation
+      const bestHour = getBestHour(venue, dateKey, weather);
+      const bestHourLine = bestHour
+        ? `<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:8px;padding:6px 8px;margin-top:6px;display:flex;align-items:center;gap:6px">
+            <span style="font-size:14px">&#11088;</span>
+            <div>
+              <div style="font-size:10px;color:#92400e;font-weight:600">B&auml;sta timmen idag</div>
+              <div style="font-size:12px;color:#78350f;font-weight:500">${bestHour.label}</div>
+            </div>
+          </div>`
+        : "";
+
       // Weather line for current hour
       const weatherLine = currentWeather
         ? `<div style="font-size:11px;color:#64748b;margin-top:6px;display:flex;align-items:center;gap:4px">
@@ -386,12 +452,21 @@ export default function SunMap({ hour, date, filter, typeFilter, sunRange, weath
             ` : ""}
           </div>
           ${weatherLine}
+          ${bestHourLine}
           <div style="font-size:12px;color:#64748b;margin-top:6px">${sunHours} soltimmar (vid klart v&auml;der)</div>
-          <button
-            class="feedback-btn"
-            data-venue-id="${venue.id}"
-            style="margin-top:8px;padding:4px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#94a3b8;font-size:11px;cursor:pointer;width:100%;text-align:center"
-          >St&auml;mmer inte?</button>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button
+              class="share-btn"
+              data-venue-id="${venue.id}"
+              data-venue-name="${venue.name}"
+              style="flex:1;padding:4px 10px;border:1px solid #fde68a;border-radius:8px;background:#fffbeb;color:#92400e;font-size:11px;cursor:pointer;text-align:center;font-weight:500"
+            >&#128279; Dela</button>
+            <button
+              class="feedback-btn"
+              data-venue-id="${venue.id}"
+              style="flex:1;padding:4px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#94a3b8;font-size:11px;cursor:pointer;text-align:center"
+            >St&auml;mmer inte?</button>
+          </div>
         </div>
       `);
 
@@ -400,6 +475,28 @@ export default function SunMap({ hour, date, filter, typeFilter, sunRange, weath
         .bindPopup(popup);
 
       marker.on("popupopen", () => {
+        // Share button
+        const shareBtn = document.querySelector(`.share-btn[data-venue-id="${venue.id}"]`);
+        if (shareBtn) {
+          (shareBtn as HTMLElement).onclick = () => {
+            const url = new URL(window.location.href);
+            url.search = "";
+            url.searchParams.set("venue", venue.id);
+            url.searchParams.set("hour", String(hour));
+            const shareUrl = url.toString();
+
+            if (navigator.share) {
+              navigator.share({ title: `${venue.name} — Soldryck`, text: `Se solläget på ${venue.name}!`, url: shareUrl });
+            } else {
+              navigator.clipboard.writeText(shareUrl).then(() => {
+                (shareBtn as HTMLElement).textContent = "Kopierad!";
+                setTimeout(() => { (shareBtn as HTMLElement).innerHTML = "&#128279; Dela"; }, 2000);
+              });
+            }
+          };
+        }
+
+        // Feedback button
         const btn = document.querySelector(`.feedback-btn[data-venue-id="${venue.id}"]`);
         if (btn && onFeedback) {
           (btn as HTMLElement).onclick = () => {
@@ -426,7 +523,29 @@ export default function SunMap({ hour, date, filter, typeFilter, sunRange, weath
     map.off("zoomend moveend", handleCollisions);
     function handleCollisions() { if (mapRef.current) resolveBadgeCollisions(mapRef.current, markersRef.current); }
     map.on("zoomend moveend", handleCollisions);
-  }, [hour, dateKey, filter, typeFilter, sunRange, weather]);
+
+    // Pan to metro station when selected
+    if (metroStation && !focusVenueId) {
+      map.setView([metroStation.lat, metroStation.lng], 15, { animate: true });
+    }
+
+    // Focus on venue from URL params
+    if (focusVenueId) {
+      const targetVenue = allVenues.find((v: any) => v.id === focusVenueId);
+      if (targetVenue) {
+        map.setView([targetVenue.lat, targetVenue.lng], 16, { animate: true });
+        // Find and open the marker's popup
+        const targetMarker = markersRef.current.find((m) => {
+          const ll = m.getLatLng();
+          return Math.abs(ll.lat - targetVenue.lat) < 0.0001 && Math.abs(ll.lng - targetVenue.lng) < 0.0001;
+        });
+        if (targetMarker) {
+          setTimeout(() => targetMarker.openPopup(), 500);
+        }
+      }
+      onFocusHandled?.();
+    }
+  }, [hour, dateKey, filter, typeFilter, sunRange, weather, metroStation]);
 
   // Shadow overlay layer
   useEffect(() => {

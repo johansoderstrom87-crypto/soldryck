@@ -8,6 +8,7 @@ import FeedbackModal from "./components/FeedbackModal";
 import { fetchWeather, type WeatherData } from "./lib/weather";
 import type { FeedbackVenue } from "./components/SunMap";
 import type { VenueType, SunRange } from "./components/SunMap";
+import type { MetroStation } from "./data/metro-stations";
 
 // Try computed data first, fall back to mock
 let venueData: typeof import("./data/venues-computed") | null = null;
@@ -34,7 +35,13 @@ const SunMap = dynamic(() => import("./components/SunMap"), {
 
 export default function Home() {
   const now = new Date();
-  const [hour, setHour] = useState(Math.min(Math.max(now.getHours(), 7), 22));
+
+  // Parse URL params for shared links
+  const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const initialHour = urlParams?.get("hour") ? Number(urlParams.get("hour")) : Math.min(Math.max(now.getHours(), 7), 22);
+  const initialVenue = urlParams?.get("venue") ?? null;
+
+  const [hour, setHour] = useState(initialHour);
   const [date, setDate] = useState(now);
   const [filter, setFilter] = useState<"all" | "sun" | "shade">("all");
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -43,6 +50,8 @@ export default function Home() {
   const [showShadows, setShowShadows] = useState(false);
   const [typeFilter, setTypeFilter] = useState<Set<VenueType>>(new Set());
   const [sunRange, setSunRange] = useState<SunRange>(null);
+  const [focusVenueId, setFocusVenueId] = useState<string | null>(initialVenue);
+  const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
   const dateStr = useMemo(() => date.toISOString().slice(0, 10), [date]);
@@ -89,9 +98,11 @@ export default function Home() {
         hour={hour}
         showShadows={showShadows}
         onToggleShadows={() => setShowShadows((s) => !s)}
+        metroStation={metroStation}
+        onMetroStationChange={setMetroStation}
       />
 
-      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} />
+      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} />
 
       <TimeSlider
         hour={hour}

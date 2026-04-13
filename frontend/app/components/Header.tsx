@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { type WeatherData, getSymbolInfo, hasSunshine } from "../lib/weather";
 import { VENUE_TYPES, type VenueType, type SunRange } from "./SunMap";
+import { METRO_STATIONS, METRO_LINES, type MetroStation } from "../data/metro-stations";
 
 const TYPE_OPTIONS: { value: VenueType; label: string; icon: string }[] = [
   { value: "restaurant", label: "Restaurang", icon: "🍽️" },
@@ -25,6 +26,8 @@ interface HeaderProps {
   hour: number;
   showShadows: boolean;
   onToggleShadows: () => void;
+  metroStation: MetroStation | null;
+  onMetroStationChange: (station: MetroStation | null) => void;
 }
 
 const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: string; activeClass: string }[] = [
@@ -34,7 +37,7 @@ const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: str
 ];
 
 function FilterButton({
-  filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
+  filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange, metroStation, onMetroStationChange,
 }: {
   filter: "all" | "sun" | "shade";
   onFilterChange: (f: "all" | "sun" | "shade") => void;
@@ -42,6 +45,8 @@ function FilterButton({
   onTypeFilterChange: (types: Set<VenueType>) => void;
   sunRange: SunRange;
   onSunRangeChange: (range: SunRange) => void;
+  metroStation: MetroStation | null;
+  onMetroStationChange: (station: MetroStation | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -57,7 +62,7 @@ function FilterButton({
   }, [open]);
 
   const current = FILTER_OPTIONS.find((o) => o.value === filter)!;
-  const activeFilterCount = typeFilter.size + (sunRange ? 1 : 0);
+  const activeFilterCount = typeFilter.size + (sunRange ? 1 : 0) + (metroStation ? 1 : 0);
 
   function toggleType(type: VenueType) {
     const next = new Set(typeFilter);
@@ -184,6 +189,47 @@ function FilterButton({
               </div>
             )}
           </div>
+
+          {/* Divider */}
+          <div className="border-t border-slate-200 my-1" />
+
+          {/* Metro station filter */}
+          <div className="px-1.5 py-0.5">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">Nära T-bana</div>
+              {metroStation && (
+                <button
+                  onClick={() => onMetroStationChange(null)}
+                  className="text-[9px] text-amber-500 hover:text-amber-600 font-medium"
+                >
+                  Rensa
+                </button>
+              )}
+            </div>
+            <select
+              value={metroStation?.name ?? ""}
+              onChange={(e) => {
+                if (!e.target.value) { onMetroStationChange(null); return; }
+                const station = METRO_STATIONS.find((s) => s.name === e.target.value) ?? null;
+                onMetroStationChange(station);
+              }}
+              className="w-full px-1.5 py-1 rounded-lg text-xs border border-slate-200 bg-white text-slate-600 cursor-pointer"
+            >
+              <option value="">Alla stationer</option>
+              {METRO_STATIONS
+                .sort((a, b) => a.name.localeCompare(b.name, "sv"))
+                .map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+            </select>
+            {metroStation && (
+              <div className="text-[9px] text-amber-600 mt-1 flex items-center gap-1">
+                <span>Visar inom 500m från {metroStation.name}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -204,6 +250,8 @@ export default function Header({
   hour,
   showShadows,
   onToggleShadows,
+  metroStation,
+  onMetroStationChange,
 }: HeaderProps) {
   const currentWeather = weather?.hourly[hour];
   const actualSun = currentWeather ? hasSunshine(currentWeather.symbolCode) : true;
@@ -297,7 +345,7 @@ export default function Header({
 
           {/* Filter + shadow toggle */}
           <div className="flex items-center gap-1.5">
-            <FilterButton filter={filter} onFilterChange={onFilterChange} typeFilter={typeFilter} onTypeFilterChange={onTypeFilterChange} sunRange={sunRange} onSunRangeChange={onSunRangeChange} />
+            <FilterButton filter={filter} onFilterChange={onFilterChange} typeFilter={typeFilter} onTypeFilterChange={onTypeFilterChange} sunRange={sunRange} onSunRangeChange={onSunRangeChange} metroStation={metroStation} onMetroStationChange={onMetroStationChange} />
             <button
               onClick={onToggleShadows}
               className={`rounded-xl shadow-lg backdrop-blur-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all ${

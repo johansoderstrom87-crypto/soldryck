@@ -1,0 +1,23 @@
+{
+  "name": "Soldryck — Hitta solen i Stockholm",
+  "short_name": "Soldryck",
+  "description": "Se vilka uteserveringar i Stockholm som har sol just nu, timme för timme.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
