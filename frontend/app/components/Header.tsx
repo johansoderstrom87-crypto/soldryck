@@ -248,31 +248,49 @@ export default function Header({
 
             {/* Weather timeline */}
             {weather && (
-              <div className="flex gap-[2px]">
-                {forecastHours.map((h) => {
-                  const hw = weather.hourly[h];
-                  if (!hw) return <div key={h} className="w-2.5 h-2.5 rounded-sm bg-slate-100 flex-shrink-0" />;
-                  const s = getSymbolInfo(hw.symbolCode);
-                  const bg =
-                    s.category === "clear" ? "#fbbf24"
-                    : s.category === "clouds" ? "#cbd5e1"
-                    : s.category === "rain" ? "#60a5fa"
-                    : s.category === "thunder" ? "#a78bfa"
-                    : "#c4b5fd";
-                  return (
+              <div>
+                <div className="flex gap-[2px]">
+                  {forecastHours.map((h) => {
+                    const hw = weather.hourly[h];
+                    const bg = hw
+                      ? (() => {
+                          const s = getSymbolInfo(hw.symbolCode);
+                          return s.category === "clear" ? "#fbbf24"
+                            : s.category === "clouds" ? "#cbd5e1"
+                            : s.category === "rain" ? "#60a5fa"
+                            : s.category === "thunder" ? "#a78bfa"
+                            : "#c4b5fd";
+                        })()
+                      : "#e2e8f0";
+                    const title = hw
+                      ? `${h}:00 — ${getSymbolInfo(hw.symbolCode).label} ${Math.round(hw.temperature)}°C`
+                      : `${h}:00`;
+                    return (
+                      <div
+                        key={h}
+                        className="flex-shrink-0 rounded-sm"
+                        style={{
+                          width: 12, height: 12,
+                          background: bg,
+                          border: h === hour ? "2px solid #0f172a" : "none",
+                          opacity: h === hour ? 1 : 0.6,
+                        }}
+                        title={title}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="flex gap-[2px] mt-0.5">
+                  {forecastHours.map((h) => (
                     <div
                       key={h}
-                      className="flex-shrink-0 rounded-sm"
-                      style={{
-                        width: 12, height: 12,
-                        background: bg,
-                        border: h === hour ? "2px solid #0f172a" : "none",
-                        opacity: h === hour ? 1 : 0.6,
-                      }}
-                      title={`${h}:00 — ${s.label} ${Math.round(hw.temperature)}°C`}
-                    />
-                  );
-                })}
+                      className="flex-shrink-0 text-center"
+                      style={{ width: 12, fontSize: 7, lineHeight: 1, color: h === hour ? "#0f172a" : "#94a3b8", fontWeight: h === hour ? 700 : 400 }}
+                    >
+                      {h}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

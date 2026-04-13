@@ -168,21 +168,26 @@ function getAmbientDarkness(hour: number, weatherSymbol?: number): number {
   // Weather-based darkness
   let weatherDark = 0;
   if (weatherSymbol) {
-    if (weatherSymbol >= 5 && weatherSymbol <= 7) weatherDark = 0.08;       // overcast/fog
-    else if (weatherSymbol === 3 || weatherSymbol === 4) weatherDark = 0.04; // partly cloudy
-    else if (weatherSymbol >= 8 && weatherSymbol <= 10) weatherDark = 0.1;  // rain showers
-    else if (weatherSymbol >= 18 && weatherSymbol <= 20) weatherDark = 0.12; // steady rain
-    else if (weatherSymbol === 11 || weatherSymbol === 21) weatherDark = 0.15; // thunder
+    if (weatherSymbol === 3 || weatherSymbol === 4) weatherDark = 0.06;     // partly cloudy
+    else if (weatherSymbol === 5 || weatherSymbol === 6) weatherDark = 0.14; // overcast
+    else if (weatherSymbol === 7) weatherDark = 0.16;                        // fog
+    else if (weatherSymbol >= 8 && weatherSymbol <= 10) weatherDark = 0.16;  // rain showers
+    else if (weatherSymbol >= 18 && weatherSymbol <= 20) weatherDark = 0.18; // steady rain
+    else if (weatherSymbol === 11 || weatherSymbol === 21) weatherDark = 0.22; // thunder
+    else if (weatherSymbol >= 12 && weatherSymbol <= 17) weatherDark = 0.14; // snow showers
+    else if (weatherSymbol >= 22 && weatherSymbol <= 27) weatherDark = 0.16; // snow/sleet
   }
 
   return Math.min(timeDark + weatherDark, 0.55);
 }
 
-/** Get warm/cool tint color based on time of day */
-function getAmbientColor(hour: number): string {
-  if (hour <= 7 || hour >= 19) return "30, 20, 60";   // warm blue-purple for dawn/dusk
-  if (hour >= 17) return "40, 20, 10";                  // warm golden tint
-  return "15, 23, 42";                                   // neutral slate for midday clouds
+/** Get warm/cool tint color based on time of day and weather */
+function getAmbientColor(hour: number, weatherSymbol?: number): string {
+  // Cloudy/rainy weather → grey-blue tint even during daytime
+  if (weatherSymbol && weatherSymbol >= 5) return "50, 60, 80";  // desaturated grey-blue
+  if (hour <= 7 || hour >= 19) return "30, 20, 60";              // warm blue-purple for dawn/dusk
+  if (hour >= 17) return "40, 20, 10";                            // warm golden tint
+  return "15, 23, 42";                                             // neutral slate
 }
 
 // Cache for loaded shadow GeoJSON
@@ -468,7 +473,7 @@ export default function SunMap({ hour, date, filter, typeFilter, sunRange, weath
 
   const currentWeatherSymbol = weather?.hourly[hour]?.symbolCode;
   const darkness = getAmbientDarkness(hour, currentWeatherSymbol);
-  const ambientColor = getAmbientColor(hour);
+  const ambientColor = getAmbientColor(hour, currentWeatherSymbol);
 
   return (
     <div className="w-full h-full relative">

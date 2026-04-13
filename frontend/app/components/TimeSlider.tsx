@@ -11,6 +11,15 @@ interface TimeSliderProps {
 
 const DAY_NAMES = ["Sön", "Mån", "Tis", "Ons", "Tor", "Fre", "Lör"];
 const MONTH_NAMES_SHORT = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+const MONTHS = [
+  { label: "Apr", month: 3 },
+  { label: "Maj", month: 4 },
+  { label: "Jun", month: 5 },
+  { label: "Jul", month: 6 },
+  { label: "Aug", month: 7 },
+  { label: "Sep", month: 8 },
+  { label: "Okt", month: 9 },
+];
 
 export default function TimeSlider({
   hour,
@@ -51,6 +60,12 @@ export default function TimeSlider({
   }, []);
 
   const selectedDateStr = date.toISOString().slice(0, 10);
+  const selectedMonth = date.getMonth();
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  // Check if selected date is within the upcoming 8 days
+  const isInDayRange = days.some((d) => d.toISOString().slice(0, 10) === selectedDateStr);
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg">
@@ -108,7 +123,7 @@ export default function TimeSlider({
           </div>
         </div>
 
-        {/* Day selector */}
+        {/* Day selector — upcoming 8 days */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1">
           {days.map((d, i) => {
             const dStr = d.toISOString().slice(0, 10);
@@ -127,6 +142,32 @@ export default function TimeSlider({
               >
                 <span className="font-semibold">{dayName}</span>
                 <span className={`text-[9px] ${isSelected ? "text-amber-100" : "text-slate-400"}`}>{dateLabel}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Month selector — for checking sun patterns in other months */}
+        <div className="flex items-center gap-1 overflow-x-auto pt-1">
+          {MONTHS.map(({ label, month }) => {
+            const isSelected = !isInDayRange && selectedMonth === month;
+            const isCurrent = now.getMonth() === month;
+            return (
+              <button
+                key={month}
+                onClick={() => {
+                  const d = new Date(now.getFullYear(), month, 15);
+                  onDateChange(d);
+                }}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                  isSelected
+                    ? "bg-amber-500 text-white shadow-sm"
+                    : isCurrent && isInDayRange
+                    ? "text-amber-600 bg-amber-50"
+                    : "text-slate-400 hover:bg-slate-100"
+                }`}
+              >
+                {label}
               </button>
             );
           })}
