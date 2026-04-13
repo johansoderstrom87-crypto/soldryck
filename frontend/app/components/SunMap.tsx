@@ -12,7 +12,7 @@ try {
 }
 
 import { type WeatherData, getSymbolInfo, getCombinedStatus } from "../lib/weather";
-import { type MetroStation, STATION_RADIUS_M, distanceM } from "../data/metro-stations";
+import { METRO_STATIONS, type MetroStation, STATION_RADIUS_M, distanceM } from "../data/metro-stations";
 
 export interface FeedbackVenue {
   id: string;
@@ -244,6 +244,7 @@ const shadowCache = new Map<string, any>();
 export default function SunMap({ hour, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, focusVenueId, onFocusHandled, metroStation }: SunMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
+  const metroMarkersRef = useRef<L.Marker[]>([]);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -280,6 +281,42 @@ export default function SunMap({ hour, date, filter, typeFilter, sunRange, weath
     return () => {
       map.remove();
       mapRef.current = null;
+    };
+  }, []);
+
+  // Metro station markers — visible at same zoom as venue badges
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    metroMarkersRef.current.forEach((m) => m.remove());
+    metroMarkersRef.current = [];
+
+    for (const station of METRO_STATIONS) {
+      const lineColor = station.lines.includes("red") ? "#e3000b"
+        : station.lines.includes("green") ? "#00a14e"
+        : "#0065bd";
+
+      const icon = L.divIcon({
+        className: "metro-marker",
+        html: `<div class="metro-icon" style="--line-color:${lineColor}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" fill="${lineColor}" stroke="#fff" stroke-width="2"/>
+            <text x="12" y="16" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="system-ui">T</text>
+          </svg>
+          <span class="metro-label">${station.name}</span>
+        </div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      });
+
+      const marker = L.marker([station.lat, station.lng], { icon, interactive: false, zIndexOffset: -100 }).addTo(map);
+      metroMarkersRef.current.push(marker);
+    }
+
+    return () => {
+      metroMarkersRef.current.forEach((m) => m.remove());
+      metroMarkersRef.current = [];
     };
   }, []);
 
