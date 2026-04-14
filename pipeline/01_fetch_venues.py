@@ -21,11 +21,16 @@ OUTPUT_FILE = os.path.join(DATA_DIR, "venues.geojson")
 # Bounding box: Stockholms kommun med lite marginal
 BBOX = "59.23,17.82,59.44,18.22"
 
-OVERPASS_QUERY = f"""[out:json][timeout:120];
+OVERPASS_QUERY = f"""[out:json][timeout:180];
 (
-  node["amenity"~"restaurant|cafe|bar|pub"]["outdoor_seating"="yes"]({BBOX});
-  way["amenity"~"restaurant|cafe|bar|pub"]["outdoor_seating"="yes"]({BBOX});
-  node["amenity"~"restaurant|cafe|bar|pub"]["outdoor_seating"~"yes|summer|seasonal"]({BBOX});
+  // Alla platser med outdoor_seating satt till vad som helst utom "no"
+  nwr["amenity"~"restaurant|cafe|bar|pub|biergarten|fast_food|ice_cream|food_court"]["outdoor_seating"]["outdoor_seating"!~"^no$|^none$|^0$",i]({BBOX});
+  // Alternativ tagg: al_fresco=yes (bl.a. Mister Singh)
+  nwr["amenity"~"restaurant|cafe|bar|pub|biergarten|fast_food|ice_cream|food_court"]["al_fresco"~"^(yes|true|1)$",i]({BBOX});
+  // Biergarten antas alltid ha uteservering
+  nwr["amenity"="biergarten"]({BBOX});
+  // Explicit leisure=outdoor_seating (fristaaende uteserveringar)
+  nwr["leisure"="outdoor_seating"]({BBOX});
 );
 out center body;"""
 
@@ -99,6 +104,8 @@ def elements_to_geojson(elements: list) -> dict:
                     "phone": tags.get("phone", ""),
                     "addr_street": tags.get("addr:street", ""),
                     "addr_housenumber": tags.get("addr:housenumber", ""),
+                    "level": tags.get("level", ""),
+                    "outdoor_seating": tags.get("outdoor_seating", ""),
                 },
             }
         )
