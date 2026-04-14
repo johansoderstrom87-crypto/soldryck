@@ -165,6 +165,7 @@ body {
   background: none !important;
   border: none !important;
   box-shadow: none !important;
+  overflow: visible !important;
 }
 
 .metro-icon {
@@ -172,10 +173,30 @@ body {
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+  position: absolute;
+  left: 0;
+  top: 0;
 }
 
 .show-badges .metro-icon {
   display: flex;
+}
+
+.metro-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
 }
 
 .metro-label {

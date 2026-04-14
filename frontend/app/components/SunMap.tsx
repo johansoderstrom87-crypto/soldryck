@@ -300,14 +300,11 @@ export default function SunMap({ hour, date, filter, typeFilter, sunRange, weath
       const icon = L.divIcon({
         className: "metro-marker",
         html: `<div class="metro-icon" style="--line-color:${lineColor}">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" fill="${lineColor}" stroke="#fff" stroke-width="2"/>
-            <text x="12" y="16" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="system-ui">T</text>
-          </svg>
+          <div class="metro-dot" style="background:${lineColor}">T</div>
           <span class="metro-label">${station.name}</span>
         </div>`,
-        iconSize: [16, 16],
-        iconAnchor: [8, 8],
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
       });
 
       const marker = L.marker([station.lat, station.lng], { icon, interactive: false, zIndexOffset: -100 }).addTo(map);
