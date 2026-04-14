@@ -17,6 +17,35 @@ self.addEventListener("activate", (e) => {
   self.clients.claim();
 });
 
+self.addEventListener("push", (e) => {
+  if (!e.data) return;
+  let payload = {};
+  try { payload = e.data.json(); } catch { payload = { title: "Soldryck", body: e.data.text() }; }
+  const { title = "Soldryck", body = "", url = "/" } = payload;
+  e.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icons/icon.svg",
+      badge: "/icons/icon.svg",
+      data: { url },
+      tag: "soldryck-sun",
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = e.notification.data?.url || "/";
+  e.waitUntil(
+    self.clients.matchAll({ type: "window" }).then((clients) => {
+      for (const c of clients) {
+        if ("focus" in c) { c.navigate(url); return c.focus(); }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
+  );
+});
+
 self.addEventListener("fetch", (e) => {
   const { request } = e;
   // Skip non-GET and external API calls

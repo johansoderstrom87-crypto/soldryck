@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { type WeatherData, getSymbolInfo, hasSunshine } from "../lib/weather";
 import { VENUE_TYPES, type VenueType, type SunRange } from "./SunMap";
 import { METRO_STATIONS, METRO_LINES, type MetroStation } from "../data/metro-stations";
+import FavoritesPanel from "./FavoritesPanel";
 
 const TYPE_OPTIONS: { value: VenueType; label: string; icon: string }[] = [
   { value: "restaurant", label: "Restaurang", icon: "🍽️" },
@@ -28,6 +29,8 @@ interface HeaderProps {
   onToggleShadows: () => void;
   metroStation: MetroStation | null;
   onMetroStationChange: (station: MetroStation | null) => void;
+  venues: { id: string; name: string; type: string; address: string; lat: number; lng: number }[];
+  onSelectVenue: (id: string) => void;
 }
 
 const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: string; activeClass: string }[] = [
@@ -252,6 +255,8 @@ export default function Header({
   onToggleShadows,
   metroStation,
   onMetroStationChange,
+  venues,
+  onSelectVenue,
 }: HeaderProps) {
   const currentWeather = weather?.hourly[hour];
   const actualSun = currentWeather ? hasSunshine(currentWeather.symbolCode) : true;
@@ -346,6 +351,7 @@ export default function Header({
           {/* Filter + shadow toggle */}
           <div className="flex items-center gap-1.5">
             <FilterButton filter={filter} onFilterChange={onFilterChange} typeFilter={typeFilter} onTypeFilterChange={onTypeFilterChange} sunRange={sunRange} onSunRangeChange={onSunRangeChange} metroStation={metroStation} onMetroStationChange={onMetroStationChange} />
+            <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} />
             <button
               onClick={onToggleShadows}
               className={`rounded-xl shadow-lg backdrop-blur-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all ${

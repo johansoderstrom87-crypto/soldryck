@@ -13,6 +13,7 @@ try {
 
 import { type WeatherData, getSymbolInfo, getCombinedStatus } from "../lib/weather";
 import { METRO_STATIONS, type MetroStation, STATION_RADIUS_M, distanceM } from "../data/metro-stations";
+import { getFavorites, toggleFavorite } from "../lib/favorites";
 
 export interface FeedbackVenue {
   id: string;
@@ -488,7 +489,14 @@ export default function SunMap({ hour, date, filter, typeFilter, sunRange, weath
           ${weatherLine}
           ${bestHourLine}
           <div style="font-size:12px;color:#64748b;margin-top:6px">${sunHours} soltimmar (vid klart v&auml;der)</div>
+          <div id="venue-photo-${venue.id}" style="margin-top:8px"></div>
           <div style="display:flex;gap:6px;margin-top:8px">
+            <button
+              class="fav-btn"
+              data-venue-id="${venue.id}"
+              style="flex:0 0 36px;padding:4px;border:1px solid #fecaca;border-radius:8px;background:#fff;color:#ef4444;font-size:16px;cursor:pointer;text-align:center"
+              title="Spara som favorit"
+            >${getFavorites().has(venue.id) ? "&#10084;&#65039;" : "&#9825;"}</button>
             <button
               class="share-btn"
               data-venue-id="${venue.id}"
@@ -509,6 +517,34 @@ export default function SunMap({ hour, date, filter, typeFilter, sunRange, weath
         .bindPopup(popup);
 
       marker.on("popupopen", () => {
+        // Favorite button
+        const favBtn = document.querySelector(`.fav-btn[data-venue-id="${venue.id}"]`);
+        if (favBtn) {
+          (favBtn as HTMLElement).onclick = () => {
+            const favs = toggleFavorite(venue.id);
+            (favBtn as HTMLElement).innerHTML = favs.has(venue.id) ? "\u2764\uFE0F" : "\u2661";
+          };
+        }
+
+        // Fetch venue photo
+        const photoContainer = document.getElementById(`venue-photo-${venue.id}`);
+        if (photoContainer && !photoContainer.dataset.loaded) {
+          photoContainer.dataset.loaded = "1";
+          const params = new URLSearchParams({
+            id: venue.id,
+            name: venue.name,
+            lat: String(venue.lat),
+            lng: String(venue.lng),
+          });
+          fetch(`/api/venue-photo?${params}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((data) => {
+              if (!data?.photoUrl) return;
+              photoContainer.innerHTML = `<img src="${data.photoUrl}" alt="${venue.name}" style="width:100%;height:120px;object-fit:cover;border-radius:8px;display:block" loading="lazy" />`;
+            })
+            .catch(() => {});
+        }
+
         // Share button
         const shareBtn = document.querySelector(`.share-btn[data-venue-id="${venue.id}"]`);
         if (shareBtn) {

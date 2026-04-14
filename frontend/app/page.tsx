@@ -100,6 +100,8 @@ export default function Home() {
         onToggleShadows={() => setShowShadows((s) => !s)}
         metroStation={metroStation}
         onMetroStationChange={setMetroStation}
+        venues={allVenues}
+        onSelectVenue={(id) => setFocusVenueId(id)}
       />
 
       <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} />

@@ -28,3 +28,17 @@ export async function ensureTable() {
     )
   `);
 }
+
+export async function ensurePushTable() {
+  const p = getPool();
+  if (!p) return;
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      endpoint TEXT PRIMARY KEY,
+      subscription JSONB NOT NULL,
+      favorite_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+      last_notified_date TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+}
