@@ -91,11 +91,6 @@ export default function Home() {
         onTypeFilterChange={setTypeFilter}
         sunRange={sunRange}
         onSunRangeChange={setSunRange}
-        sunCount={sunCount}
-        totalCount={allVenues.length}
-        weather={weatherForDate}
-        weatherLoading={weatherLoading}
-        hour={hour}
         showShadows={showShadows}
         onToggleShadows={() => setShowShadows((s) => !s)}
         metroStation={metroStation}
@@ -111,6 +106,10 @@ export default function Home() {
         onHourChange={setHour}
         date={date}
         onDateChange={setDate}
+        weather={weatherForDate}
+        weatherLoading={weatherLoading}
+        sunCount={sunCount}
+        totalCount={allVenues.length}
       />
 
       {feedbackVenue && (

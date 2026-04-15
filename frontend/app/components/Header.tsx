@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { type WeatherData, getSymbolInfo, hasSunshine } from "../lib/weather";
-import { VENUE_TYPES, type VenueType, type SunRange } from "./SunMap";
+import { type VenueType, type SunRange } from "./SunMap";
 import { METRO_STATIONS, METRO_LINES, type MetroStation } from "../data/metro-stations";
 import FavoritesPanel from "./FavoritesPanel";
 
@@ -20,11 +19,6 @@ interface HeaderProps {
   onTypeFilterChange: (types: Set<VenueType>) => void;
   sunRange: SunRange;
   onSunRangeChange: (range: SunRange) => void;
-  sunCount: number;
-  totalCount: number;
-  weather: WeatherData | null;
-  weatherLoading: boolean;
-  hour: number;
   showShadows: boolean;
   onToggleShadows: () => void;
   metroStation: MetroStation | null;
@@ -246,11 +240,6 @@ export default function Header({
   onTypeFilterChange,
   sunRange,
   onSunRangeChange,
-  sunCount,
-  totalCount,
-  weather,
-  weatherLoading,
-  hour,
   showShadows,
   onToggleShadows,
   metroStation,
@@ -258,138 +247,27 @@ export default function Header({
   venues,
   onSelectVenue,
 }: HeaderProps) {
-  const currentWeather = weather?.hourly[hour];
-  const actualSun = currentWeather ? hasSunshine(currentWeather.symbolCode) : true;
-  const symbolInfo = currentWeather ? getSymbolInfo(currentWeather.symbolCode) : null;
-
-  const forecastHours = Array.from({ length: 16 }, (_, i) => i + 7);
-
   return (
     <div className="absolute top-0 left-0 right-0 z-[1000] pointer-events-none">
       <div className="p-3">
-        {/* Weather + branding + filter */}
-        <div className="flex flex-col gap-1.5 pointer-events-auto max-w-[260px]">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-lg px-3.5 py-2.5">
-            {/* Top row: weather left, branding right */}
-            <div className="flex items-center justify-between gap-2 mb-1.5">
-              {/* Weather info */}
-              {currentWeather && symbolInfo ? (
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-base leading-none">{symbolInfo.icon}</span>
-                  <div className="min-w-0">
-                    <div className="text-xs font-semibold text-slate-800 truncate">
-                      {symbolInfo.label}, {Math.round(currentWeather.temperature)}°C
-                    </div>
-                    <div className="text-[9px] text-slate-400 truncate">
-                      Vind {currentWeather.windSpeed} m/s
-                      {currentWeather.precipMm > 0 ? ` · ${currentWeather.precipMm} mm` : ""}
-                    </div>
-                  </div>
-                </div>
-              ) : weatherLoading ? (
-                <div className="h-4 w-20 bg-slate-100 rounded animate-pulse" />
-              ) : (
-                <div />
-              )}
-
-              {/* Branding + stats */}
-              <div className="text-right flex-shrink-0">
-                <div className="text-sm font-bold text-slate-900 leading-tight">Soldryck</div>
-                <div className="text-[9px] text-slate-400">{sunCount}/{totalCount} sol</div>
-              </div>
-            </div>
-
-            {/* Weather timeline */}
-            {weather && (
-              <div>
-                <div className="flex gap-[2px]">
-                  {forecastHours.map((h) => {
-                    const hw = weather.hourly[h];
-                    const bg = hw
-                      ? (() => {
-                          const s = getSymbolInfo(hw.symbolCode);
-                          return s.category === "clear" ? "#fbbf24"
-                            : s.category === "clouds" ? "#cbd5e1"
-                            : s.category === "rain" ? "#60a5fa"
-                            : s.category === "thunder" ? "#a78bfa"
-                            : "#c4b5fd";
-                        })()
-                      : "#e2e8f0";
-                    const title = hw
-                      ? `${h}:00 — ${getSymbolInfo(hw.symbolCode).label} ${Math.round(hw.temperature)}°C`
-                      : `${h}:00`;
-                    return (
-                      <div
-                        key={h}
-                        className="flex-shrink-0 rounded-sm"
-                        style={{
-                          width: 12, height: 12,
-                          background: bg,
-                          border: h === hour ? "2px solid #0f172a" : "none",
-                          opacity: h === hour ? 1 : 0.6,
-                        }}
-                        title={title}
-                      />
-                    );
-                  })}
-                </div>
-                <div className="flex gap-[2px] mt-0.5">
-                  {forecastHours.map((h) => (
-                    <div
-                      key={h}
-                      className="flex-shrink-0 text-center"
-                      style={{ width: 12, fontSize: 7, lineHeight: 1, color: h === hour ? "#0f172a" : "#94a3b8", fontWeight: h === hour ? 700 : 400 }}
-                    >
-                      {h}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Filter + shadow toggle */}
-          <div className="flex items-center gap-1.5">
-            <FilterButton filter={filter} onFilterChange={onFilterChange} typeFilter={typeFilter} onTypeFilterChange={onTypeFilterChange} sunRange={sunRange} onSunRangeChange={onSunRangeChange} metroStation={metroStation} onMetroStationChange={onMetroStationChange} />
-            <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} />
-            <button
-              onClick={onToggleShadows}
-              className={`rounded-xl shadow-lg backdrop-blur-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all ${
-                showShadows
-                  ? "bg-slate-900 text-white"
-                  : "bg-white/95 text-slate-600 hover:bg-white"
-              }`}
-              title={showShadows ? "Dölj skuggor" : "Visa skuggor"}
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="8" cy="8" r="4" />
-                <path d="M8 4v0a4 4 0 0 1 0 8v0" fill="currentColor" stroke="none" />
-              </svg>
-              Skuggor
-            </button>
-          </div>
-
-          {/* Weather warning — compact */}
-          {currentWeather && !actualSun && symbolInfo && (
-            <div
-              className={`rounded-xl px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 ${
-                symbolInfo.category === "rain" || symbolInfo.category === "thunder"
-                  ? "bg-blue-50/90 text-blue-600 border border-blue-200"
-                  : symbolInfo.category === "snow"
-                  ? "bg-purple-50/90 text-purple-600 border border-purple-200"
-                  : "bg-slate-50/90 text-slate-500 border border-slate-200"
-              }`}
-            >
-              <span>{symbolInfo.icon}</span>
-              <span>
-                {symbolInfo.category === "rain" || symbolInfo.category === "thunder"
-                  ? "Regn — kartan visar sol vid klart väder"
-                  : symbolInfo.category === "snow"
-                  ? "Snö — kartan visar sol vid klart väder"
-                  : "Mulet — solplatserna stämmer vid uppklaring"}
-              </span>
-            </div>
-          )}
+        <div className="flex items-center gap-1.5 pointer-events-auto">
+          <FilterButton filter={filter} onFilterChange={onFilterChange} typeFilter={typeFilter} onTypeFilterChange={onTypeFilterChange} sunRange={sunRange} onSunRangeChange={onSunRangeChange} metroStation={metroStation} onMetroStationChange={onMetroStationChange} />
+          <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} />
+          <button
+            onClick={onToggleShadows}
+            className={`rounded-xl shadow-lg backdrop-blur-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all ${
+              showShadows
+                ? "bg-slate-900 text-white"
+                : "bg-white/95 text-slate-600 hover:bg-white"
+            }`}
+            title={showShadows ? "Dölj skuggor" : "Visa skuggor"}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="8" cy="8" r="4" />
+              <path d="M8 4v0a4 4 0 0 1 0 8v0" fill="currentColor" stroke="none" />
+            </svg>
+            Skuggor
+          </button>
         </div>
       </div>
     </div>
