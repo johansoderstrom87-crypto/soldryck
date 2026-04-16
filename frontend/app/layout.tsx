@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Inter } from "next/font/google";
+import { Geist, Inter, Outfit } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -10,6 +10,12 @@ const geistSans = Geist({
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+});
+
+const outfit = Outfit({
+  variable: "--font-outfit",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
 export const metadata: Metadata = {
@@ -33,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="sv" className={`${geistSans.variable} ${inter.variable} h-full`}>
+    <html lang="sv" className={`${geistSans.variable} ${inter.variable} ${outfit.variable} h-full`}>
       <head>
         <link
           rel="stylesheet"
