@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useCallback } from "react";
+import { useEffect, useRef, useMemo, useCallback, useDeferredValue } from "react";
 import L from "leaflet";
 
 // Load computed data if available, otherwise mock
@@ -242,7 +242,10 @@ function getAmbientColor(hour: number, weatherSymbol?: number): string {
 // Cache for loaded shadow GeoJSON
 const shadowCache = new Map<string, any>();
 
-export default function SunMap({ hour, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, focusVenueId, onFocusHandled, metroStation }: SunMapProps) {
+export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, focusVenueId, onFocusHandled, metroStation }: SunMapProps) {
+  // Defer expensive map rebuild while the user is actively scrubbing the timeline
+  const hour = useDeferredValue(hourProp);
+
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const metroMarkersRef = useRef<L.Marker[]>([]);
