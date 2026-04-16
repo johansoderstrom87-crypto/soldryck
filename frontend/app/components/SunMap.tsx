@@ -196,47 +196,99 @@ function resolveBadgeCollisions(map: L.Map, markers: L.Marker[]) {
 }
 
 /**
- * Calculate ambient darkness (0 = bright daylight, 1 = dark night).
- * Combines time-of-day (sunrise/sunset curve) with weather conditions.
- * Stockholm approximate sunrise/sunset for April–October:
- *   Sunrise ~5–7, Sunset ~18–22 depending on month.
- *   We use a simplified model based on hour only.
+ * Sunrise/sunset in local CEST hours for Stockholm (59.33°N, 18.07°E).
+ * Uses a standard solar declination approximation — accurate to within ~5 min
+ * for our purposes, which is plenty for an ambient lighting effect.
  */
-function getAmbientDarkness(hour: number, weatherSymbol?: number): number {
-  // Time-based darkness (golden hour curve)
-  let timeDark = 0;
-  if (hour <= 6) timeDark = 0.35 - (hour - 5) * 0.15;       // 5→0.5, 6→0.35, ramping down
-  else if (hour <= 8) timeDark = 0.05 + (8 - hour) * 0.05;   // gentle morning warmth
-  else if (hour <= 17) timeDark = 0;                           // full daylight
-  else if (hour <= 19) timeDark = (hour - 17) * 0.05;         // golden hour
-  else if (hour <= 21) timeDark = 0.1 + (hour - 19) * 0.12;  // dusk
-  else timeDark = 0.34 + (hour - 21) * 0.08;                  // late evening
+function getSunTimes(date: Date): { sunrise: number; sunset: number } {
+  const lat = 59.33;
+  const lng = 18.07;
+  const start = new Date(date.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((date.getTime() - start.getTime()) / 86400000);
+  const decl = 0.4093 * Math.sin((2 * Math.PI * (dayOfYear - 81)) / 365);
+  const cosH = -Math.tan((lat * Math.PI) / 180) * Math.tan(decl);
+  if (cosH >= 1) return { sunrise: 12, sunset: 12 };   // polar night (not expected Apr–Oct)
+  if (cosH <= -1) return { sunrise: 0, sunset: 24 };   // midnight sun
+  const H = (Math.acos(cosH) * 180) / Math.PI;
+  const hours = H / 15;
+  const solarNoon = 12 - lng / 15 + 2; // CEST (UTC+2), matches shadow pipeline
+  return { sunrise: solarNoon - hours, sunset: solarNoon + hours };
+}
 
-  timeDark = Math.max(0, Math.min(timeDark, 0.5));
+/**
+ * Calculate ambient darkness (0 = bright daylight, 1 = dark night).
+ * Follows the actual sunrise/sunset for the selected date, and adds extra
+ * darkening for overcast/rainy weather.
+ */
+function getAmbientDarkness(hour: number, date: Date, weatherSymbol?: number): number {
+  const { sunrise, sunset } = getSunTimes(date);
 
-  // Weather-based darkness
+  // Twilight curve anchored to sunrise/sunset.
+  //   Deep night until 1.5h before sunrise, dawn ramp down to full daylight ~1h after,
+  //   then full daylight until 1h before sunset, golden-hour ramp up to deep night ~1.5h after.
+  let timeDark: number;
+  if (hour <= sunrise - 1.5) timeDark = 0.55;
+  else if (hour <= sunrise - 0.25) timeDark = 0.55 - ((hour - (sunrise - 1.5)) / 1.25) * 0.35;
+  else if (hour <= sunrise + 1) timeDark = 0.20 - ((hour - (sunrise - 0.25)) / 1.25) * 0.20;
+  else if (hour <= sunset - 1) timeDark = 0;
+  else if (hour <= sunset + 0.25) timeDark = ((hour - (sunset - 1)) / 1.25) * 0.20;
+  else if (hour <= sunset + 1.5) timeDark = 0.20 + ((hour - (sunset + 0.25)) / 1.25) * 0.35;
+  else timeDark = 0.55;
+
+  // Weather-based adjustment. Clear sky adds a tiny warm overlay (tinted below),
+  // while overcast/rain/thunder layers on substantial darkness.
   let weatherDark = 0;
-  if (weatherSymbol) {
-    if (weatherSymbol === 3 || weatherSymbol === 4) weatherDark = 0.06;     // partly cloudy
-    else if (weatherSymbol === 5 || weatherSymbol === 6) weatherDark = 0.14; // overcast
-    else if (weatherSymbol === 7) weatherDark = 0.16;                        // fog
-    else if (weatherSymbol >= 8 && weatherSymbol <= 10) weatherDark = 0.16;  // rain showers
-    else if (weatherSymbol >= 18 && weatherSymbol <= 20) weatherDark = 0.18; // steady rain
-    else if (weatherSymbol === 11 || weatherSymbol === 21) weatherDark = 0.22; // thunder
-    else if (weatherSymbol >= 12 && weatherSymbol <= 17) weatherDark = 0.14; // snow showers
-    else if (weatherSymbol >= 22 && weatherSymbol <= 27) weatherDark = 0.16; // snow/sleet
+  if (weatherSymbol !== undefined) {
+    if (weatherSymbol === 1) weatherDark = 0.03;
+    else if (weatherSymbol === 2) weatherDark = 0.02;
+    else if (weatherSymbol === 3) weatherDark = 0.05;
+    else if (weatherSymbol === 4) weatherDark = 0.11;
+    else if (weatherSymbol === 5) weatherDark = 0.18;
+    else if (weatherSymbol === 6) weatherDark = 0.26;
+    else if (weatherSymbol === 7) weatherDark = 0.20;
+    else if (weatherSymbol >= 8 && weatherSymbol <= 10) weatherDark = 0.20 + (weatherSymbol - 8) * 0.05;
+    else if (weatherSymbol === 11 || weatherSymbol === 21) weatherDark = 0.34;
+    else if (weatherSymbol >= 12 && weatherSymbol <= 17) weatherDark = 0.20;
+    else if (weatherSymbol >= 18 && weatherSymbol <= 20) weatherDark = 0.24 + (weatherSymbol - 18) * 0.05;
+    else if (weatherSymbol >= 22 && weatherSymbol <= 24) weatherDark = 0.22;
+    else if (weatherSymbol >= 25 && weatherSymbol <= 27) weatherDark = 0.26;
   }
 
-  return Math.min(timeDark + weatherDark, 0.55);
+  return Math.max(0, Math.min(timeDark + weatherDark, 0.65));
 }
 
 /** Get warm/cool tint color based on time of day and weather */
-function getAmbientColor(hour: number, weatherSymbol?: number): string {
-  // Cloudy/rainy weather → grey-blue tint even during daytime
-  if (weatherSymbol && weatherSymbol >= 5) return "50, 60, 80";  // desaturated grey-blue
-  if (hour <= 7 || hour >= 19) return "30, 20, 60";              // warm blue-purple for dawn/dusk
-  if (hour >= 17) return "40, 20, 10";                            // warm golden tint
-  return "15, 23, 42";                                             // neutral slate
+function getAmbientColor(hour: number, date: Date, weatherSymbol?: number): string {
+  const { sunrise, sunset } = getSunTimes(date);
+
+  // Rain/thunder — deep cold grey-blue
+  if (
+    weatherSymbol &&
+    (weatherSymbol === 11 ||
+      weatherSymbol === 21 ||
+      (weatherSymbol >= 8 && weatherSymbol <= 10) ||
+      (weatherSymbol >= 18 && weatherSymbol <= 20))
+  ) {
+    return "35, 42, 58";
+  }
+
+  // Overcast / fog — flat grey
+  if (weatherSymbol === 5 || weatherSymbol === 6 || weatherSymbol === 7) {
+    return "60, 65, 78";
+  }
+
+  // Clear / nearly clear during daytime — warm golden overlay so slight alpha reads as sunlit
+  if (weatherSymbol !== undefined && weatherSymbol <= 2 && hour > sunrise && hour < sunset) {
+    return "255, 210, 140";
+  }
+
+  // Golden hour around sunset — warm orange
+  if (hour >= sunset - 0.5 && hour <= sunset + 1) return "60, 30, 15";
+
+  // Pre-dawn / late evening — cool blue-purple
+  if (hour <= sunrise + 0.5 || hour >= sunset + 1) return "30, 25, 55";
+
+  return "15, 23, 42"; // neutral slate
 }
 
 // Cache for loaded shadow GeoJSON
@@ -664,8 +716,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   }, [hour, dateKey, showShadows]);
 
   const currentWeatherSymbol = weather?.hourly[hour]?.symbolCode;
-  const darkness = getAmbientDarkness(hour, currentWeatherSymbol);
-  const ambientColor = getAmbientColor(hour, currentWeatherSymbol);
+  const darkness = getAmbientDarkness(hour, date, currentWeatherSymbol);
+  const ambientColor = getAmbientColor(hour, date, currentWeatherSymbol);
 
   return (
     <div className="w-full h-full relative">
