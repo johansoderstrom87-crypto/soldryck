@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useCallback, useDeferredValue } from "react";
+import { useEffect, useRef, useMemo, useDeferredValue } from "react";
 import L from "leaflet";
 
 // Load computed data if available, otherwise mock
@@ -303,6 +303,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const metroMarkersRef = useRef<L.Marker[]>([]);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const ambientOverlayRef = useRef<HTMLDivElement | null>(null);
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
 
@@ -719,16 +720,36 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const darkness = getAmbientDarkness(hour, date, currentWeatherSymbol);
   const ambientColor = getAmbientColor(hour, date, currentWeatherSymbol);
 
+  // Inject ambient overlay INSIDE the leaflet container, with a z-index that
+  // sits above the tile/shadow/overlay panes but below the marker/popup panes —
+  // so the map darkens but venue badges and popups stay bright.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !mapRef.current) return;
+    if (ambientOverlayRef.current) return;
+    const ov = document.createElement("div");
+    ov.style.position = "absolute";
+    ov.style.inset = "0";
+    ov.style.pointerEvents = "none";
+    ov.style.zIndex = "550";
+    ov.style.transition = "background 0.8s ease";
+    container.appendChild(ov);
+    ambientOverlayRef.current = ov;
+    return () => {
+      ov.remove();
+      ambientOverlayRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const ov = ambientOverlayRef.current;
+    if (!ov) return;
+    ov.style.background = `rgba(${ambientColor}, ${darkness})`;
+  }, [ambientColor, darkness]);
+
   return (
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
-      <div
-        className="absolute inset-0 pointer-events-none z-[400]"
-        style={{
-          background: `rgba(${ambientColor}, ${darkness})`,
-          transition: "background 0.8s ease",
-        }}
-      />
     </div>
   );
 }
