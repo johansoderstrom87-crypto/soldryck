@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useEffect } from "react";
-import { type WeatherData, getSymbolInfo, hasSunshine } from "../lib/weather";
+import { useMemo, useRef, useState, useCallback } from "react";
+import { type WeatherData, getSymbolInfo } from "../lib/weather";
 
 interface TimeSliderProps {
   hour: number;
@@ -14,20 +14,19 @@ interface TimeSliderProps {
   totalCount: number;
 }
 
-const DAY_NAMES = ["Sön", "Mån", "Tis", "Ons", "Tor", "Fre", "Lör"];
+const DAY_NAMES = ["SÖN", "MÅN", "TIS", "ONS", "TOR", "FRE", "LÖR"];
 const MONTH_NAMES_SHORT = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
 const MONTHS = [
   { label: "APR", month: 3 },
   { label: "MAJ", month: 4 },
-  { label: "JUN", month: 5 },
-  { label: "JUL", month: 6 },
+  { label: "JUNI", month: 5 },
+  { label: "JULI", month: 6 },
   { label: "AUG", month: 7 },
   { label: "SEP", month: 8 },
   { label: "OKT", month: 9 },
 ];
 
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 7); // 7–22
-const HOUR_WIDTH = 44; // px per hour column
 
 export default function TimeSlider({
   hour,
@@ -39,13 +38,14 @@ export default function TimeSlider({
   sunCount,
   totalCount,
 }: TimeSliderProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
 
-  // Generate 8 days: today + 7 days forward
+  // Generate 7 days: today + 6 days forward (matches image layout)
   const days = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return Array.from({ length: 8 }, (_, i) => {
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
       d.setDate(d.getDate() + i);
       return d;
@@ -60,184 +60,196 @@ export default function TimeSlider({
   const isInDayRange = days.some((d) => d.toISOString().slice(0, 10) === selectedDateStr);
 
   const currentWeather = weather?.hourly[hour];
-  const symbolInfo = currentWeather ? getSymbolInfo(currentWeather.symbolCode) : null;
-  const actualSun = currentWeather ? hasSunshine(currentWeather.symbolCode) : true;
 
-  // Smooth scroll to selected hour
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const targetScroll = (hour - 7) * HOUR_WIDTH - el.clientWidth / 2 + HOUR_WIDTH / 2;
-    el.scrollTo({ left: Math.max(0, targetScroll), behavior: "smooth" });
-  }, [hour]);
+  const updateHourFromClientX = useCallback(
+    (clientX: number) => {
+      const el = trackRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const idx = Math.round(ratio * (HOURS.length - 1));
+      const h = HOURS[idx];
+      if (h !== undefined && h !== hour) onHourChange(h);
+    },
+    [hour, onHourChange]
+  );
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDragging(true);
+    updateHourFromClientX(e.clientX);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    updateHourFromClientX(e.clientX);
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    setDragging(false);
+  };
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-[1000] p-3 pointer-events-none">
-      <div
-        className="pointer-events-auto max-w-4xl mx-auto rounded-3xl overflow-hidden shadow-2xl"
-        style={{
-          background: "rgba(30, 30, 40, 0.55)",
-          backdropFilter: "blur(20px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(20px) saturate(1.4)",
-          border: "0.5px solid rgba(255, 255, 255, 0.1)",
-          fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
-        }}
-      >
-        {/* Weather warning */}
-        {currentWeather && !actualSun && symbolInfo && (
+    <div
+      className="absolute bottom-0 left-0 right-0 z-[1000] p-3 pointer-events-none"
+      style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}
+    >
+      {/* Floating weather text — no background */}
+      <div className="text-center mb-2 pointer-events-none min-h-[28px]">
+        {currentWeather ? (
           <div
-            className={`px-4 py-1.5 text-[10px] font-medium flex items-center justify-center gap-1.5 ${
-              symbolInfo.category === "rain" || symbolInfo.category === "thunder"
-                ? "bg-blue-500/20 text-blue-200"
-                : symbolInfo.category === "snow"
-                ? "bg-purple-500/20 text-purple-200"
-                : "bg-slate-500/20 text-slate-200"
-            }`}
+            className="inline-flex items-baseline gap-2 tabular-nums"
+            style={{ textShadow: "0 1px 4px rgba(0,0,0,0.6), 0 0 12px rgba(0,0,0,0.4)" }}
           >
-            <span>{symbolInfo.icon}</span>
-            <span>
-              {symbolInfo.category === "rain" || symbolInfo.category === "thunder"
-                ? "Regn — kartan visar sol vid klart väder"
-                : symbolInfo.category === "snow"
-                ? "Snö — kartan visar sol vid klart väder"
-                : "Mulet — solplatserna stämmer vid uppklaring"}
+            <span
+              className="text-white"
+              style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1 }}
+            >
+              {Math.round(currentWeather.temperature)}°C
+            </span>
+            <span className="text-white/85" style={{ fontSize: 12, fontWeight: 500 }}>
+              {currentWeather.windSpeed} m/s
             </span>
           </div>
+        ) : weatherLoading ? null : (
+          <span
+            className="text-white/85 text-xs"
+            style={{ textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}
+          >
+            {sunCount}/{totalCount} ställen i sol
+          </span>
         )}
+      </div>
 
-        <div className="px-4 pt-3 pb-2.5">
-          {/* Featured weather — current hour temp/wind/icon */}
-          <div className="flex items-center justify-center gap-3 mb-2">
-            {currentWeather && symbolInfo ? (
-              <>
-                <span className="text-3xl leading-none">{symbolInfo.icon}</span>
-                <div className="flex items-baseline gap-2">
-                  <span
-                    className="text-2xl leading-none text-white tabular-nums"
-                    style={{ fontWeight: 700, letterSpacing: "-0.02em" }}
-                  >
-                    {Math.round(currentWeather.temperature)}°C
-                  </span>
-                  <span className="text-[11px] text-white/60 font-medium uppercase tracking-wide">
-                    {currentWeather.windSpeed} m/s
-                  </span>
+      <div
+        className="pointer-events-auto max-w-md mx-auto rounded-2xl"
+        style={{
+          background: "rgba(20, 20, 28, 0.45)",
+          backdropFilter: "blur(18px) saturate(1.3)",
+          WebkitBackdropFilter: "blur(18px) saturate(1.3)",
+          border: "0.5px solid rgba(255, 255, 255, 0.08)",
+        }}
+      >
+        <div className="px-3 pt-2 pb-2.5">
+          {/* Weather icons row (above gradient) */}
+          <div className="flex items-end mb-1" style={{ height: 22 }}>
+            {HOURS.map((h) => {
+              const hw = weather?.hourly[h];
+              const hwSymbol = hw ? getSymbolInfo(hw.symbolCode) : null;
+              const isSelected = h === hour;
+              return (
+                <div
+                  key={h}
+                  className="flex-1 flex items-end justify-center transition-all duration-200 ease-out"
+                  style={{
+                    fontSize: isSelected ? 18 : 11,
+                    opacity: isSelected ? 1 : 0.6,
+                    lineHeight: 1,
+                    filter: isSelected ? "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" : "none",
+                  }}
+                >
+                  {hwSymbol?.icon ?? "·"}
                 </div>
-              </>
-            ) : weatherLoading ? (
-              <div className="h-6 w-32 bg-white/10 rounded animate-pulse" />
-            ) : (
-              <span className="text-xs text-white/60">{sunCount}/{totalCount} ställen i sol</span>
-            )}
+              );
+            })}
           </div>
 
-          {/* Hour timeline — scrollable with gradient + weather icons + big selected hour */}
-          <div className="relative">
+          {/* Draggable gradient slider */}
+          <div
+            ref={trackRef}
+            className="relative select-none touch-none"
+            style={{ touchAction: "none", cursor: dragging ? "grabbing" : "grab" }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+          >
+            {/* Thin sun gradient strip */}
             <div
-              ref={scrollRef}
-              className="overflow-x-auto scrollbar-hide py-1"
+              className="rounded-full"
               style={{
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-                WebkitOverflowScrolling: "touch",
+                height: 26,
+                background:
+                  "linear-gradient(90deg, rgba(30,30,50,0.85) 0%, rgba(255,180,80,0.45) 22%, rgba(255,225,150,0.75) 50%, rgba(255,180,80,0.45) 78%, rgba(30,30,50,0.85) 100%)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.1), inset 0 -1px 1px rgba(0,0,0,0.2)",
+              }}
+            />
+
+            {/* Hour numbers over gradient */}
+            <div className="absolute inset-0 flex items-center pointer-events-none">
+              {HOURS.map((h) => {
+                const isSelected = h === hour;
+                return (
+                  <div
+                    key={h}
+                    className="flex-1 flex justify-center tabular-nums transition-all duration-200"
+                    style={{
+                      fontSize: isSelected ? 0 : 10,
+                      fontWeight: 600,
+                      color: "rgba(255,255,255,0.9)",
+                      textShadow: "0 1px 2px rgba(0,0,0,0.4)",
+                    }}
+                  >
+                    {h}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Selected hour orange pill */}
+            <div
+              className="absolute top-1/2 flex items-center justify-center rounded-full pointer-events-none tabular-nums"
+              style={{
+                left: `${((hour - 7 + 0.5) / HOURS.length) * 100}%`,
+                transform: "translate(-50%, -50%)",
+                width: 38,
+                height: 38,
+                background: "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)",
+                boxShadow:
+                  "0 0 24px rgba(251, 146, 60, 0.6), 0 4px 14px rgba(251, 146, 60, 0.45), inset 0 1px 1px rgba(255,255,255,0.25)",
+                color: "#fff",
+                fontSize: 16,
+                fontWeight: 900,
+                letterSpacing: "-0.02em",
+                transition: dragging ? "none" : "left 0.22s ease-out",
               }}
             >
-              <div
-                className="relative flex items-end"
-                style={{ width: HOURS.length * HOUR_WIDTH, height: 96 }}
-              >
-                {/* Sun gradient strip behind hour numbers */}
-                <div
-                  className="absolute left-0 right-0 rounded-2xl"
-                  style={{
-                    bottom: 0,
-                    height: 56,
-                    background: "linear-gradient(90deg, rgba(15,23,42,0.9) 0%, rgba(255,180,80,0.35) 25%, rgba(255,220,140,0.6) 50%, rgba(255,180,80,0.35) 75%, rgba(15,23,42,0.9) 100%)",
-                  }}
-                />
-
-                {HOURS.map((h) => {
-                  const hw = weather?.hourly[h];
-                  const isSelected = h === hour;
-                  const hwSymbol = hw ? getSymbolInfo(hw.symbolCode) : null;
-                  return (
-                    <button
-                      key={h}
-                      onClick={() => onHourChange(h)}
-                      className="relative flex flex-col items-center justify-end flex-shrink-0 group"
-                      style={{ width: HOUR_WIDTH, height: "100%" }}
-                      title={hw ? `${h}:00 — ${hwSymbol?.label} ${Math.round(hw.temperature)}°C` : `${h}:00`}
-                    >
-                      {/* Weather icon above */}
-                      <span
-                        className="relative z-10 transition-all duration-300 ease-out"
-                        style={{
-                          fontSize: isSelected ? 24 : 14,
-                          opacity: isSelected ? 1 : 0.55,
-                          marginBottom: isSelected ? 6 : 10,
-                          filter: isSelected ? "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" : "none",
-                          lineHeight: 1,
-                        }}
-                      >
-                        {hwSymbol?.icon ?? "·"}
-                      </span>
-
-                      {/* Hour number */}
-                      <div
-                        className="relative z-10 flex items-center justify-center transition-all duration-300 ease-out tabular-nums"
-                        style={{
-                          width: isSelected ? 52 : HOUR_WIDTH - 4,
-                          height: isSelected ? 52 : 36,
-                          marginBottom: isSelected ? -8 : 0,
-                          fontWeight: isSelected ? 900 : 500,
-                          fontSize: isSelected ? 26 : 14,
-                          color: isSelected ? "#fff" : "rgba(255,255,255,0.75)",
-                          background: isSelected
-                            ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
-                            : "transparent",
-                          borderRadius: isSelected ? 16 : 8,
-                          boxShadow: isSelected
-                            ? "0 0 30px rgba(251, 146, 60, 0.6), 0 8px 24px rgba(251, 146, 60, 0.4), inset 0 1px 1px rgba(255,255,255,0.2)"
-                            : "none",
-                          letterSpacing: isSelected ? "-0.03em" : "0",
-                        }}
-                      >
-                        {isSelected ? String(h).padStart(2, "0") : h}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              {hour}
             </div>
           </div>
 
           {/* Day pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pt-3 pb-1 -mx-1 px-1"
-               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+          <div className="flex items-stretch gap-1 mt-3">
             {days.map((d, i) => {
               const dStr = d.toISOString().slice(0, 10);
               const isSelected = selectedDateStr === dStr;
-              const dayName = i === 0 ? "IDAG" : (DAY_NAMES[d.getDay()] ?? "").toUpperCase();
+              const dayName = i === 0 ? "IDAG" : (DAY_NAMES[d.getDay()] ?? "");
               const dateLabel = `${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
               return (
                 <button
                   key={dStr}
                   onClick={() => onDateChange(d)}
-                  className="flex-shrink-0 rounded-full px-3 py-1.5 transition-all duration-200 flex flex-col items-center min-w-[56px]"
+                  className="flex-1 rounded-full px-1 py-1 transition-all duration-200 flex flex-col items-center justify-center"
                   style={{
                     background: isSelected
                       ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
-                      : "rgba(255, 255, 255, 0.08)",
-                    boxShadow: isSelected
-                      ? "0 4px 16px rgba(251, 146, 60, 0.4)"
-                      : "none",
-                    color: isSelected ? "#fff" : "rgba(255, 255, 255, 0.75)",
+                      : "rgba(255, 255, 255, 0.06)",
+                    boxShadow: isSelected ? "0 3px 12px rgba(251, 146, 60, 0.4)" : "none",
+                    color: isSelected ? "#fff" : "rgba(255, 255, 255, 0.72)",
+                    minWidth: 0,
                   }}
                 >
-                  <span className="text-[10px] font-bold tracking-wider leading-none">{dayName}</span>
                   <span
-                    className="text-[9px] leading-tight mt-0.5"
+                    className="text-[9px] font-bold tracking-wider leading-none"
+                    style={{ letterSpacing: "0.08em" }}
+                  >
+                    {dayName}
+                  </span>
+                  <span
+                    className="text-[8.5px] leading-tight mt-0.5 tabular-nums"
                     style={{
-                      color: isSelected ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.5)",
+                      color: isSelected ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.45)",
                       fontWeight: 500,
                     }}
                   >
@@ -249,8 +261,7 @@ export default function TimeSlider({
           </div>
 
           {/* Month pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pt-1.5 -mx-1 px-1"
-               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+          <div className="flex items-stretch gap-1 mt-1.5">
             {MONTHS.map(({ label, month }) => {
               const isSelected = !isInDayRange && selectedMonth === month;
               const isCurrent = now.getMonth() === month;
@@ -261,19 +272,20 @@ export default function TimeSlider({
                     const d = new Date(now.getFullYear(), month, 15);
                     onDateChange(d);
                   }}
-                  className="flex-shrink-0 rounded-full px-3.5 py-1 transition-all duration-200 text-[10px] font-bold tracking-wider"
+                  className="flex-1 rounded-full py-1 transition-all duration-200 text-[9px] font-bold tracking-wider"
                   style={{
                     background: isSelected
                       ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
                       : isCurrent && isInDayRange
-                      ? "rgba(251, 146, 60, 0.2)"
-                      : "rgba(255, 255, 255, 0.05)",
+                      ? "rgba(251, 146, 60, 0.18)"
+                      : "rgba(255, 255, 255, 0.04)",
                     color: isSelected
                       ? "#fff"
                       : isCurrent && isInDayRange
                       ? "#fdba74"
                       : "rgba(255, 255, 255, 0.55)",
-                    boxShadow: isSelected ? "0 4px 12px rgba(251, 146, 60, 0.4)" : "none",
+                    boxShadow: isSelected ? "0 3px 10px rgba(251, 146, 60, 0.4)" : "none",
+                    letterSpacing: "0.08em",
                   }}
                 >
                   {label}
