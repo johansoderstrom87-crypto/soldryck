@@ -38,31 +38,41 @@ body {
 }
 
 /* Sun status marker */
-.marker-sun {
-  background: #f59e0b;
+/* Marker wrapper — positioning container, no visual styling */
+.marker-root {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Marker dot — the coloured circle. Isolated from the badge so we can darken
+   it with an ambient filter without touching the name label. */
+.marker-dot {
+  width: 100%;
+  height: 100%;
   border: 3px solid #fff;
   border-radius: 50%;
+  box-sizing: border-box;
+  filter: var(--marker-dot-filter, none);
+  transition: filter 0.8s ease;
+}
+
+.marker-dot.marker-sun {
+  background: #f59e0b;
   box-shadow: 0 0 12px rgba(245, 158, 11, 0.5), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.marker-shade {
+.marker-dot.marker-shade {
   background: #94a3b8;
-  border: 3px solid #fff;
-  border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.marker-partial {
+.marker-dot.marker-partial {
   background: #fb923c;
-  border: 3px solid #fff;
-  border-radius: 50%;
   box-shadow: 0 0 8px rgba(251, 146, 60, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.marker-rain {
+.marker-dot.marker-rain {
   background: #60a5fa;
-  border: 3px solid #fff;
-  border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
@@ -82,8 +92,6 @@ body {
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
   align-items: center;
   gap: 6px;
-  /* Counter the marker-pane brightness filter so badge cards stay bright */
-  filter: brightness(calc(1 / var(--marker-brightness, 1)));
 }
 
 .show-badges .marker-badge {

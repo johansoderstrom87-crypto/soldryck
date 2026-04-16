@@ -449,8 +449,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           <div class="marker-badge-arrow"></div>
         </div>` : "";
       const icon = L.divIcon({
-        className: markerClass,
-        html: badgeHtml,
+        className: "marker-root",
+        html: `<div class="marker-dot ${markerClass}"></div>${badgeHtml}`,
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
         popupAnchor: [0, -size / 2 - 4],
@@ -788,19 +788,19 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const darkness = getAmbientDarkness(hour, date, currentWeatherSymbol);
   const ambientColor = getAmbientColor(hour, date, currentWeatherSymbol);
 
-  // Apply darkening directly to Leaflet's tile + overlay + marker panes via
-  // CSS filter. Pane-level filter is the only reliable way to avoid affecting
-  // popups — leaflet-map-pane has a CSS transform and so forms its own
-  // stacking context, which traps any outer overlay above every inner pane
-  // including popups. Badges (children of marker icons) get counter-brightened
-  // via a CSS variable so they remain fully legible when the map darkens.
+  // Darken the map via CSS filter on Leaflet's tile + overlay panes — this is
+  // the only reliable way to avoid affecting popups, because leaflet-map-pane
+  // has a CSS transform and forms its own stacking context (anything layered
+  // outside it ends up above every pane, including the popup pane).
+  //
+  // Markers get their own dampening via a CSS variable on the `.marker-dot`
+  // child element, leaving the sibling `.marker-badge` untouched.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const tilePane = container.querySelector<HTMLElement>(".leaflet-tile-pane");
     const overlayPane = container.querySelector<HTMLElement>(".leaflet-overlay-pane");
-    const markerPane = container.querySelector<HTMLElement>(".leaflet-marker-pane");
-    if (!tilePane || !overlayPane || !markerPane) return;
+    if (!tilePane || !overlayPane) return;
 
     const brightness = Math.max(0.35, 1 - darkness * 0.9);
     const [r, , b] = ambientColor.split(",").map((n) => Number(n.trim()));
@@ -809,18 +809,14 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     const saturate = 1 - darkness * 0.25;
 
     const tileFilter = `brightness(${brightness}) saturate(${saturate}) hue-rotate(${hueRotate}deg)`;
-    // Markers get only the brightness/saturate shift (no hue rotation — their
-    // colour semantics matter), and a softer dampening than tiles.
-    const markerBrightness = Math.max(0.55, 1 - darkness * 0.55);
-    const markerFilter = `brightness(${markerBrightness}) saturate(${saturate})`;
-
     tilePane.style.filter = tileFilter;
     tilePane.style.transition = "filter 0.8s ease";
     overlayPane.style.filter = tileFilter;
     overlayPane.style.transition = "filter 0.8s ease";
-    markerPane.style.filter = markerFilter;
-    markerPane.style.transition = "filter 0.8s ease";
-    container.style.setProperty("--marker-brightness", String(markerBrightness));
+
+    const markerBrightness = Math.max(0.55, 1 - darkness * 0.55);
+    const markerSaturate = 1 - darkness * 0.2;
+    container.style.setProperty("--marker-dot-filter", `brightness(${markerBrightness}) saturate(${markerSaturate})`);
   }, [darkness, ambientColor]);
 
   return (
