@@ -172,10 +172,10 @@ export default function TimeSlider({
         }}
       >
         <div className="px-3 pt-1 pb-2.5" style={{ overflow: "visible" }}>
-          {/* Weather icons row — selected bigger, may poke above panel top edge */}
+          {/* Weather icons row — absolutely positioned to align with hour cells, scaled (no reflow) */}
           <div
-            className="flex items-end mb-1"
-            style={{ height: 26, overflow: "visible" }}
+            className="relative mb-1"
+            style={{ height: 30, overflow: "visible" }}
           >
             {HOURS.map((h) => {
               const hw = getHourWeather(h);
@@ -185,16 +185,24 @@ export default function TimeSlider({
               return (
                 <div
                   key={h}
-                  className="flex-1 flex items-end justify-center transition-all duration-200 ease-out"
+                  className="absolute flex items-end justify-center"
                   style={{
-                    fontSize: isSelected ? 32 : 14,
+                    left: `${((h - 7 + 0.5) / HOURS.length) * 100}%`,
+                    bottom: 0,
+                    width: 20,
+                    marginLeft: -10,
+                    fontSize: 14,
+                    lineHeight: 1,
+                    transform: `scale(${isSelected ? 2.2 : 1})`,
+                    transformOrigin: "bottom center",
                     opacity: isSelected ? 1 : past ? 0.35 : 0.85,
                     filter: past
                       ? "grayscale(1)"
                       : isSelected
                       ? "drop-shadow(0 2px 4px rgba(0,0,0,0.25))"
                       : "none",
-                    lineHeight: 1,
+                    willChange: "transform",
+                    transition: "transform 0.22s ease-out, opacity 0.22s ease-out",
                   }}
                 >
                   {hwSymbol?.icon ?? "·"}
@@ -225,26 +233,28 @@ export default function TimeSlider({
               }}
             />
 
-            {/* Hour numbers over gradient */}
-            <div className="absolute inset-0 flex items-center pointer-events-none">
-              {HOURS.map((h) => {
-                const isSelected = h === hour;
-                const past = isPastHour(h);
-                return (
-                  <div
-                    key={h}
-                    className="flex-1 flex justify-center tabular-nums transition-colors"
-                    style={{
-                      fontSize: isSelected ? 0 : 10,
-                      fontWeight: 700,
-                      color: past ? "rgba(0,0,0,0.38)" : "rgba(0,0,0,0.85)",
-                    }}
-                  >
-                    {h}
-                  </div>
-                );
-              })}
-            </div>
+            {/* Hour numbers — absolutely positioned (no layout changes on hour tick) */}
+            {HOURS.map((h) => {
+              const isSelected = h === hour;
+              const past = isPastHour(h);
+              return (
+                <div
+                  key={h}
+                  className="absolute top-1/2 tabular-nums pointer-events-none"
+                  style={{
+                    left: `${((h - 7 + 0.5) / HOURS.length) * 100}%`,
+                    transform: "translate(-50%, -50%)",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: past ? "rgba(0,0,0,0.38)" : "rgba(0,0,0,0.85)",
+                    opacity: isSelected ? 0 : 1,
+                    transition: "opacity 0.15s ease-out, color 0.2s",
+                  }}
+                >
+                  {h}
+                </div>
+              );
+            })}
 
             {/* Selected hour orange pill — larger */}
             <div
@@ -261,6 +271,7 @@ export default function TimeSlider({
                 fontSize: 18,
                 fontWeight: 900,
                 letterSpacing: "-0.02em",
+                willChange: "left",
                 transition: dragging ? "none" : "left 0.22s ease-out",
               }}
             >
