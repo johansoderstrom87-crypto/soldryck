@@ -1,18 +1,42 @@
 import { NextRequest } from "next/server";
 
+type DaySegment = { open: string; close: string };
 type HoursInfo = {
   openNow: boolean | null;
   closesAt: string | null; // "22:00"
-  weekday: string[] | null; // ["Måndag: 11:00–22:00", ...]
+  // 7 entries, Monday..Sunday. Each day may have zero or more open/close segments.
+  week: DaySegment[][] | null;
 };
 
 const cache = new Map<string, { info: HoursInfo; ts: number }>();
 const CACHE_TTL = 1000 * 60 * 60 * 24 * 30; // 30 days
 
-const WEEKDAY_SV = ["Måndag", "Tisdag", "Onsdag", "Torsdag", "Fredag", "Lördag", "Söndag"];
-
 function emptyInfo(): HoursInfo {
-  return { openNow: null, closesAt: null, weekday: null };
+  return { openNow: null, closesAt: null, week: null };
+}
+
+function hhmm(h?: number, m?: number): string {
+  return `${String(h ?? 0).padStart(2, "0")}:${String(m ?? 0).padStart(2, "0")}`;
+}
+
+// Places API day index: 0=Sun..6=Sat. Our UI uses 0=Mon..6=Sun.
+function toMon0(d: number): number {
+  return (d + 6) % 7;
+}
+
+function buildWeek(periods: unknown): DaySegment[][] | null {
+  if (!Array.isArray(periods) || periods.length === 0) return null;
+  const week: DaySegment[][] = [[], [], [], [], [], [], []];
+  for (const p of periods as Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }>) {
+    const openDay = p.open?.day;
+    if (typeof openDay !== "number") continue;
+    const dayIdx = toMon0(openDay);
+    week[dayIdx].push({
+      open: hhmm(p.open?.hour, p.open?.minute),
+      close: hhmm(p.close?.hour, p.close?.minute),
+    });
+  }
+  return week;
 }
 
 export async function GET(req: NextRequest) {
@@ -43,7 +67,7 @@ export async function GET(req: NextRequest) {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": key,
         "X-Goog-FieldMask":
-          "places.id,places.regularOpeningHours.weekdayDescriptions,places.currentOpeningHours.openNow,places.currentOpeningHours.periods",
+          "places.id,places.regularOpeningHours.periods,places.currentOpeningHours.openNow,places.currentOpeningHours.periods",
       },
       body: JSON.stringify({
         textQuery: `${name} Stockholm`,
@@ -71,50 +95,32 @@ export async function GET(req: NextRequest) {
       return Response.json(info);
     }
 
-    const regular = place.regularOpeningHours?.weekdayDescriptions as string[] | undefined;
     const current = place.currentOpeningHours;
+    const regular = place.regularOpeningHours;
     const openNow = typeof current?.openNow === "boolean" ? current.openNow : null;
 
-    // Find today's closing time if open now
+    // Build the week view from regular hours (stable week-over-week), fall back
+    // to current if regular is missing.
+    const week = buildWeek(regular?.periods) ?? buildWeek(current?.periods);
+
+    // Find today's closing time if open now. Use currentOpeningHours.periods
+    // since it reflects today's actual state (holiday hours etc).
     let closesAt: string | null = null;
     if (openNow && Array.isArray(current?.periods)) {
-      const now = new Date();
-      const weekday = (now.getDay() + 6) % 7; // JS: 0=Sun, we want 0=Mon
-      for (const p of current.periods) {
-        const openDay = p.open?.day;
-        const closeDay = p.close?.day;
-        // Places API day: 0=Sun..6=Sat. Convert to 0=Mon..6=Sun.
-        const convert = (d: number) => (d + 6) % 7;
-        if (openDay === undefined) continue;
-        if (convert(openDay) === weekday) {
-          const h = p.close?.hour;
-          const m = p.close?.minute ?? 0;
-          if (typeof h === "number") {
-            closesAt = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-          }
-          break;
-        }
-        if (closeDay !== undefined && convert(closeDay) === weekday) {
-          const h = p.close?.hour;
-          const m = p.close?.minute ?? 0;
-          if (typeof h === "number") {
-            closesAt = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      const todayMon0 = toMon0(new Date().getDay());
+      for (const p of current.periods as Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }>) {
+        if (typeof p.open?.day !== "number") continue;
+        // Match either the period starting today or spilling into today.
+        if (toMon0(p.open.day) === todayMon0 || (typeof p.close?.day === "number" && toMon0(p.close.day) === todayMon0)) {
+          if (typeof p.close?.hour === "number") {
+            closesAt = hhmm(p.close.hour, p.close.minute);
           }
           break;
         }
       }
     }
 
-    // Places API returns weekday descriptions starting with Monday when lang=sv.
-    // If missing, build our own from periods; otherwise just use Google's.
-    const weekdayDescriptions = regular && regular.length === 7 ? regular : buildWeekdayFromPeriods(current?.periods);
-
-    const info: HoursInfo = {
-      openNow,
-      closesAt,
-      weekday: weekdayDescriptions,
-    };
-
+    const info: HoursInfo = { openNow, closesAt, week };
     cache.set(id, { info, ts: Date.now() });
     return Response.json(info);
   } catch (err) {
@@ -123,24 +129,4 @@ export async function GET(req: NextRequest) {
     cache.set(id, { info, ts: Date.now() });
     return Response.json(info);
   }
-}
-
-function buildWeekdayFromPeriods(periods: unknown): string[] | null {
-  if (!Array.isArray(periods) || periods.length === 0) return null;
-  const byDay: Record<number, string[]> = {};
-  for (const p of periods as Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { hour?: number; minute?: number } }>) {
-    const d = p.open?.day;
-    if (typeof d !== "number") continue;
-    const dayIdx = (d + 6) % 7; // Mon=0
-    const openH = p.open?.hour ?? 0;
-    const openM = p.open?.minute ?? 0;
-    const closeH = p.close?.hour ?? 0;
-    const closeM = p.close?.minute ?? 0;
-    const segment = `${String(openH).padStart(2, "0")}:${String(openM).padStart(2, "0")}–${String(closeH).padStart(2, "0")}:${String(closeM).padStart(2, "0")}`;
-    (byDay[dayIdx] ??= []).push(segment);
-  }
-  return WEEKDAY_SV.map((name, i) => {
-    const segs = byDay[i];
-    return `${name}: ${segs && segs.length ? segs.join(", ") : "Stängt"}`;
-  });
 }

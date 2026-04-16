@@ -613,34 +613,56 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           });
           fetch(`/api/venue-hours?${params}`)
             .then((r) => r.ok ? r.json() : null)
-            .then((data: { openNow: boolean | null; closesAt: string | null; weekday: string[] | null } | null) => {
-              if (!data || (data.openNow === null && !data.weekday)) return;
+            .then((data: { openNow: boolean | null; closesAt: string | null; week: { open: string; close: string }[][] | null } | null) => {
+              if (!data || (data.openNow === null && !data.week)) return;
+              const DAYS = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
+              const todayMon0 = (new Date().getDay() + 6) % 7;
               const dotColor = data.openNow ? "#10b981" : data.openNow === false ? "#ef4444" : "#94a3b8";
               const statusText = data.openNow
                 ? `Öppet${data.closesAt ? ` — stänger ${data.closesAt}` : ""}`
                 : data.openNow === false
                   ? "Stängt just nu"
                   : "Öppettider";
-              const weekHtml = data.weekday && data.weekday.length
-                ? `<div class="venue-hours-week" style="margin-top:6px;font-size:11px;color:#475569;line-height:1.5;display:none">
-                    ${data.weekday.map((d) => `<div>${d}</div>`).join("")}
-                  </div>`
+
+              const weekRows = data.week?.map((segments, i) => {
+                const isToday = i === todayMon0;
+                const timeText = segments.length
+                  ? segments.map((s) => `${s.open}–${s.close}`).join(", ")
+                  : "Stängt";
+                const closed = segments.length === 0;
+                return `
+                  <div class="venue-hours-row${isToday ? " venue-hours-row-today" : ""}">
+                    <span class="venue-hours-day">${DAYS[i]}</span>
+                    <span class="venue-hours-time${closed ? " venue-hours-closed" : ""}">${timeText}</span>
+                  </div>
+                `;
+              }).join("") ?? "";
+
+              const weekHtml = data.week && data.week.length
+                ? `<div class="venue-hours-week" style="display:none">${weekRows}</div>`
                 : "";
+
               hoursContainer.innerHTML = `
-                <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#334155">
-                  <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0"></span>
-                  <span style="font-weight:500">${statusText}</span>
-                  ${weekHtml ? `<button class="hours-toggle" style="margin-left:auto;padding:2px 6px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;color:#64748b;font-size:10px;cursor:pointer">Visa alla</button>` : ""}
+                <div class="venue-hours-status">
+                  <span class="venue-hours-dot" style="background:${dotColor}"></span>
+                  <span class="venue-hours-status-text">${statusText}</span>
+                  ${weekHtml ? `<button class="hours-toggle" aria-expanded="false">
+                    <span class="hours-toggle-label">Visa alla</span>
+                    <svg class="hours-toggle-caret" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 3.5L5 6.5L8 3.5" /></svg>
+                  </button>` : ""}
                 </div>
                 ${weekHtml}
               `;
+
               const toggle = hoursContainer.querySelector<HTMLButtonElement>(".hours-toggle");
               const week = hoursContainer.querySelector<HTMLDivElement>(".venue-hours-week");
               if (toggle && week) {
                 toggle.onclick = () => {
                   const visible = week.style.display !== "none";
                   week.style.display = visible ? "none" : "block";
-                  toggle.textContent = visible ? "Visa alla" : "Dölj";
+                  toggle.setAttribute("aria-expanded", visible ? "false" : "true");
+                  const label = toggle.querySelector(".hours-toggle-label");
+                  if (label) label.textContent = visible ? "Visa alla" : "Dölj";
                 };
               }
             })
