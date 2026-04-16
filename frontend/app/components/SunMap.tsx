@@ -545,6 +545,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           ${bestHourLine}
           <div style="font-size:12px;color:#64748b;margin-top:6px">${sunHours} soltimmar (vid klart v&auml;der)</div>
           <div id="venue-photo-${venue.id}" style="margin-top:8px"></div>
+          <div id="venue-hours-${venue.id}" style="margin-top:8px"></div>
           <div style="display:flex;gap:6px;margin-top:8px">
             <button
               class="fav-btn"
@@ -596,6 +597,52 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             .then((data) => {
               if (!data?.photoUrl) return;
               photoContainer.innerHTML = `<img src="${data.photoUrl}" alt="${venue.name}" style="width:100%;height:120px;object-fit:cover;border-radius:8px;display:block" loading="lazy" />`;
+            })
+            .catch(() => {});
+        }
+
+        // Fetch venue hours (Google Places)
+        const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
+        if (hoursContainer && !hoursContainer.dataset.loaded) {
+          hoursContainer.dataset.loaded = "1";
+          const params = new URLSearchParams({
+            id: venue.id,
+            name: venue.name,
+            lat: String(venue.lat),
+            lng: String(venue.lng),
+          });
+          fetch(`/api/venue-hours?${params}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((data: { openNow: boolean | null; closesAt: string | null; weekday: string[] | null } | null) => {
+              if (!data || (data.openNow === null && !data.weekday)) return;
+              const dotColor = data.openNow ? "#10b981" : data.openNow === false ? "#ef4444" : "#94a3b8";
+              const statusText = data.openNow
+                ? `Öppet${data.closesAt ? ` — stänger ${data.closesAt}` : ""}`
+                : data.openNow === false
+                  ? "Stängt just nu"
+                  : "Öppettider";
+              const weekHtml = data.weekday && data.weekday.length
+                ? `<div class="venue-hours-week" style="margin-top:6px;font-size:11px;color:#475569;line-height:1.5;display:none">
+                    ${data.weekday.map((d) => `<div>${d}</div>`).join("")}
+                  </div>`
+                : "";
+              hoursContainer.innerHTML = `
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#334155">
+                  <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0"></span>
+                  <span style="font-weight:500">${statusText}</span>
+                  ${weekHtml ? `<button class="hours-toggle" style="margin-left:auto;padding:2px 6px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;color:#64748b;font-size:10px;cursor:pointer">Visa alla</button>` : ""}
+                </div>
+                ${weekHtml}
+              `;
+              const toggle = hoursContainer.querySelector<HTMLButtonElement>(".hours-toggle");
+              const week = hoursContainer.querySelector<HTMLDivElement>(".venue-hours-week");
+              if (toggle && week) {
+                toggle.onclick = () => {
+                  const visible = week.style.display !== "none";
+                  week.style.display = visible ? "none" : "block";
+                  toggle.textContent = visible ? "Visa alla" : "Dölj";
+                };
+              }
             })
             .catch(() => {});
         }
