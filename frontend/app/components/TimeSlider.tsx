@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useCallback } from "react";
+import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import { type WeatherData, type HourlyWeather, getSymbolInfo, toLocalDateStr } from "../lib/weather";
 
 interface TimeSliderProps {
@@ -40,6 +40,17 @@ export default function TimeSlider({
 }: TimeSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [trackWidth, setTrackWidth] = useState(0);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const update = () => setTrackWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const days = useMemo(() => {
     const today = new Date();
@@ -164,11 +175,13 @@ export default function TimeSlider({
       <div
         className="pointer-events-auto max-w-md mx-auto rounded-2xl"
         style={{
-          background: "rgba(255, 255, 255, 0.28)",
-          backdropFilter: "blur(20px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+          background: "rgba(255, 255, 255, 0.3)",
+          backdropFilter: "blur(14px) saturate(1.3)",
+          WebkitBackdropFilter: "blur(14px) saturate(1.3)",
           border: "0.5px solid rgba(255, 255, 255, 0.45)",
           overflow: "visible",
+          transform: "translateZ(0)",
+          isolation: "isolate",
         }}
       >
         <div className="px-3 pt-1 pb-2.5" style={{ overflow: "visible" }}>
@@ -256,23 +269,26 @@ export default function TimeSlider({
               );
             })}
 
-            {/* Selected hour orange pill — larger */}
+            {/* Selected hour orange pill — translate3d keeps it on its own GPU layer, no reflow */}
             <div
-              className="absolute top-1/2 flex items-center justify-center rounded-full pointer-events-none tabular-nums"
+              className="absolute flex items-center justify-center rounded-full pointer-events-none tabular-nums"
               style={{
-                left: `${((hour - 7 + 0.5) / HOURS.length) * 100}%`,
-                transform: "translate(-50%, -50%)",
+                top: "50%",
+                left: 0,
                 width: 46,
                 height: 46,
+                transform: `translate3d(${
+                  ((hour - 7 + 0.5) / HOURS.length) * trackWidth - 23
+                }px, -50%, 0)`,
+                willChange: "transform",
+                transition: dragging ? "none" : "transform 0.22s ease-out",
                 background: "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)",
                 boxShadow:
-                  "0 0 28px rgba(251, 146, 60, 0.7), 0 6px 16px rgba(251, 146, 60, 0.5), inset 0 1px 1px rgba(255,255,255,0.3)",
+                  "0 0 24px rgba(251, 146, 60, 0.65), 0 4px 12px rgba(251, 146, 60, 0.45), inset 0 1px 1px rgba(255,255,255,0.3)",
                 color: "#000",
                 fontSize: 18,
                 fontWeight: 900,
                 letterSpacing: "-0.02em",
-                willChange: "left",
-                transition: dragging ? "none" : "left 0.22s ease-out",
               }}
             >
               {hour}
