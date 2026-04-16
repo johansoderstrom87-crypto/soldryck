@@ -55,6 +55,14 @@ export function getSymbolInfo(code: number) {
   return SYMBOL_MAP[code] ?? { label: "Okänt", icon: "❓", category: "clouds" as const };
 }
 
+/** Local YYYY-MM-DD (avoids UTC off-by-one around midnight in CET/CEST) */
+export function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
 /** Is there actual sunshine given weather? */
 export function hasSunshine(symbolCode: number): boolean {
   return symbolCode <= 2; // Only clear or nearly clear = actual sun
@@ -108,7 +116,7 @@ const STOCKHOLM_LAT = 59.33;
 const STOCKHOLM_LON = 18.07;
 const SMHI_URL = `https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/${STOCKHOLM_LON}/lat/${STOCKHOLM_LAT}/data.json`;
 
-const CACHE_KEY = "soldryck_weather";
+const CACHE_KEY = "soldryck_weather_v2";
 const CACHE_TTL = 30 * 60 * 1000; // 30 min
 
 export async function fetchWeather(): Promise<WeatherData | null> {
@@ -132,7 +140,7 @@ export async function fetchWeather(): Promise<WeatherData | null> {
     const hourly: Record<number, HourlyWeather> = {};
     const daily: Record<string, Record<number, HourlyWeather>> = {};
     const today: HourlyWeather[] = [];
-    const nowDate = new Date().toISOString().slice(0, 10);
+    const nowDate = toLocalDateStr(new Date());
 
     for (const entry of timeSeries) {
       const time = entry.time as string;
@@ -150,8 +158,8 @@ export async function fetchWeather(): Promise<WeatherData | null> {
         symbolCode: d.symbol_code ?? 1,
       };
 
-      // Store by date + hour
-      const entryDate = time.slice(0, 10);
+      // Key by LOCAL date so daily["YYYY-MM-DD"] aligns with calendar days in Stockholm
+      const entryDate = toLocalDateStr(date);
       if (!daily[entryDate]) daily[entryDate] = {};
       daily[entryDate][hour] = hw;
 

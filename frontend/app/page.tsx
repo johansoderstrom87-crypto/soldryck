@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import TimeSlider from "./components/TimeSlider";
 import Header from "./components/Header";
 import FeedbackModal from "./components/FeedbackModal";
-import { fetchWeather, type WeatherData } from "./lib/weather";
+import { fetchWeather, toLocalDateStr, type WeatherData } from "./lib/weather";
 import type { FeedbackVenue } from "./components/SunMap";
 import type { VenueType, SunRange } from "./components/SunMap";
 import type { MetroStation } from "./data/metro-stations";
@@ -54,7 +54,7 @@ export default function Home() {
   const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
-  const dateStr = useMemo(() => date.toISOString().slice(0, 10), [date]);
+  const dateStr = useMemo(() => toLocalDateStr(date), [date]);
 
   // Weather for the selected date
   const weatherForDate = useMemo(() => {

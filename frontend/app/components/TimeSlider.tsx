@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useCallback } from "react";
-import { type WeatherData, type HourlyWeather, getSymbolInfo } from "../lib/weather";
+import { type WeatherData, type HourlyWeather, getSymbolInfo, toLocalDateStr } from "../lib/weather";
 
 interface TimeSliderProps {
   hour: number;
@@ -52,9 +52,9 @@ export default function TimeSlider({
   }, []);
 
   const realNow = new Date();
-  const todayStr = realNow.toISOString().slice(0, 10);
+  const todayStr = toLocalDateStr(realNow);
   const currentRealHour = realNow.getHours();
-  const selectedDateStr = date.toISOString().slice(0, 10);
+  const selectedDateStr = toLocalDateStr(date);
   const displayIsPast = selectedDateStr < todayStr;
   const displayIsToday = selectedDateStr === todayStr;
 
@@ -84,7 +84,7 @@ export default function TimeSlider({
   const selectedMonth = date.getMonth();
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const isInDayRange = days.some((d) => d.toISOString().slice(0, 10) === selectedDateStr);
+  const isInDayRange = days.some((d) => toLocalDateStr(d) === selectedDateStr);
 
   const currentWeather = getHourWeather(hour);
 
@@ -271,7 +271,7 @@ export default function TimeSlider({
           {/* Day pills */}
           <div className="flex items-stretch gap-1 mt-3">
             {days.map((d, i) => {
-              const dStr = d.toISOString().slice(0, 10);
+              const dStr = toLocalDateStr(d);
               const isSelected = selectedDateStr === dStr;
               const dayName = i === 0 ? "IDAG" : (DAY_NAMES[d.getDay()] ?? "");
               const dateLabel = `${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
