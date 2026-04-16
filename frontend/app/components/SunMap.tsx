@@ -719,31 +719,39 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const darkness = getAmbientDarkness(hour, date, currentWeatherSymbol);
   const ambientColor = getAmbientColor(hour, date, currentWeatherSymbol);
 
-  // Apply darkening directly to Leaflet's tile + overlay panes via CSS filter.
-  // Doing it at pane level (instead of a sibling overlay div) is the only
-  // reliable way to avoid affecting markers, badges and popups — leaflet-map-pane
-  // has a CSS transform and so forms its own stacking context, which traps any
-  // outer overlay above every inner pane including popups.
+  // Apply darkening directly to Leaflet's tile + overlay + marker panes via
+  // CSS filter. Pane-level filter is the only reliable way to avoid affecting
+  // popups — leaflet-map-pane has a CSS transform and so forms its own
+  // stacking context, which traps any outer overlay above every inner pane
+  // including popups. Badges (children of marker icons) get counter-brightened
+  // via a CSS variable so they remain fully legible when the map darkens.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const tilePane = container.querySelector<HTMLElement>(".leaflet-tile-pane");
     const overlayPane = container.querySelector<HTMLElement>(".leaflet-overlay-pane");
-    if (!tilePane || !overlayPane) return;
+    const markerPane = container.querySelector<HTMLElement>(".leaflet-marker-pane");
+    if (!tilePane || !overlayPane || !markerPane) return;
 
     const brightness = Math.max(0.35, 1 - darkness * 0.9);
-    // Map the warm/cool ambient RGB to a hue shift so tiles pick up a matching tint.
-    // Parse "r, g, b" — skew toward red = warm, toward blue = cool.
     const [r, , b] = ambientColor.split(",").map((n) => Number(n.trim()));
-    const warmBias = (r - b) / 255; // -1 (cold) .. 1 (warm)
-    const hueRotate = -warmBias * 12 * darkness; // small shift only when darkening
+    const warmBias = (r - b) / 255;
+    const hueRotate = -warmBias * 12 * darkness;
     const saturate = 1 - darkness * 0.25;
 
-    const filter = `brightness(${brightness}) saturate(${saturate}) hue-rotate(${hueRotate}deg)`;
-    tilePane.style.filter = filter;
+    const tileFilter = `brightness(${brightness}) saturate(${saturate}) hue-rotate(${hueRotate}deg)`;
+    // Markers get only the brightness/saturate shift (no hue rotation — their
+    // colour semantics matter), and a softer dampening than tiles.
+    const markerBrightness = Math.max(0.55, 1 - darkness * 0.55);
+    const markerFilter = `brightness(${markerBrightness}) saturate(${saturate})`;
+
+    tilePane.style.filter = tileFilter;
     tilePane.style.transition = "filter 0.8s ease";
-    overlayPane.style.filter = filter;
+    overlayPane.style.filter = tileFilter;
     overlayPane.style.transition = "filter 0.8s ease";
+    markerPane.style.filter = markerFilter;
+    markerPane.style.transition = "filter 0.8s ease";
+    container.style.setProperty("--marker-brightness", String(markerBrightness));
   }, [darkness, ambientColor]);
 
   return (
