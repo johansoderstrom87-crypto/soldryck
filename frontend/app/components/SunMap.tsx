@@ -303,7 +303,6 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const metroMarkersRef = useRef<L.Marker[]>([]);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const ambientOverlayRef = useRef<HTMLDivElement | null>(null);
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
 
@@ -720,32 +719,32 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const darkness = getAmbientDarkness(hour, date, currentWeatherSymbol);
   const ambientColor = getAmbientColor(hour, date, currentWeatherSymbol);
 
-  // Inject ambient overlay INSIDE the leaflet container, with a z-index that
-  // sits above the tile/shadow/overlay panes but below the marker/popup panes —
-  // so the map darkens but venue badges and popups stay bright.
+  // Apply darkening directly to Leaflet's tile + overlay panes via CSS filter.
+  // Doing it at pane level (instead of a sibling overlay div) is the only
+  // reliable way to avoid affecting markers, badges and popups — leaflet-map-pane
+  // has a CSS transform and so forms its own stacking context, which traps any
+  // outer overlay above every inner pane including popups.
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || !mapRef.current) return;
-    if (ambientOverlayRef.current) return;
-    const ov = document.createElement("div");
-    ov.style.position = "absolute";
-    ov.style.inset = "0";
-    ov.style.pointerEvents = "none";
-    ov.style.zIndex = "550";
-    ov.style.transition = "background 0.8s ease";
-    container.appendChild(ov);
-    ambientOverlayRef.current = ov;
-    return () => {
-      ov.remove();
-      ambientOverlayRef.current = null;
-    };
-  }, []);
+    if (!container) return;
+    const tilePane = container.querySelector<HTMLElement>(".leaflet-tile-pane");
+    const overlayPane = container.querySelector<HTMLElement>(".leaflet-overlay-pane");
+    if (!tilePane || !overlayPane) return;
 
-  useEffect(() => {
-    const ov = ambientOverlayRef.current;
-    if (!ov) return;
-    ov.style.background = `rgba(${ambientColor}, ${darkness})`;
-  }, [ambientColor, darkness]);
+    const brightness = Math.max(0.35, 1 - darkness * 0.9);
+    // Map the warm/cool ambient RGB to a hue shift so tiles pick up a matching tint.
+    // Parse "r, g, b" — skew toward red = warm, toward blue = cool.
+    const [r, , b] = ambientColor.split(",").map((n) => Number(n.trim()));
+    const warmBias = (r - b) / 255; // -1 (cold) .. 1 (warm)
+    const hueRotate = -warmBias * 12 * darkness; // small shift only when darkening
+    const saturate = 1 - darkness * 0.25;
+
+    const filter = `brightness(${brightness}) saturate(${saturate}) hue-rotate(${hueRotate}deg)`;
+    tilePane.style.filter = filter;
+    tilePane.style.transition = "filter 0.8s ease";
+    overlayPane.style.filter = filter;
+    overlayPane.style.transition = "filter 0.8s ease";
+  }, [darkness, ambientColor]);
 
   return (
     <div className="w-full h-full relative">
