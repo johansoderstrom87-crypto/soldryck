@@ -88,7 +88,8 @@ body {
   border-radius: 999px;
   padding: 5px 12px 5px 5px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
   align-items: center;
   gap: 6px;
