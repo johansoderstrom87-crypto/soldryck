@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import { type WeatherData, type HourlyWeather, getSymbolInfo, toLocalDateStr } from "../lib/weather";
+import DirectionGauges from "./DirectionGauges";
 
 interface TimeSliderProps {
   hour: number;
@@ -135,6 +136,11 @@ export default function TimeSlider({
       className="absolute bottom-0 left-0 right-0 z-[1000] p-3 pointer-events-none"
       style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}
     >
+      {/* Sun arc + wind arrow */}
+      <div className="flex justify-center pointer-events-none mb-1">
+        <DirectionGauges hour={hour} date={date} weather={weather} />
+      </div>
+
       {/* Floating weather text — no background, black */}
       <div className="text-center mb-2 pointer-events-none min-h-[26px]">
         {currentWeather ? (
@@ -150,16 +156,6 @@ export default function TimeSlider({
               }}
             >
               {Math.round(currentWeather.temperature)}°C
-            </span>
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: "rgba(0,0,0,0.72)",
-                textShadow: textShadowOnMap,
-              }}
-            >
-              {currentWeather.windSpeed} m/s
             </span>
           </div>
         ) : weatherLoading ? null : (
