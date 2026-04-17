@@ -49,117 +49,126 @@ export default function DirectionGauges({ hour, date, weather }: DirectionGauges
 
   if (!hasSun && !hasWind) return null;
 
-  const textShadow = "0 1px 4px rgba(255,255,255,0.75), 0 0 12px rgba(255,255,255,0.4)";
-
-  // Sun: arrow direction = where sunlight goes (opposite of azimuth)
-  // Azimuth is where the sun IS, so light shines FROM there.
-  // Arrow points in the direction the light travels = azimuth + 180.
-  const sunArrowDeg = hasSun ? (sunAzimuth + 180) % 360 : 0;
-  const sunArrowRad = (sunArrowDeg * Math.PI) / 180;
-
-  // Wind: arrow shows where wind comes FROM
-  const windArrowRad = windDir !== undefined ? (windDir * Math.PI) / 180 : 0;
+  // Light direction = opposite of where the sun is
+  const lightDeg = hasSun ? (sunAzimuth + 180) % 360 : 0;
 
   return (
-    <div className="flex items-center justify-center gap-4">
-      {/* Sun direction */}
+    <div className="flex items-center justify-center gap-2.5">
+      {/* Sun direction pill */}
       {hasSun && (
-        <div className="flex items-center gap-1.5">
-          {/* Sun icon + arrow */}
-          <svg width="36" height="36" viewBox="0 0 36 36">
-            {/* Sun rays */}
-            {Array.from({ length: 8 }, (_, i) => {
-              const a = (i * Math.PI) / 4;
-              return (
-                <line
-                  key={i}
-                  x1={12 + Math.cos(a) * 5.5}
-                  y1={12 + Math.sin(a) * 5.5}
-                  x2={12 + Math.cos(a) * 8}
-                  y2={12 + Math.sin(a) * 8}
-                  stroke="#f59e0b"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              );
-            })}
-            {/* Sun body */}
-            <circle cx="12" cy="12" r="4.5" fill="#f59e0b" />
-            <circle cx="12" cy="12" r="3" fill="#fbbf24" />
-
-            {/* Arrow from sun showing light direction */}
-            <line
-              x1={12 + Math.cos(sunArrowRad - Math.PI / 2) * 9}
-              y1={12 + Math.sin(sunArrowRad - Math.PI / 2) * 9}
-              x2={12 + Math.cos(sunArrowRad - Math.PI / 2) * 22}
-              y2={12 + Math.sin(sunArrowRad - Math.PI / 2) * 22}
-              stroke="#f59e0b"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            {/* Arrowhead */}
-            <polygon
-              points={`
-                ${12 + Math.cos(sunArrowRad - Math.PI / 2) * 22},${12 + Math.sin(sunArrowRad - Math.PI / 2) * 22}
-                ${12 + Math.cos(sunArrowRad - Math.PI / 2 + 0.45) * 17},${12 + Math.sin(sunArrowRad - Math.PI / 2 + 0.45) * 17}
-                ${12 + Math.cos(sunArrowRad - Math.PI / 2 - 0.45) * 17},${12 + Math.sin(sunArrowRad - Math.PI / 2 - 0.45) * 17}
-              `}
-              fill="#f59e0b"
-            />
-          </svg>
-          <span
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px 8px 10px",
+            borderRadius: 16,
+            background: "linear-gradient(135deg, rgba(251,191,36,0.25) 0%, rgba(245,158,11,0.18) 100%)",
+            backdropFilter: "blur(16px) saturate(1.4)",
+            WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+            border: "1px solid rgba(251,191,36,0.35)",
+            boxShadow: "0 4px 20px rgba(245,158,11,0.2), 0 1px 3px rgba(0,0,0,0.06)",
+          }}
+        >
+          {/* Compass circle with arrow */}
+          <div
             style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "#000",
-              textShadow,
-              whiteSpace: "nowrap",
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+              boxShadow: "0 2px 10px rgba(245,158,11,0.45), inset 0 1px 1px rgba(255,255,255,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
             }}
           >
-            Solriktning ({degreesToCardinal(sunAzimuth)})
-          </span>
+            <svg width="30" height="30" viewBox="0 0 30 30">
+              <defs>
+                <linearGradient id="sunArrowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#fff" stopOpacity="1" />
+                  <stop offset="100%" stopColor="#fef3c7" stopOpacity="0.9" />
+                </linearGradient>
+              </defs>
+              {/* Arrow pointing in light direction */}
+              <g transform={`rotate(${lightDeg}, 15, 15)`}>
+                {/* Shaft */}
+                <line
+                  x1="15" y1="24" x2="15" y2="6"
+                  stroke="url(#sunArrowGrad)" strokeWidth="3" strokeLinecap="round"
+                />
+                {/* Arrowhead */}
+                <polygon points="15,3 10,10 20,10" fill="white" />
+              </g>
+            </svg>
+          </div>
+          <div style={{ lineHeight: 1.15 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "#92400e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              Solriktning
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#78350f", letterSpacing: "-0.02em" }}>
+              {degreesToCardinal(sunAzimuth)}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Wind direction */}
+      {/* Wind direction pill */}
       {hasWind && (
-        <div className="flex items-center gap-1">
-          <svg width="20" height="20" viewBox="0 0 20 20">
-            {/* Arrow pointing where wind goes (from windDir toward opposite) */}
-            {(() => {
-              const toRad = windArrowRad + Math.PI;
-              const tailX = 10 + Math.sin(windArrowRad) * 8;
-              const tailY = 10 - Math.cos(windArrowRad) * 8;
-              const tipX = 10 + Math.sin(toRad) * 8;
-              const tipY = 10 - Math.cos(toRad) * 8;
-              return (
-                <>
-                  <line
-                    x1={tailX} y1={tailY} x2={tipX} y2={tipY}
-                    stroke="rgba(0,0,0,0.72)" strokeWidth="2" strokeLinecap="round"
-                  />
-                  <polygon
-                    points={`
-                      ${tipX},${tipY}
-                      ${tipX - Math.sin(toRad + 0.5) * 4},${tipY + Math.cos(toRad + 0.5) * 4}
-                      ${tipX - Math.sin(toRad - 0.5) * 4},${tipY + Math.cos(toRad - 0.5) * 4}
-                    `}
-                    fill="rgba(0,0,0,0.72)"
-                  />
-                </>
-              );
-            })()}
-          </svg>
-          <span
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px 8px 10px",
+            borderRadius: 16,
+            background: "linear-gradient(135deg, rgba(147,197,253,0.25) 0%, rgba(96,165,250,0.18) 100%)",
+            backdropFilter: "blur(16px) saturate(1.4)",
+            WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+            border: "1px solid rgba(147,197,253,0.4)",
+            boxShadow: "0 4px 20px rgba(59,130,246,0.15), 0 1px 3px rgba(0,0,0,0.06)",
+          }}
+        >
+          {/* Compass circle with arrow */}
+          <div
             style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: "rgba(0,0,0,0.72)",
-              textShadow,
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)",
+              boxShadow: "0 2px 10px rgba(59,130,246,0.4), inset 0 1px 1px rgba(255,255,255,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
             }}
           >
-            {Math.round(windSpeed)} m/s
-          </span>
+            <svg width="30" height="30" viewBox="0 0 30 30">
+              <defs>
+                <linearGradient id="windArrowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#fff" stopOpacity="1" />
+                  <stop offset="100%" stopColor="#dbeafe" stopOpacity="0.9" />
+                </linearGradient>
+              </defs>
+              {/* Arrow pointing where wind comes FROM (toward viewer) */}
+              <g transform={`rotate(${windDir! + 180}, 15, 15)`}>
+                <line
+                  x1="15" y1="24" x2="15" y2="6"
+                  stroke="url(#windArrowGrad)" strokeWidth="3" strokeLinecap="round"
+                />
+                <polygon points="15,3 10,10 20,10" fill="white" />
+              </g>
+            </svg>
+          </div>
+          <div style={{ lineHeight: 1.15 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "#1e40af", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              Vind
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#1e3a8a", letterSpacing: "-0.02em" }}>
+              {Math.round(windSpeed)} m/s {degreesToCardinal(windDir)}
+            </div>
+          </div>
         </div>
       )}
     </div>
