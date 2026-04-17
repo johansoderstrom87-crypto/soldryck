@@ -11,6 +11,13 @@ try {
   venueModule = require("../data/mock-venues");
 }
 
+let unconfirmedModule: { unconfirmedVenues: any[] } | null = null;
+try {
+  unconfirmedModule = require("../data/venues-unconfirmed");
+} catch {
+  // venues-unconfirmed.ts doesn't exist yet
+}
+
 import { type WeatherData, getSymbolInfo, getCombinedStatus } from "../lib/weather";
 import { METRO_STATIONS, type MetroStation, STATION_RADIUS_M, distanceM } from "../data/metro-stations";
 import { getFavorites, toggleFavorite } from "../lib/favorites";
@@ -711,6 +718,51 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
       markersRef.current.push(marker);
     });
+
+    // Unconfirmed venues — grey dots, only visible at zoom >= 17
+    if (unconfirmedModule?.unconfirmedVenues) {
+      for (const venue of unconfirmedModule.unconfirmedVenues) {
+        if (metroStation) {
+          const dist = distanceM(venue.lat, venue.lng, metroStation.lat, metroStation.lng);
+          if (dist > STATION_RADIUS_M) continue;
+        }
+        if (typeFilter.size > 0 && !typeFilter.has(venue.type)) continue;
+
+        const icon = L.divIcon({
+          className: "marker-root marker-unconfirmed",
+          html: `<div class="marker-dot marker-grey"></div>`,
+          iconSize: [10, 10],
+          iconAnchor: [5, 5],
+          popupAnchor: [0, -9],
+        });
+
+        const address = venue.address
+          ? `<div style="color:#94a3b8;font-size:11px;margin-top:1px">${venue.address}</div>`
+          : "";
+
+        const popup = L.popup({ maxWidth: 280 }).setContent(`
+          <div style="min-width:200px">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">
+              <div>
+                <strong style="font-size:15px">${venue.name}</strong>
+                <div style="color:#64748b;font-size:12px;margin-top:2px">${typeToLabel(venue.type)}</div>
+                ${address}
+              </div>
+            </div>
+            <div style="background:#f1f5f9;border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:#64748b">
+              Ingen bekr&auml;ftad uteservering i v&aring;r data. <br/>Har st&auml;llet uteservering? Anv&auml;nd &quot;St&auml;mmer inte?&quot; f&ouml;r att meddela oss!
+            </div>
+            <div id="venue-hours-${venue.id}" style="margin-top:8px"></div>
+          </div>
+        `);
+
+        const marker = L.marker([venue.lat, venue.lng], { icon, zIndexOffset: -200 })
+          .addTo(map)
+          .bindPopup(popup);
+
+        markersRef.current.push(marker);
+      }
+    }
 
     // Collision detection: reassign badge positions to avoid overlap
     resolveBadgeCollisions(map, markersRef.current);

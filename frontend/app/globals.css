@@ -76,6 +76,17 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
+.marker-dot.marker-grey {
+  background: #cbd5e1;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  opacity: 0.6;
+}
+
+/* Unconfirmed venues: hidden until zoom >= 17 */
+.marker-unconfirmed { display: none !important; }
+.show-badges .marker-unconfirmed { display: block !important; }
+
 /* Category badges — glassmorphism labels, visible at zoom >= 17 */
 .marker-badge {
   display: none;
