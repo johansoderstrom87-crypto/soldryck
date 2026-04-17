@@ -10,6 +10,7 @@ export interface HourlyWeather {
   cloudCover: number; // 0-8 oktas
   precipMm: number;
   windSpeed: number;
+  windDirection: number; // degrees (0=N, 90=E, 180=S, 270=W)
   symbolCode: number; // 1-27
 }
 
@@ -155,6 +156,7 @@ export async function fetchWeather(): Promise<WeatherData | null> {
         cloudCover: d.cloud_area_fraction ?? 0,
         precipMm: d.precipitation_amount_mean ?? 0,
         windSpeed: d.wind_speed ?? 0,
+        windDirection: d.wind_dir ?? 0,
         symbolCode: d.symbol_code ?? 1,
       };
 

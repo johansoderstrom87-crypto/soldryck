@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import TimeSlider from "./components/TimeSlider";
 import Header from "./components/Header";
 import FeedbackModal from "./components/FeedbackModal";
+import DirectionGauges from "./components/DirectionGauges";
 import { fetchWeather, toLocalDateStr, type WeatherData } from "./lib/weather";
 import type { FeedbackVenue } from "./components/SunMap";
 import type { VenueType, SunRange } from "./components/SunMap";
@@ -165,6 +166,11 @@ export default function Home() {
             />
           );
         })}
+      </div>
+
+      {/* Direction gauges — right edge */}
+      <div className="absolute right-3 z-[1000] pointer-events-auto" style={{ top: "50%", transform: "translateY(-65%)" }}>
+        <DirectionGauges hour={hour} date={date} weather={weatherForDate} />
       </div>
 
       <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} />
