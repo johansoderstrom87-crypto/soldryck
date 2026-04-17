@@ -156,7 +156,7 @@ export async function fetchWeather(): Promise<WeatherData | null> {
         cloudCover: d.cloud_area_fraction ?? 0,
         precipMm: d.precipitation_amount_mean ?? 0,
         windSpeed: d.wind_speed ?? 0,
-        windDirection: d.wind_dir ?? 0,
+        windDirection: d.wind_from_direction ?? 0,
         symbolCode: d.symbol_code ?? 1,
       };
 

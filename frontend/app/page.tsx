@@ -168,12 +168,12 @@ export default function Home() {
         })}
       </div>
 
-      {/* Direction gauges — right edge */}
-      <div className="absolute right-3 z-[1000] pointer-events-auto" style={{ top: "50%", transform: "translateY(-65%)" }}>
+      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} />
+
+      {/* Direction gauges — above the bottom panel */}
+      <div className="absolute bottom-[280px] left-1/2 -translate-x-1/2 z-[1000] pointer-events-auto">
         <DirectionGauges hour={hour} date={date} weather={weatherForDate} />
       </div>
-
-      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} />
 
       <TimeSlider
         hour={hour}
