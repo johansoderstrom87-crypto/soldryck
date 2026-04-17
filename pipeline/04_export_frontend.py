@@ -82,7 +82,8 @@ export const STATUS_LABELS: Record<SunStatus, string> = {{
   n: "Natt",
 }};
 
-export const venues: ComputedVenue[] = {json.dumps(venues, ensure_ascii=False, separators=(',', ':'))};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const venues = {json.dumps(venues, ensure_ascii=False, separators=(',', ':'))} as any as ComputedVenue[];
 
 /** Hitta närmaste tillgängliga datum-nyckel */
 export function getClosestDateKey(date: Date): string {{
