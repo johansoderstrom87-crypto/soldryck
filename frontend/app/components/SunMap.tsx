@@ -750,7 +750,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
               </div>
             </div>
             <div style="background:#f1f5f9;border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:#64748b">
-              Ingen bekr&auml;ftad uteservering i v&aring;r data. <br/>Har st&auml;llet uteservering? Anv&auml;nd &quot;St&auml;mmer inte?&quot; f&ouml;r att meddela oss!
+              ${venue.source === "google_denied"
+                ? "Enligt Google har detta st&auml;lle <b>ingen uteservering</b>."
+                : "Ingen bekr&auml;ftad uteservering i v&aring;r data."
+              }
+              <br/>St&auml;mmer inte? Anv&auml;nd knappen nedan f&ouml;r att meddela oss!
             </div>
             <div id="venue-hours-${venue.id}" style="margin-top:8px"></div>
           </div>
