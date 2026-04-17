@@ -307,6 +307,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
+  const unconfirmedMarkersRef = useRef<L.Marker[]>([]);
   const metroMarkersRef = useRef<L.Marker[]>([]);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -337,6 +338,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     map.on("zoomend", () => {
       const container = map.getContainer();
       container.classList.toggle("show-badges", map.getZoom() >= 17);
+      // Trigger unconfirmed venue rendering on zoom change
+      map.fire("update-unconfirmed");
+    });
+
+    map.on("moveend", () => {
+      map.fire("update-unconfirmed");
     });
 
     mapRef.current = map;
@@ -719,9 +726,60 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       markersRef.current.push(marker);
     });
 
-    // Unconfirmed venues — grey dots, only visible at zoom >= 17
-    if (unconfirmedModule?.unconfirmedVenues) {
-      for (const venue of unconfirmedModule.unconfirmedVenues) {
+    // Collision detection: reassign badge positions to avoid overlap
+    resolveBadgeCollisions(map, markersRef.current);
+    map.off("zoomend moveend", handleCollisions);
+    function handleCollisions() { if (mapRef.current) resolveBadgeCollisions(mapRef.current, markersRef.current); }
+    map.on("zoomend moveend", handleCollisions);
+
+    // Pan to metro station when selected
+    if (metroStation && !focusVenueId) {
+      map.setView([metroStation.lat, metroStation.lng], 15, { animate: true });
+    }
+
+    // Focus on venue from URL params
+    if (focusVenueId) {
+      const targetVenue = allVenues.find((v: any) => v.id === focusVenueId);
+      if (targetVenue) {
+        map.setView([targetVenue.lat, targetVenue.lng], 16, { animate: true });
+        // Find and open the marker's popup
+        const targetMarker = markersRef.current.find((m) => {
+          const ll = m.getLatLng();
+          return Math.abs(ll.lat - targetVenue.lat) < 0.0001 && Math.abs(ll.lng - targetVenue.lng) < 0.0001;
+        });
+        if (targetMarker) {
+          setTimeout(() => targetMarker.openPopup(), 500);
+        }
+      }
+      onFocusHandled?.();
+    }
+  }, [hour, dateKey, filter, typeFilter, sunRange, weather, metroStation]);
+
+  // Unconfirmed venues — lazy loaded only at zoom >= 17 and in viewport
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !unconfirmedModule?.unconfirmedVenues) return;
+
+    function renderUnconfirmed() {
+      if (!mapRef.current) return;
+      const m = mapRef.current;
+
+      // Clear previous unconfirmed markers
+      unconfirmedMarkersRef.current.forEach((mk) => mk.remove());
+      unconfirmedMarkersRef.current = [];
+
+      if (m.getZoom() < 17) return;
+
+      const bounds = m.getBounds();
+      const latBuf = (bounds.getNorth() - bounds.getSouth()) * 0.15;
+      const lngBuf = (bounds.getEast() - bounds.getWest()) * 0.15;
+      const viewBounds = L.latLngBounds(
+        [bounds.getSouth() - latBuf, bounds.getWest() - lngBuf],
+        [bounds.getNorth() + latBuf, bounds.getEast() + lngBuf],
+      );
+
+      for (const venue of unconfirmedModule!.unconfirmedVenues) {
+        if (!viewBounds.contains([venue.lat, venue.lng])) continue;
         if (metroStation) {
           const dist = distanceM(venue.lat, venue.lng, metroStation.lat, metroStation.lng);
           if (dist > STATION_RADIUS_M) continue;
@@ -761,41 +819,22 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         `);
 
         const marker = L.marker([venue.lat, venue.lng], { icon, zIndexOffset: -200 })
-          .addTo(map)
+          .addTo(m)
           .bindPopup(popup);
 
-        markersRef.current.push(marker);
+        unconfirmedMarkersRef.current.push(marker);
       }
     }
 
-    // Collision detection: reassign badge positions to avoid overlap
-    resolveBadgeCollisions(map, markersRef.current);
-    map.off("zoomend moveend", handleCollisions);
-    function handleCollisions() { if (mapRef.current) resolveBadgeCollisions(mapRef.current, markersRef.current); }
-    map.on("zoomend moveend", handleCollisions);
+    map.on("update-unconfirmed", renderUnconfirmed);
+    renderUnconfirmed();
 
-    // Pan to metro station when selected
-    if (metroStation && !focusVenueId) {
-      map.setView([metroStation.lat, metroStation.lng], 15, { animate: true });
-    }
-
-    // Focus on venue from URL params
-    if (focusVenueId) {
-      const targetVenue = allVenues.find((v: any) => v.id === focusVenueId);
-      if (targetVenue) {
-        map.setView([targetVenue.lat, targetVenue.lng], 16, { animate: true });
-        // Find and open the marker's popup
-        const targetMarker = markersRef.current.find((m) => {
-          const ll = m.getLatLng();
-          return Math.abs(ll.lat - targetVenue.lat) < 0.0001 && Math.abs(ll.lng - targetVenue.lng) < 0.0001;
-        });
-        if (targetMarker) {
-          setTimeout(() => targetMarker.openPopup(), 500);
-        }
-      }
-      onFocusHandled?.();
-    }
-  }, [hour, dateKey, filter, typeFilter, sunRange, weather, metroStation]);
+    return () => {
+      map.off("update-unconfirmed", renderUnconfirmed);
+      unconfirmedMarkersRef.current.forEach((mk) => mk.remove());
+      unconfirmedMarkersRef.current = [];
+    };
+  }, [metroStation, typeFilter]);
 
   // Shadow overlay layer
   useEffect(() => {
