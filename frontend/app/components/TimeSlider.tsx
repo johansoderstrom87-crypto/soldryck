@@ -136,8 +136,8 @@ export default function TimeSlider({
       className="absolute bottom-0 left-0 right-0 z-[1000] p-3 pointer-events-none"
       style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}
     >
-      {/* Sun arc + wind arrow */}
-      <div className="flex justify-center pointer-events-none mb-1">
+      {/* Sun + wind direction cards */}
+      <div className="pointer-events-none mb-1">
         <DirectionGauges hour={hour} date={date} weather={weather} />
       </div>
 
