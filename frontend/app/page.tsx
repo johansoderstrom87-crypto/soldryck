@@ -104,13 +104,13 @@ export default function Home() {
     },
     {
       type: "bar",
-      label: "Bar",
+      label: "Bar & Pub",
       svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
     },
     {
-      type: "pub",
-      label: "Pub",
-      svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 11h1a3 3 0 0 1 0 6h-1"/><path d="M5 11h12v7a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4Z"/><path d="M12 2v4"/><path d="M8 4l1-2"/><path d="M16 4l-1-2"/></svg>`,
+      type: "rooftop",
+      label: "Takbar",
+      svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><line x1="3" y1="7" x2="7" y2="7"/><line x1="17" y1="7" x2="21" y2="7"/></svg>`,
     },
   ];
 

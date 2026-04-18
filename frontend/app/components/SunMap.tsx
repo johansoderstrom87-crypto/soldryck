@@ -29,8 +29,26 @@ export interface FeedbackVenue {
   currentSchedule: Record<number, "sun" | "shade" | "night">;
 }
 
-export const VENUE_TYPES = ["restaurant", "cafe", "bar", "pub"] as const;
+export const VENUE_TYPES = ["restaurant", "cafe", "bar", "rooftop"] as const;
 export type VenueType = (typeof VENUE_TYPES)[number];
+
+// Keywords that identify rooftop venues (exclude false positives like takeaway/takumi)
+const ROOFTOP_EXCLUDE = ["takeaway", "take away", "take-away", "takumi", "takara", "takiya", "tako"];
+function isRooftopVenue(venue: { name: string }): boolean {
+  const n = venue.name.toLowerCase();
+  if (ROOFTOP_EXCLUDE.some((ex) => n.includes(ex))) return false;
+  return /\btak\b|takpark|taket|takterrass|terrass|gondolen|pharmarium|himlen/i.test(venue.name);
+}
+
+/** Check if a venue passes the typeFilter. "bar" matches bar+pub, "rooftop" matches by name. */
+function matchesTypeFilter(venue: { type: string; name: string }, typeFilter: Set<VenueType>): boolean {
+  if (typeFilter.size === 0) return true;
+  if (typeFilter.has("restaurant") && venue.type === "restaurant") return true;
+  if (typeFilter.has("cafe") && venue.type === "cafe") return true;
+  if (typeFilter.has("bar") && (venue.type === "bar" || venue.type === "pub")) return true;
+  if (typeFilter.has("rooftop") && isRooftopVenue(venue)) return true;
+  return false;
+}
 
 export type SunRange = { from: number; to: number } | null;
 
@@ -410,7 +428,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       }
 
       // Filter by type
-      if (typeFilter.size > 0 && !typeFilter.has(venue.type)) return;
+      if (!matchesTypeFilter(venue, typeFilter)) return;
 
       // Filter by sun/shade
       if (filter === "sun" && status !== "sun") return;
@@ -784,7 +802,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           const dist = distanceM(venue.lat, venue.lng, metroStation.lat, metroStation.lng);
           if (dist > STATION_RADIUS_M) continue;
         }
-        if (typeFilter.size > 0 && !typeFilter.has(venue.type)) continue;
+        if (!matchesTypeFilter(venue, typeFilter)) continue;
 
         const icon = L.divIcon({
           className: "marker-root marker-unconfirmed",

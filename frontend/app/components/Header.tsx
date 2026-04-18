@@ -8,8 +8,8 @@ import FavoritesPanel from "./FavoritesPanel";
 const TYPE_OPTIONS: { value: VenueType; label: string; icon: string }[] = [
   { value: "restaurant", label: "Restaurang", icon: "🍽️" },
   { value: "cafe", label: "Café", icon: "☕" },
-  { value: "bar", label: "Bar", icon: "🍺" },
-  { value: "pub", label: "Pub", icon: "🍺" },
+  { value: "bar", label: "Bar & Pub", icon: "🍸" },
+  { value: "rooftop", label: "Takbar", icon: "🏙️" },
 ];
 
 interface HeaderProps {
