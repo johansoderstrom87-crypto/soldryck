@@ -138,7 +138,7 @@ export default function TimeSlider({
     >
       {/* Sun / temp / wind bar */}
       <div className="pointer-events-none mb-1">
-        <DirectionGauges hour={hour} date={date} weather={weather} />
+        <DirectionGauges hour={hour} date={date} currentWeather={currentWeather} />
       </div>
 
       <div

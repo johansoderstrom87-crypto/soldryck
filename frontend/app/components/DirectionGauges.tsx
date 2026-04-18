@@ -1,6 +1,6 @@
 "use client";
 
-import { type WeatherData } from "../lib/weather";
+import { type HourlyWeather } from "../lib/weather";
 
 function getSunAzimuth(date: Date, hour: number): number | null {
   const lat = 59.33;
@@ -36,14 +36,14 @@ function degreesToCardinal(deg: number): string {
 interface DirectionGaugesProps {
   hour: number;
   date: Date;
-  weather: WeatherData | null;
+  currentWeather: HourlyWeather | null;
 }
 
-export default function DirectionGauges({ hour, date, weather }: DirectionGaugesProps) {
+export default function DirectionGauges({ hour, date, currentWeather }: DirectionGaugesProps) {
   const sunAzimuth = getSunAzimuth(date, hour);
-  const windDir = weather?.hourly[hour]?.windDirection;
-  const windSpeed = weather?.hourly[hour]?.windSpeed;
-  const temperature = weather?.hourly[hour]?.temperature;
+  const windDir = currentWeather?.windDirection;
+  const windSpeed = currentWeather?.windSpeed;
+  const temperature = currentWeather?.temperature;
 
   const hasSun = sunAzimuth !== null;
   const hasWind = windDir !== undefined && windSpeed !== undefined && windSpeed > 0;
