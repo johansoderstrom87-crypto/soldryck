@@ -12,9 +12,23 @@ import os
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 INPUT_FILE = os.path.join(DATA_DIR, "shadow_results.json")
+VENUES_FILE = os.path.join(DATA_DIR, "venues.geojson")
 OUTPUT_FILE = os.path.join(
     os.path.dirname(__file__), "..", "frontend", "app", "data", "venues-computed.ts"
 )
+
+# Known rooftop venues — name-based identification for venues without OSM level data
+KNOWN_ROOFTOP_NAMES = {
+    "tak", "tak stockholm", "urban deli", "gondolen", "eriks gondolen",
+    "himlen", "stockholm under stjärnorna", "mosebacke etablissement",
+    "mosebacketerrassen", "restaurang himmla", "le hibou", "at six rooftop",
+    "rooftop at brunkebergstorg", "the rooftop", "blique by nobis",
+    "miss clara rooftop", "pharmarium", "the capital", "3sixty",
+    "top floor", "panorama", "takpark",
+}
+
+# Minimum OSM level to count as rooftop
+ROOFTOP_MIN_LEVEL = 4
 
 
 def compact_schedule(schedule: dict) -> dict:
@@ -33,28 +47,66 @@ def compact_schedule(schedule: dict) -> dict:
     return compact
 
 
+def is_rooftop(name: str, level_str: str) -> bool:
+    """Determine if a venue is a rooftop bar/restaurant."""
+    # Check OSM level
+    if level_str:
+        try:
+            # Handle multi-level like "-1;0" — take the max
+            levels = [int(x) for x in level_str.replace(";", ",").split(",") if x.strip().lstrip("-").isdigit()]
+            if levels and max(levels) >= ROOFTOP_MIN_LEVEL:
+                return True
+        except ValueError:
+            pass
+
+    # Check known names
+    name_lower = name.lower().strip()
+    for known in KNOWN_ROOFTOP_NAMES:
+        if name_lower == known or name_lower.startswith(known + " ") or name_lower.endswith(" " + known):
+            return True
+
+    return False
+
+
 def main():
     print("=== Steg 4: Exportera till frontend ===")
 
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         results = json.load(f)
 
+    # Load venues.geojson for level data
+    level_lookup = {}
+    if os.path.exists(VENUES_FILE):
+        with open(VENUES_FILE, "r", encoding="utf-8") as f:
+            geojson = json.load(f)
+        for feat in geojson["features"]:
+            props = feat["properties"]
+            level_lookup[str(props["id"])] = props.get("level", "")
+
     print(f"Läste {len(results)} platser")
 
     # Bygg venues-array
     venues = []
+    rooftop_count = 0
     for venue_id, data in results.items():
-        venues.append(
-            {
-                "id": venue_id,
-                "name": data["name"],
-                "lat": round(data["lat"], 6),
-                "lng": round(data["lng"], 6),
-                "type": data["type"],
-                "address": data.get("address", ""),
-                "schedule": compact_schedule(data["schedule"]),
-            }
-        )
+        level = level_lookup.get(venue_id, "")
+        rooftop = is_rooftop(data["name"], level)
+        if rooftop:
+            rooftop_count += 1
+        venue = {
+            "id": venue_id,
+            "name": data["name"],
+            "lat": round(data["lat"], 6),
+            "lng": round(data["lng"], 6),
+            "type": data["type"],
+            "address": data.get("address", ""),
+            "schedule": compact_schedule(data["schedule"]),
+        }
+        if rooftop:
+            venue["rooftop"] = True
+        venues.append(venue)
+
+    print(f"  {rooftop_count} takbarer/takrestauranger")
 
     # Generera TypeScript
     ts_content = f"""// Auto-genererad av pipeline/04_export_frontend.py
@@ -71,6 +123,7 @@ export interface ComputedVenue {{
   lng: number;
   type: string;
   address: string;
+  rooftop?: boolean;
   /** schedule[MM-DD][hour] = SunStatus */
   schedule: Record<string, Record<string, SunStatus>>;
 }}

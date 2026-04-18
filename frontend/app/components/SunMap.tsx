@@ -18,7 +18,7 @@ try {
   // venues-unconfirmed.ts doesn't exist yet
 }
 
-import { type WeatherData, getSymbolInfo, getCombinedStatus } from "../lib/weather";
+import { type WeatherData, getSymbolInfo } from "../lib/weather";
 import { METRO_STATIONS, type MetroStation, STATION_RADIUS_M, distanceM } from "../data/metro-stations";
 import { getFavorites, toggleFavorite } from "../lib/favorites";
 
@@ -32,21 +32,13 @@ export interface FeedbackVenue {
 export const VENUE_TYPES = ["restaurant", "cafe", "bar", "rooftop"] as const;
 export type VenueType = (typeof VENUE_TYPES)[number];
 
-// Keywords that identify rooftop venues (exclude false positives like takeaway/takumi)
-const ROOFTOP_EXCLUDE = ["takeaway", "take away", "take-away", "takumi", "takara", "takiya", "tako"];
-function isRooftopVenue(venue: { name: string }): boolean {
-  const n = venue.name.toLowerCase();
-  if (ROOFTOP_EXCLUDE.some((ex) => n.includes(ex))) return false;
-  return /\btak\b|takpark|taket|takterrass|terrass|gondolen|pharmarium|himlen/i.test(venue.name);
-}
-
-/** Check if a venue passes the typeFilter. "bar" matches bar+pub, "rooftop" matches by name. */
-function matchesTypeFilter(venue: { type: string; name: string }, typeFilter: Set<VenueType>): boolean {
+/** Check if a venue passes the typeFilter. "bar" matches bar+pub, "rooftop" uses pipeline-computed flag. */
+function matchesTypeFilter(venue: { type: string; rooftop?: boolean }, typeFilter: Set<VenueType>): boolean {
   if (typeFilter.size === 0) return true;
   if (typeFilter.has("restaurant") && venue.type === "restaurant") return true;
   if (typeFilter.has("cafe") && venue.type === "cafe") return true;
   if (typeFilter.has("bar") && (venue.type === "bar" || venue.type === "pub")) return true;
-  if (typeFilter.has("rooftop") && isRooftopVenue(venue)) return true;
+  if (typeFilter.has("rooftop") && venue.rooftop) return true;
   return false;
 }
 
@@ -445,7 +437,6 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       }
 
       // Determine marker style based on combined shadow + weather
-      const combined = getCombinedStatus(rawStatus, weatherSymbol);
       const isRain = weatherSymbol && getSymbolInfo(weatherSymbol).category === "rain";
       const isActuallySunny = status === "sun" && weatherSymbol !== undefined && weatherSymbol <= 2;
 
@@ -514,22 +505,6 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         })
         .join("");
 
-      const weatherTimeline = weather
-        ? hours.map((h) => {
-            const hw = weather.hourly[h];
-            if (!hw) return `<div style="width:14px;height:14px;border-radius:3px;background:#f1f5f9;flex-shrink:0"></div>`;
-            const si = getSymbolInfo(hw.symbolCode);
-            const bg =
-              si.category === "clear" ? "background:#fbbf24"
-              : si.category === "clouds" ? "background:#cbd5e1"
-              : si.category === "rain" ? "background:#60a5fa"
-              : si.category === "thunder" ? "background:#a78bfa"
-              : "background:#c4b5fd";
-            const border = h === hour ? "border:2px solid #0f172a" : "";
-            return `<div style="width:14px;height:14px;border-radius:3px;${bg};${border};flex-shrink:0" title="${h}:00 — ${si.label} ${Math.round(hw.temperature)}°C"></div>`;
-          }).join("")
-        : "";
-
       // Best hour recommendation
       const bestHour = getBestHour(venue, dateKey, weather);
       const bestHourLine = bestHour
@@ -539,14 +514,6 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
               <div style="font-size:10px;color:#92400e;font-weight:600">B&auml;sta timmen idag</div>
               <div style="font-size:12px;color:#78350f;font-weight:500">${bestHour.label}</div>
             </div>
-          </div>`
-        : "";
-
-      // Weather line for current hour
-      const weatherLine = currentWeather
-        ? `<div style="font-size:11px;color:#64748b;margin-top:6px;display:flex;align-items:center;gap:4px">
-            <span>${getSymbolInfo(currentWeather.symbolCode).icon}</span>
-            <span>${Math.round(currentWeather.temperature)}°C — ${combined.label}</span>
           </div>`
         : "";
 
@@ -568,12 +535,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">SOL / SKUGGA</div>
             <div style="display:flex;gap:2px;flex-wrap:nowrap;overflow-x:auto">${shadowTimeline}</div>
             <div style="display:flex;gap:2px;flex-wrap:nowrap;margin-top:1px">${hourLabels}</div>
-            ${weatherTimeline ? `
-              <div style="font-size:10px;color:#94a3b8;margin-bottom:2px;margin-top:6px">VÄDER</div>
-              <div style="display:flex;gap:2px;flex-wrap:nowrap;overflow-x:auto">${weatherTimeline}</div>
-            ` : ""}
           </div>
-          ${weatherLine}
           ${bestHourLine}
           <div style="font-size:12px;color:#64748b;margin-top:6px">${sunHours} soltimmar (vid klart v&auml;der)</div>
           <div id="venue-photo-${venue.id}" style="margin-top:8px"></div>
