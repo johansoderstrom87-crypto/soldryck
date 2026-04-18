@@ -488,7 +488,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       const hourLabels = hours
         .map((h) => {
           const bold = h === hour ? "font-weight:700;color:#0f172a" : "";
-          return `<div style="width:14px;text-align:center;font-size:8px;color:#94a3b8;flex-shrink:0;${bold}">${h}</div>`;
+          return `<div style="width:12px;text-align:center;font-size:7px;color:#94a3b8;flex-shrink:0;${bold}">${h}</div>`;
         })
         .join("");
 
@@ -501,19 +501,16 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             : s === "night" ? "background:#1e293b"
             : "background:#cbd5e1";
           const border = h === hour ? "border:2px solid #0f172a" : "";
-          return `<div style="width:14px;height:14px;border-radius:3px;${bg};${border};flex-shrink:0" title="${h}:00 — ${statusToLabel(s)}"></div>`;
+          return `<div style="width:12px;height:12px;border-radius:2px;${bg};${border};flex-shrink:0" title="${h}:00 — ${statusToLabel(s)}"></div>`;
         })
         .join("");
 
       // Best hour recommendation
       const bestHour = getBestHour(venue, dateKey, weather);
       const bestHourLine = bestHour
-        ? `<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:8px;padding:6px 8px;margin-top:6px;display:flex;align-items:center;gap:6px">
-            <span style="font-size:14px">&#11088;</span>
-            <div>
-              <div style="font-size:10px;color:#92400e;font-weight:600">B&auml;sta timmen idag</div>
-              <div style="font-size:12px;color:#78350f;font-weight:500">${bestHour.label}</div>
-            </div>
+        ? `<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:6px;padding:4px 8px;margin-top:4px;display:flex;align-items:center;gap:5px">
+            <span style="font-size:12px">&#11088;</span>
+            <span style="font-size:11px;color:#78350f;font-weight:500">B&auml;sta timmen: ${bestHour.label}</span>
           </div>`
         : "";
 
@@ -521,42 +518,40 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         ? `<div style="color:#94a3b8;font-size:11px;margin-top:1px">${venue.address || ""}</div>`
         : "";
 
-      const popup = L.popup({ maxWidth: 300 }).setContent(`
-        <div style="min-width:260px">
-          <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
+      const popup = L.popup({ maxWidth: 280 }).setContent(`
+        <div style="min-width:240px">
+          <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">
             <div>
-              <strong style="font-size:15px">${venue.name}</strong>
-              <div style="color:#64748b;font-size:12px;margin-top:2px">${typeToLabel(venue.type)}</div>
-              ${address}
+              <strong style="font-size:14px;line-height:1.2">${venue.name}</strong>
+              <div style="color:#64748b;font-size:11px;margin-top:1px">${typeToLabel(venue.type)}${address ? ` · ${venue.address || ""}` : ""}</div>
             </div>
-            <span style="font-size:24px">${statusToEmoji(status)}</span>
+            <span style="font-size:20px;margin-left:6px">${statusToEmoji(status)}</span>
           </div>
-          <div style="background:#f8fafc;border-radius:8px;padding:8px;margin-top:4px">
-            <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">SOL / SKUGGA</div>
-            <div style="display:flex;gap:2px;flex-wrap:nowrap;overflow-x:auto">${shadowTimeline}</div>
-            <div style="display:flex;gap:2px;flex-wrap:nowrap;margin-top:1px">${hourLabels}</div>
+          <div style="background:#f8fafc;border-radius:6px;padding:5px 6px;margin-top:2px">
+            <div style="display:flex;gap:1px;flex-wrap:nowrap;overflow-x:auto">${shadowTimeline}</div>
+            <div style="display:flex;gap:1px;flex-wrap:nowrap;margin-top:1px">${hourLabels}</div>
           </div>
           ${bestHourLine}
-          <div style="font-size:12px;color:#64748b;margin-top:6px">${sunHours} soltimmar (vid klart v&auml;der)</div>
-          <div id="venue-photo-${venue.id}" style="margin-top:8px"></div>
-          <div id="venue-hours-${venue.id}" style="margin-top:8px"></div>
-          <div style="display:flex;gap:6px;margin-top:8px">
+          <div style="font-size:11px;color:#64748b;margin-top:4px">${sunHours} soltimmar (vid klart v&auml;der)</div>
+          <div id="venue-photo-${venue.id}" style="margin-top:6px"></div>
+          <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
+          <div style="display:flex;gap:4px;margin-top:6px">
             <button
               class="fav-btn"
               data-venue-id="${venue.id}"
-              style="flex:0 0 36px;padding:4px;border:1px solid #fecaca;border-radius:8px;background:#fff;color:#ef4444;font-size:16px;cursor:pointer;text-align:center"
+              style="flex:0 0 32px;padding:3px;border:1px solid #fecaca;border-radius:6px;background:#fff;color:#ef4444;font-size:14px;cursor:pointer;text-align:center"
               title="Spara som favorit"
             >${getFavorites().has(venue.id) ? "&#10084;&#65039;" : "&#9825;"}</button>
             <button
               class="share-btn"
               data-venue-id="${venue.id}"
               data-venue-name="${venue.name}"
-              style="flex:1;padding:4px 10px;border:1px solid #fde68a;border-radius:8px;background:#fffbeb;color:#92400e;font-size:11px;cursor:pointer;text-align:center;font-weight:500"
+              style="flex:1;padding:3px 8px;border:1px solid #fde68a;border-radius:6px;background:#fffbeb;color:#92400e;font-size:10px;cursor:pointer;text-align:center;font-weight:500"
             >&#128279; Dela</button>
             <button
               class="feedback-btn"
               data-venue-id="${venue.id}"
-              style="flex:1;padding:4px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#94a3b8;font-size:11px;cursor:pointer;text-align:center"
+              style="flex:1;padding:3px 8px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;color:#94a3b8;font-size:10px;cursor:pointer;text-align:center"
             >St&auml;mmer inte?</button>
           </div>
         </div>
@@ -590,7 +585,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             .then((r) => r.ok ? r.json() : null)
             .then((data) => {
               if (!data?.photoUrl) return;
-              photoContainer.innerHTML = `<img src="${data.photoUrl}" alt="${venue.name}" style="width:100%;height:120px;object-fit:cover;border-radius:8px;display:block" loading="lazy" />`;
+              photoContainer.innerHTML = `<img src="${data.photoUrl}" alt="${venue.name}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;display:block" loading="lazy" />`;
             })
             .catch(() => {});
         }
