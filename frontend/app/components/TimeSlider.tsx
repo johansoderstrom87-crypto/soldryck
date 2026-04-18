@@ -136,36 +136,9 @@ export default function TimeSlider({
       className="absolute bottom-0 left-0 right-0 z-[1000] p-3 pointer-events-none"
       style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}
     >
-      {/* Sun + wind direction cards */}
-      <div className="pointer-events-none mb-0">
+      {/* Sun / temp / wind bar */}
+      <div className="pointer-events-none mb-1">
         <DirectionGauges hour={hour} date={date} weather={weather} />
-      </div>
-
-      {/* Floating weather text — no background, black */}
-      <div className="text-center mb-2 pointer-events-none min-h-[26px]">
-        {currentWeather ? (
-          <div className="inline-flex items-baseline gap-2 tabular-nums">
-            <span
-              style={{
-                fontSize: 22,
-                fontWeight: 800,
-                letterSpacing: "-0.02em",
-                lineHeight: 1,
-                color: "#000",
-                textShadow: textShadowOnMap,
-              }}
-            >
-              {Math.round(currentWeather.temperature)}°C
-            </span>
-          </div>
-        ) : weatherLoading ? null : (
-          <span
-            className="text-xs"
-            style={{ color: "#000", textShadow: textShadowOnMap, fontWeight: 600 }}
-          >
-            {sunCount}/{totalCount} ställen i sol
-          </span>
-        )}
       </div>
 
       <div
