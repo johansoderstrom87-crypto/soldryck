@@ -19,16 +19,27 @@ OUTPUT_FILE = os.path.join(
 
 # Known rooftop venues — name-based identification for venues without OSM level data
 KNOWN_ROOFTOP_NAMES = {
-    "tak", "tak stockholm", "urban deli", "gondolen", "eriks gondolen",
-    "himlen", "stockholm under stjärnorna", "mosebacke etablissement",
-    "mosebacketerrassen", "restaurang himmla", "le hibou", "at six rooftop",
-    "rooftop at brunkebergstorg", "the rooftop", "blique by nobis",
-    "miss clara rooftop", "pharmarium", "the capital", "3sixty",
-    "top floor", "panorama", "takpark",
+    "tak", "tak stockholm", "takpark by urban deli", "takpark",
+    "gondolen", "eriks gondolen", "himlen",
+    "mosebacke etablissement", "mosebacketerrassen",
+    "le hibou", "the capital", "capital",
+    "3sixty", "3sixty skybar",
+    "sus", "stockholm under stjärnorna",
+    "pelago", "basta",
+    "scandic anglais terrassbaren", "terrassbaren",
+    "the winery hotel", "dramatenterrassen",
+    "the nest", "the nest at downtown camper",
+    "freyja + söder", "freyja",
+    "arc", "arc at blique by nobis", "blique by nobis",
+    "spesso", "ascaroterrassen",
+    "sjöstaden skybar", "sjostaden skybar",
+    "la terrazza", "la terrazza at italienskan",
+    "rooftop garden bar", "clarion sign",
+    "slakthuset",
 }
 
 # Minimum OSM level to count as rooftop
-ROOFTOP_MIN_LEVEL = 4
+ROOFTOP_MIN_LEVEL = 6
 
 
 def compact_schedule(schedule: dict) -> dict:
