@@ -137,7 +137,7 @@ export default function TimeSlider({
       style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}
     >
       {/* Sun + wind direction cards */}
-      <div className="pointer-events-none mb-1">
+      <div className="pointer-events-none mb-0">
         <DirectionGauges hour={hour} date={date} weather={weather} />
       </div>
 

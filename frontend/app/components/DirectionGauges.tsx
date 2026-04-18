@@ -33,19 +33,6 @@ function degreesToCardinal(deg: number): string {
   return dirs[Math.round(deg / 45) % 8];
 }
 
-const cardStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "8px 14px",
-  borderRadius: 14,
-  background: "rgba(255,255,255,0.82)",
-  backdropFilter: "blur(16px) saturate(1.4)",
-  WebkitBackdropFilter: "blur(16px) saturate(1.4)",
-  border: "0.5px solid rgba(255,255,255,0.6)",
-  boxShadow: "0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04)",
-};
-
 interface DirectionGaugesProps {
   hour: number;
   date: Date;
@@ -66,65 +53,79 @@ export default function DirectionGauges({ hour, date, weather }: DirectionGauges
 
   return (
     <div className="flex items-end justify-between w-full max-w-md mx-auto px-1">
-      {/* Sun — left corner */}
+      {/* Sun — left corner, icon only */}
       {hasSun ? (
-        <div style={cardStyle}>
-          {/* Sun icon with direction arrow */}
-          <svg width="28" height="28" viewBox="0 0 28 28" style={{ flexShrink: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 10,
+            borderRadius: 14,
+            background: "linear-gradient(135deg, rgba(251,191,36,0.25) 0%, rgba(245,158,11,0.18) 100%)",
+            backdropFilter: "blur(16px) saturate(1.4)",
+            WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+            border: "1px solid rgba(251,191,36,0.35)",
+            boxShadow: "0 4px 20px rgba(245,158,11,0.2), 0 1px 3px rgba(0,0,0,0.06)",
+          }}
+        >
+          <svg width="44" height="44" viewBox="-22 -22 44 44" style={{ display: "block", overflow: "visible" }}>
             {/* Sun rays */}
             {Array.from({ length: 8 }, (_, i) => {
               const a = (i * Math.PI) / 4;
               return (
                 <line
                   key={i}
-                  x1={10 + Math.cos(a) * 5}
-                  y1={10 + Math.sin(a) * 5}
-                  x2={10 + Math.cos(a) * 8}
-                  y2={10 + Math.sin(a) * 8}
+                  x1={Math.cos(a) * 5.5}
+                  y1={Math.sin(a) * 5.5}
+                  x2={Math.cos(a) * 9}
+                  y2={Math.sin(a) * 9}
                   stroke="#f59e0b"
-                  strokeWidth="1.8"
+                  strokeWidth="2"
                   strokeLinecap="round"
                 />
               );
             })}
-            <circle cx="10" cy="10" r="3.5" fill="#f59e0b" />
+            <circle cx="0" cy="0" r="4" fill="#f59e0b" />
 
-            {/* Direction arrow from sun */}
-            <g transform={`rotate(${lightDeg}, 10, 10)`}>
-              <line x1="10" y1="5" x2="10" y2="-6" stroke="#f59e0b" strokeWidth="2.2" strokeLinecap="round" />
-              <polygon points="10,-8 7,-3 13,-3" fill="#f59e0b" />
+            {/* Direction arrow */}
+            <g transform={`rotate(${lightDeg})`}>
+              <line x1="0" y1="-6" x2="0" y2="-17" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+              <polygon points="0,-20 -3.5,-14 3.5,-14" fill="#f59e0b" />
             </g>
           </svg>
-          <div style={{ lineHeight: 1.2 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: "#78716c" }}>
-              Sol:
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#1c1917", letterSpacing: "-0.02em" }}>
-              {degreesToCardinal(sunAzimuth)}
-            </div>
-          </div>
         </div>
       ) : <div />}
 
       {/* Wind — right corner */}
       {hasWind ? (
-        <div style={cardStyle}>
-          {/* Wind icon */}
-          <svg width="26" height="20" viewBox="0 0 26 20" style={{ flexShrink: 0 }}>
-            {/* Three wind lines */}
-            <g transform={`rotate(${(windDir! + 180) % 360 - 180}, 13, 10)`}>
-              <line x1="4" y1="6" x2="22" y2="6" stroke="#64748b" strokeWidth="2" strokeLinecap="round" />
-              <line x1="6" y1="10" x2="20" y2="10" stroke="#64748b" strokeWidth="2" strokeLinecap="round" />
-              <line x1="4" y1="14" x2="18" y2="14" stroke="#64748b" strokeWidth="2" strokeLinecap="round" />
-              {/* Arrow tips */}
-              <polyline points="19,3 22,6 19,9" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 12px",
+            borderRadius: 14,
+            background: "linear-gradient(135deg, rgba(147,197,253,0.25) 0%, rgba(96,165,250,0.18) 100%)",
+            backdropFilter: "blur(16px) saturate(1.4)",
+            WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+            border: "1px solid rgba(147,197,253,0.4)",
+            boxShadow: "0 4px 20px rgba(59,130,246,0.15), 0 1px 3px rgba(0,0,0,0.06)",
+          }}
+        >
+          <svg width="24" height="18" viewBox="0 0 24 18" style={{ flexShrink: 0 }}>
+            <g transform={`rotate(${(windDir! + 180) % 360 - 180}, 12, 9)`}>
+              <line x1="3" y1="5" x2="20" y2="5" stroke="#64748b" strokeWidth="2" strokeLinecap="round" />
+              <line x1="5" y1="9" x2="18" y2="9" stroke="#64748b" strokeWidth="2" strokeLinecap="round" />
+              <line x1="3" y1="13" x2="16" y2="13" stroke="#64748b" strokeWidth="2" strokeLinecap="round" />
+              <polyline points="17,2 20,5 17,8" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </g>
           </svg>
           <div style={{ lineHeight: 1.2 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: "#78716c" }}>
+            <div style={{ fontSize: 10, fontWeight: 500, color: "#78716c" }}>
               Vind:
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#1c1917", letterSpacing: "-0.02em" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#1c1917", letterSpacing: "-0.02em" }}>
               {degreesToCardinal(windDir)} ({Math.round(windSpeed)} m/s)
             </div>
           </div>
