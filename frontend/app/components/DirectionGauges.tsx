@@ -55,16 +55,16 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
           display: "flex",
           alignItems: "stretch",
           borderRadius: 14,
-          background: "linear-gradient(90deg, rgba(251,191,36,0.18) 0%, rgba(255,255,255,0.35) 35%, rgba(255,255,255,0.35) 65%, rgba(96,165,250,0.15) 100%)",
-          backdropFilter: "blur(16px) saturate(1.3)",
-          WebkitBackdropFilter: "blur(16px) saturate(1.3)",
-          boxShadow: "0 2px 12px rgba(0,0,0,0.06), inset 0 0 0 0.5px rgba(255,255,255,0.4)",
+          background: "linear-gradient(90deg, rgba(251,191,36,0.12) 0%, rgba(255,255,255,0.2) 35%, rgba(255,255,255,0.2) 65%, rgba(96,165,250,0.1) 100%)",
+          backdropFilter: "blur(14px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(14px) saturate(1.2)",
+          boxShadow: "0 2px 10px rgba(0,0,0,0.04), inset 0 0 0 0.5px rgba(255,255,255,0.3)",
           overflow: "hidden",
         }}
       >
         {/* Sun section */}
         {hasSun && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, padding: "6px 8px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "6px 10px" }}>
             <svg width="28" height="28" viewBox="-14 -14 28 28" style={{ display: "block", flexShrink: 0 }}>
               {Array.from({ length: 8 }, (_, i) => {
                 const a = (i * Math.PI) / 4;
@@ -84,7 +84,7 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
               <circle cx="0" cy="0" r="3.8" fill="#f59e0b" />
               <circle cx="0" cy="0" r="2" fill="#fbbf24" />
             </svg>
-            <svg width="12" height="22" viewBox="0 0 12 22" style={{ display: "block", flexShrink: 0, transform: `rotate(${lightDeg}deg)`, transition: "transform 0.4s ease" }}>
+            <svg width="12" height="22" viewBox="0 0 12 22" style={{ display: "block", flexShrink: 0, transform: `rotate(${lightDeg}deg)` }}>
               <line x1="6" y1="19" x2="6" y2="5" stroke="#b45309" strokeWidth="2" strokeLinecap="round" />
               <polygon points="6,1 2.5,7.5 9.5,7.5" fill="#b45309" />
             </svg>
@@ -118,14 +118,14 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
 
         {/* Wind section */}
         {hasWind && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3, padding: "6px 8px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "6px 10px" }}>
             <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: "block", flexShrink: 0 }}>
               <path d="M2 4h9c2 0 3-1.2 3-2.5S13 0 11.5 0" fill="none" stroke="#3b82f6" strokeWidth="1.8" strokeLinecap="round" />
               <path d="M2 7.5h12c1.5 0 2.8 1.2 2.8 2.5s-1.3 2.5-2.8 2.5" fill="none" stroke="#60a5fa" strokeWidth="1.8" strokeLinecap="round" />
               <path d="M2 11h6c1.2 0 2 1 2 2s-.8 1-2 1" fill="none" stroke="#93c5fd" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
             {windSpeed > 0 && windDir !== undefined && (
-              <svg width="10" height="18" viewBox="0 0 10 18" style={{ display: "block", flexShrink: 0, transform: `rotate(${(windDir + 180) % 360}deg)`, transition: "transform 0.4s ease" }}>
+              <svg width="10" height="18" viewBox="0 0 10 18" style={{ display: "block", flexShrink: 0, transform: `rotate(${(windDir + 180) % 360}deg)` }}>
                 <line x1="5" y1="16" x2="5" y2="4" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" />
                 <polygon points="5,1 2,6.5 8,6.5" fill="#2563eb" />
               </svg>
