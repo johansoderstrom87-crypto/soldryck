@@ -64,10 +64,10 @@ function Calendar({ value, onSelect, onClose }: CalendarProps) {
         left: 0,
         right: 0,
         zIndex: 10,
-        background: "rgba(255, 255, 255, 0.28)",
+        background: "rgba(255, 255, 255, 0.72)",
         backdropFilter: "blur(20px) saturate(1.4)",
         WebkitBackdropFilter: "blur(20px) saturate(1.4)",
-        border: "0.5px solid rgba(255, 255, 255, 0.5)",
+        border: "0.5px solid rgba(255, 255, 255, 0.7)",
         borderRadius: 20,
         boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)",
         padding: "12px 10px 10px",
@@ -81,8 +81,8 @@ function Calendar({ value, onSelect, onClose }: CalendarProps) {
           onClick={prevMonth}
           style={{
             width: 28, height: 28, borderRadius: 8,
-            background: "rgba(255,255,255,0.5)",
-            border: "0.5px solid rgba(255,255,255,0.6)",
+            background: "rgba(255,255,255,0.75)",
+            border: "0.5px solid rgba(255,255,255,0.8)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 12, color: "rgba(0,0,0,0.7)", cursor: "pointer",
           }}
@@ -94,8 +94,8 @@ function Calendar({ value, onSelect, onClose }: CalendarProps) {
           onClick={nextMonth}
           style={{
             width: 28, height: 28, borderRadius: 8,
-            background: "rgba(255,255,255,0.5)",
-            border: "0.5px solid rgba(255,255,255,0.6)",
+            background: "rgba(255,255,255,0.75)",
+            border: "0.5px solid rgba(255,255,255,0.8)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 12, color: "rgba(0,0,0,0.7)", cursor: "pointer",
           }}
@@ -132,7 +132,7 @@ function Calendar({ value, onSelect, onClose }: CalendarProps) {
                   ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
                   : isToday
                   ? "rgba(251, 146, 60, 0.25)"
-                  : "rgba(255,255,255,0.35)",
+                  : "rgba(255,255,255,0.65)",
                 color: isSelected ? "#fff" : "rgba(0,0,0,0.8)",
                 border: isToday && !isSelected ? "1px solid rgba(251,146,60,0.5)" : "none",
                 boxShadow: isSelected ? "0 2px 8px rgba(251,146,60,0.4)" : "none",
@@ -152,8 +152,8 @@ function Calendar({ value, onSelect, onClose }: CalendarProps) {
           style={{
             fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
             padding: "4px 14px", borderRadius: 20,
-            background: "rgba(255,255,255,0.5)",
-            border: "0.5px solid rgba(255,255,255,0.7)",
+            background: "rgba(255,255,255,0.75)",
+            border: "0.5px solid rgba(255,255,255,0.85)",
             color: "rgba(0,0,0,0.65)", cursor: "pointer",
           }}
         >
