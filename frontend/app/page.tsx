@@ -132,7 +132,7 @@ export default function Home() {
       />
 
       {/* Venue type quick-filter icons — left edge */}
-      <div className="absolute left-3 z-[1000] flex flex-col gap-2 pointer-events-auto" style={{ top: "50%", transform: "translateY(-65%)" }}>
+      <div className="absolute left-3 z-[1000] flex flex-col gap-2 pointer-events-auto" style={{ top: "50%", transform: "translateY(-65%)", fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}>
         {TYPE_BUTTONS.map(({ type, label, svg }) => {
           const active = typeFilter.size === 0 || typeFilter.has(type);
           return (
@@ -140,29 +140,30 @@ export default function Home() {
               key={type}
               onClick={() => toggleType(type)}
               title={label}
-              className="rounded-xl transition-all duration-200"
+              className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
               style={{
-                width: 42,
-                height: 42,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                width: 48,
+                height: 52,
                 background: active
-                  ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
-                  : "rgba(255,255,255,0.55)",
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
+                  ? "rgba(251, 146, 60, 0.55)"
+                  : "rgba(255,255,255,0.45)",
+                backdropFilter: "blur(14px) saturate(1.3)",
+                WebkitBackdropFilter: "blur(14px) saturate(1.3)",
                 border: active
-                  ? "1px solid rgba(251,146,60,0.5)"
-                  : "1px solid rgba(255,255,255,0.5)",
+                  ? "0.5px solid rgba(251,146,60,0.55)"
+                  : "0.5px solid rgba(255,255,255,0.55)",
                 boxShadow: active
-                  ? "0 4px 14px rgba(251,146,60,0.45)"
-                  : "0 2px 8px rgba(0,0,0,0.1)",
+                  ? "0 4px 14px rgba(251,146,60,0.35)"
+                  : "0 2px 8px rgba(0,0,0,0.08)",
                 color: active ? "#fff" : "#666",
-                opacity: active ? 1 : 0.7,
+                opacity: active ? 1 : 0.65,
               }}
-              dangerouslySetInnerHTML={{ __html: svg }}
-            />
+            >
+              <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
+              <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.55)" }}>
+                {label === "Bar & Pub" ? "Bar" : label === "Takbar" ? "Takbar" : label}
+              </span>
+            </button>
           );
         })}
       </div>
