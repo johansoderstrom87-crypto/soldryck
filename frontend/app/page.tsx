@@ -94,7 +94,7 @@ export default function Home() {
   const TYPE_BUTTONS: { type: VenueType; label: string; svg: string }[] = [
     {
       type: "restaurant",
-      label: "Restaurang",
+      label: "Mat",
       svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>`,
     },
     {
@@ -145,23 +145,23 @@ export default function Home() {
                 width: 48,
                 height: 52,
                 background: active
-                  ? "rgba(251, 146, 60, 0.55)"
-                  : "rgba(255,255,255,0.45)",
-                backdropFilter: "blur(14px) saturate(1.3)",
-                WebkitBackdropFilter: "blur(14px) saturate(1.3)",
+                  ? "rgba(245, 130, 32, 0.82)"
+                  : "rgba(255,255,255,0.42)",
+                backdropFilter: "blur(16px) saturate(1.5)",
+                WebkitBackdropFilter: "blur(16px) saturate(1.5)",
                 border: active
-                  ? "0.5px solid rgba(251,146,60,0.55)"
-                  : "0.5px solid rgba(255,255,255,0.55)",
+                  ? "1px solid rgba(255,180,80,0.6)"
+                  : "1px solid rgba(255,255,255,0.6)",
                 boxShadow: active
-                  ? "0 4px 14px rgba(251,146,60,0.35)"
-                  : "0 2px 8px rgba(0,0,0,0.08)",
-                color: active ? "#fff" : "#666",
-                opacity: active ? 1 : 0.65,
+                  ? "0 4px 16px rgba(251,146,60,0.5), inset 0 1px 1px rgba(255,220,140,0.4)"
+                  : "0 2px 8px rgba(0,0,0,0.1)",
+                color: active ? "#fff" : "#888",
+                opacity: active ? 1 : 0.7,
               }}
             >
               <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
               <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.55)" }}>
-                {label === "Bar & Pub" ? "Bar" : label === "Takbar" ? "Takbar" : label}
+                {label === "Bar & Pub" ? "Bar" : label}
               </span>
             </button>
           );
