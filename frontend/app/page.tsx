@@ -155,12 +155,12 @@ export default function Home() {
                 boxShadow: active
                   ? "0 4px 16px rgba(251,146,60,0.5), inset 0 1px 1px rgba(255,220,140,0.4)"
                   : "0 2px 8px rgba(0,0,0,0.1)",
-                color: active ? "#fff" : "#888",
+                color: active ? "#000" : "#888",
                 opacity: active ? 1 : 0.7,
               }}
             >
               <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-              <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.55)" }}>
+              <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.55)" }}>
                 {label === "Bar & Pub" ? "Bar" : label}
               </span>
             </button>
