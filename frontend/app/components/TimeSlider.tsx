@@ -459,18 +459,6 @@ export default function TimeSlider({
                     style={{ letterSpacing: "0.08em" }}
                   >
                     {dayName}
-                    {isFirstPill && (
-                      <span
-                        style={{
-                          marginLeft: 2,
-                          opacity: 0.5,
-                          fontSize: 7,
-                          display: "inline-block",
-                          transform: calendarOpen ? "rotate(180deg)" : "rotate(0deg)",
-                          transition: "transform 0.2s",
-                        }}
-                      >▾</span>
-                    )}
                   </span>
                   <span
                     className="text-[8.5px] leading-tight mt-0.5 tabular-nums"
