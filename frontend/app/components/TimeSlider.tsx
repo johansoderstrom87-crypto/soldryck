@@ -17,17 +17,15 @@ interface TimeSliderProps {
 
 const DAY_NAMES = ["SÖN", "MÅN", "TIS", "ONS", "TOR", "FRE", "LÖR"];
 const MONTH_NAMES_SHORT = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
-const MONTHS = [
-  { label: "APR", month: 3 },
-  { label: "MAJ", month: 4 },
-  { label: "JUNI", month: 5 },
-  { label: "JULI", month: 6 },
-  { label: "AUG", month: 7 },
-  { label: "SEP", month: 8 },
-  { label: "OKT", month: 9 },
-];
 
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 7); // 7–22
+
+function toInputDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export default function TimeSlider({
   hour,
@@ -35,13 +33,18 @@ export default function TimeSlider({
   date,
   onDateChange,
   weather,
-  weatherLoading,
-  sunCount,
-  totalCount,
 }: TimeSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
+
+  // baseDate determines the start of the 7-day window; always resets to today on mount
+  const [baseDate, setBaseDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
 
   useEffect(() => {
     const el = trackRef.current;
@@ -54,14 +57,12 @@ export default function TimeSlider({
   }, []);
 
   const days = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(today);
+      const d = new Date(baseDate);
       d.setDate(d.getDate() + i);
       return d;
     });
-  }, []);
+  }, [baseDate]);
 
   const realNow = new Date();
   const todayStr = toLocalDateStr(realNow);
@@ -69,6 +70,7 @@ export default function TimeSlider({
   const selectedDateStr = toLocalDateStr(date);
   const displayIsPast = selectedDateStr < todayStr;
   const displayIsToday = selectedDateStr === todayStr;
+  const baseDateIsToday = toLocalDateStr(baseDate) === todayStr;
 
   const isPastHour = useCallback(
     (h: number): boolean => {
@@ -83,7 +85,6 @@ export default function TimeSlider({
     (h: number): HourlyWeather | null => {
       if (!weather) return null;
       if (weather.hourly[h]) return weather.hourly[h];
-      // Fallback to nearest hour with data (prefer forward)
       for (let d = 1; d <= 6; d++) {
         if (weather.hourly[h + d]) return weather.hourly[h + d];
         if (weather.hourly[h - d]) return weather.hourly[h - d];
@@ -92,11 +93,6 @@ export default function TimeSlider({
     },
     [weather]
   );
-
-  const selectedMonth = date.getMonth();
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const isInDayRange = days.some((d) => toLocalDateStr(d) === selectedDateStr);
 
   const currentWeather = getHourWeather(hour);
 
@@ -129,7 +125,14 @@ export default function TimeSlider({
     setDragging(false);
   };
 
-  const textShadowOnMap = "0 1px 4px rgba(255,255,255,0.75), 0 0 12px rgba(255,255,255,0.4)";
+  const handleCalendarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.value) return;
+    const [y, m, d] = e.target.value.split("-").map(Number);
+    const picked = new Date(y, m - 1, d);
+    picked.setHours(0, 0, 0, 0);
+    setBaseDate(picked);
+    onDateChange(picked);
+  };
 
   return (
     <div
@@ -140,6 +143,16 @@ export default function TimeSlider({
       <div className="pointer-events-none mb-1">
         <DirectionGauges hour={hour} date={date} currentWeather={currentWeather} />
       </div>
+
+      {/* Hidden date input for calendar picker */}
+      <input
+        ref={dateInputRef}
+        type="date"
+        value={toInputDateStr(baseDate)}
+        onChange={handleCalendarChange}
+        style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0 }}
+        tabIndex={-1}
+      />
 
       <div
         className="pointer-events-auto max-w-md mx-auto rounded-2xl"
@@ -154,11 +167,8 @@ export default function TimeSlider({
         }}
       >
         <div className="px-3 pt-1 pb-2.5" style={{ overflow: "visible" }}>
-          {/* Weather icons row — absolutely positioned to align with hour cells, scaled (no reflow) */}
-          <div
-            className="relative mb-1"
-            style={{ height: 30, overflow: "visible" }}
-          >
+          {/* Weather icons row */}
+          <div className="relative mb-1" style={{ height: 30, overflow: "visible" }}>
             {HOURS.map((h) => {
               const hw = getHourWeather(h);
               const hwSymbol = hw ? getSymbolInfo(hw.symbolCode) : null;
@@ -203,7 +213,6 @@ export default function TimeSlider({
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
           >
-            {/* Bright sun gradient strip */}
             <div
               className="rounded-full"
               style={{
@@ -215,7 +224,6 @@ export default function TimeSlider({
               }}
             />
 
-            {/* Hour numbers — absolutely positioned (no layout changes on hour tick) */}
             {HOURS.map((h) => {
               const isSelected = h === hour;
               const past = isPastHour(h);
@@ -238,7 +246,6 @@ export default function TimeSlider({
               );
             })}
 
-            {/* Selected hour orange pill — translate3d keeps it on its own GPU layer, no reflow */}
             <div
               className="absolute flex items-center justify-center rounded-full pointer-events-none tabular-nums"
               style={{
@@ -269,16 +276,30 @@ export default function TimeSlider({
             {days.map((d, i) => {
               const dStr = toLocalDateStr(d);
               const isSelected = selectedDateStr === dStr;
-              const dayName = i === 0 ? "IDAG" : (DAY_NAMES[d.getDay()] ?? "");
+              const isFirstPill = i === 0;
+              const dayName = isFirstPill
+                ? baseDateIsToday
+                  ? "IDAG"
+                  : DAY_NAMES[d.getDay()] ?? ""
+                : DAY_NAMES[d.getDay()] ?? "";
               const dateLabel = `${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
               return (
                 <button
                   key={dStr}
-                  onClick={() => onDateChange(d)}
+                  onClick={() => {
+                    if (isFirstPill) {
+                      dateInputRef.current?.showPicker?.();
+                      dateInputRef.current?.click();
+                    } else {
+                      onDateChange(d);
+                    }
+                  }}
                   className="flex-1 rounded-full px-1 py-1 transition-all duration-200 flex flex-col items-center justify-center"
                   style={{
                     background: isSelected
                       ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
+                      : isFirstPill
+                      ? "rgba(255, 255, 255, 0.75)"
                       : "rgba(255, 255, 255, 0.6)",
                     boxShadow: isSelected ? "0 3px 12px rgba(251, 146, 60, 0.45)" : "none",
                     color: "#000",
@@ -290,6 +311,9 @@ export default function TimeSlider({
                     style={{ letterSpacing: "0.08em" }}
                   >
                     {dayName}
+                    {isFirstPill && (
+                      <span style={{ marginLeft: 2, opacity: 0.55, fontSize: 8 }}>▾</span>
+                    )}
                   </span>
                   <span
                     className="text-[8.5px] leading-tight mt-0.5 tabular-nums"
@@ -300,36 +324,6 @@ export default function TimeSlider({
                   >
                     {dateLabel}
                   </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Month pills */}
-          <div className="flex items-stretch gap-1 mt-1.5">
-            {MONTHS.map(({ label, month }) => {
-              const isSelected = !isInDayRange && selectedMonth === month;
-              const isCurrent = now.getMonth() === month;
-              return (
-                <button
-                  key={month}
-                  onClick={() => {
-                    const d = new Date(now.getFullYear(), month, 15);
-                    onDateChange(d);
-                  }}
-                  className="flex-1 rounded-full py-1 transition-all duration-200 text-[9px] font-bold tracking-wider"
-                  style={{
-                    background: isSelected
-                      ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
-                      : isCurrent && isInDayRange
-                      ? "rgba(251, 146, 60, 0.35)"
-                      : "rgba(255, 255, 255, 0.5)",
-                    color: "#000",
-                    boxShadow: isSelected ? "0 3px 10px rgba(251, 146, 60, 0.4)" : "none",
-                    letterSpacing: "0.08em",
-                  }}
-                >
-                  {label}
                 </button>
               );
             })}
