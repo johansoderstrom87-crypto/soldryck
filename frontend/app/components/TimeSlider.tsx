@@ -16,15 +16,152 @@ interface TimeSliderProps {
 }
 
 const DAY_NAMES = ["SÖN", "MÅN", "TIS", "ONS", "TOR", "FRE", "LÖR"];
+const DAY_NAMES_FULL = ["Sön", "Mån", "Tis", "Ons", "Tor", "Fre", "Lör"];
 const MONTH_NAMES_SHORT = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+const MONTH_NAMES_FULL = ["Januari", "Februari", "Mars", "April", "Maj", "Juni", "Juli", "Augusti", "September", "Oktober", "November", "December"];
 
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 7); // 7–22
 
-function toInputDateStr(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+// --- Custom calendar popup ---
+interface CalendarProps {
+  value: Date;
+  onSelect: (d: Date) => void;
+  onClose: () => void;
+}
+
+function Calendar({ value, onSelect, onClose }: CalendarProps) {
+  const [viewYear, setViewYear] = useState(value.getFullYear());
+  const [viewMonth, setViewMonth] = useState(value.getMonth());
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = toLocalDateStr(today);
+  const selectedStr = toLocalDateStr(value);
+
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  // Week starts Monday: shift sunday (0) to 6
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  const cells: (Date | null)[] = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(viewYear, viewMonth, d));
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  };
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: "calc(100% + 8px)",
+        left: 0,
+        right: 0,
+        zIndex: 10,
+        background: "rgba(255, 255, 255, 0.28)",
+        backdropFilter: "blur(20px) saturate(1.4)",
+        WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+        border: "0.5px solid rgba(255, 255, 255, 0.5)",
+        borderRadius: 20,
+        boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)",
+        padding: "12px 10px 10px",
+        fontFamily: "inherit",
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Month / year header */}
+      <div className="flex items-center justify-between mb-2 px-1">
+        <button
+          onClick={prevMonth}
+          style={{
+            width: 28, height: 28, borderRadius: 8,
+            background: "rgba(255,255,255,0.5)",
+            border: "0.5px solid rgba(255,255,255,0.6)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 12, color: "rgba(0,0,0,0.7)", cursor: "pointer",
+          }}
+        >‹</button>
+        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", color: "rgba(0,0,0,0.85)" }}>
+          {MONTH_NAMES_FULL[viewMonth]} {viewYear}
+        </span>
+        <button
+          onClick={nextMonth}
+          style={{
+            width: 28, height: 28, borderRadius: 8,
+            background: "rgba(255,255,255,0.5)",
+            border: "0.5px solid rgba(255,255,255,0.6)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 12, color: "rgba(0,0,0,0.7)", cursor: "pointer",
+          }}
+        >›</button>
+      </div>
+
+      {/* Weekday headers */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
+        {DAY_NAMES_FULL.slice(1).concat(DAY_NAMES_FULL[0]).map(n => (
+          <div key={n} style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: "rgba(0,0,0,0.4)", letterSpacing: "0.06em", padding: "2px 0" }}>
+            {n.toUpperCase()}
+          </div>
+        ))}
+      </div>
+
+      {/* Day grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={`e-${i}`} />;
+          const dStr = toLocalDateStr(d);
+          const isSelected = dStr === selectedStr;
+          const isToday = dStr === todayStr;
+          return (
+            <button
+              key={dStr}
+              onClick={() => { onSelect(d); onClose(); }}
+              style={{
+                borderRadius: 8,
+                height: 30,
+                fontSize: 11,
+                fontWeight: isSelected || isToday ? 700 : 500,
+                cursor: "pointer",
+                background: isSelected
+                  ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
+                  : isToday
+                  ? "rgba(251, 146, 60, 0.25)"
+                  : "rgba(255,255,255,0.35)",
+                color: isSelected ? "#fff" : "rgba(0,0,0,0.8)",
+                border: isToday && !isSelected ? "1px solid rgba(251,146,60,0.5)" : "none",
+                boxShadow: isSelected ? "0 2px 8px rgba(251,146,60,0.4)" : "none",
+                transition: "background 0.15s, transform 0.1s",
+              }}
+            >
+              {d.getDate()}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Today shortcut */}
+      <div style={{ marginTop: 8, textAlign: "center" }}>
+        <button
+          onClick={() => { onSelect(today); onClose(); }}
+          style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+            padding: "4px 14px", borderRadius: 20,
+            background: "rgba(255,255,255,0.5)",
+            border: "0.5px solid rgba(255,255,255,0.7)",
+            color: "rgba(0,0,0,0.65)", cursor: "pointer",
+          }}
+        >
+          IDAG
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function TimeSlider({
@@ -35,9 +172,10 @@ export default function TimeSlider({
   weather,
 }: TimeSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const dateInputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // baseDate determines the start of the 7-day window; always resets to today on mount
   const [baseDate, setBaseDate] = useState<Date>(() => {
@@ -55,6 +193,18 @@ export default function TimeSlider({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Close calendar on outside click
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setCalendarOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [calendarOpen]);
 
   const days = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -125,10 +275,7 @@ export default function TimeSlider({
     setDragging(false);
   };
 
-  const handleCalendarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.value) return;
-    const [y, m, d] = e.target.value.split("-").map(Number);
-    const picked = new Date(y, m - 1, d);
+  const handleCalendarSelect = (picked: Date) => {
     picked.setHours(0, 0, 0, 0);
     setBaseDate(picked);
     onDateChange(picked);
@@ -144,17 +291,8 @@ export default function TimeSlider({
         <DirectionGauges hour={hour} date={date} currentWeather={currentWeather} />
       </div>
 
-      {/* Hidden date input for calendar picker */}
-      <input
-        ref={dateInputRef}
-        type="date"
-        value={toInputDateStr(baseDate)}
-        onChange={handleCalendarChange}
-        style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0 }}
-        tabIndex={-1}
-      />
-
       <div
+        ref={panelRef}
         className="pointer-events-auto max-w-md mx-auto rounded-2xl"
         style={{
           background: "rgba(255, 255, 255, 0.3)",
@@ -164,8 +302,18 @@ export default function TimeSlider({
           overflow: "visible",
           transform: "translateZ(0)",
           isolation: "isolate",
+          position: "relative",
         }}
       >
+        {/* Calendar popup — anchored to panel, opens upward */}
+        {calendarOpen && (
+          <Calendar
+            value={baseDate}
+            onSelect={handleCalendarSelect}
+            onClose={() => setCalendarOpen(false)}
+          />
+        )}
+
         <div className="px-3 pt-1 pb-2.5" style={{ overflow: "visible" }}>
           {/* Weather icons row */}
           <div className="relative mb-1" style={{ height: 30, overflow: "visible" }}>
@@ -278,9 +426,7 @@ export default function TimeSlider({
               const isSelected = selectedDateStr === dStr;
               const isFirstPill = i === 0;
               const dayName = isFirstPill
-                ? baseDateIsToday
-                  ? "IDAG"
-                  : DAY_NAMES[d.getDay()] ?? ""
+                ? baseDateIsToday ? "IDAG" : DAY_NAMES[d.getDay()] ?? ""
                 : DAY_NAMES[d.getDay()] ?? "";
               const dateLabel = `${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
               return (
@@ -288,9 +434,9 @@ export default function TimeSlider({
                   key={dStr}
                   onClick={() => {
                     if (isFirstPill) {
-                      dateInputRef.current?.showPicker?.();
-                      dateInputRef.current?.click();
+                      setCalendarOpen(o => !o);
                     } else {
+                      setCalendarOpen(false);
                       onDateChange(d);
                     }
                   }}
@@ -298,6 +444,8 @@ export default function TimeSlider({
                   style={{
                     background: isSelected
                       ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
+                      : calendarOpen && isFirstPill
+                      ? "rgba(251, 146, 60, 0.2)"
                       : isFirstPill
                       ? "rgba(255, 255, 255, 0.75)"
                       : "rgba(255, 255, 255, 0.6)",
@@ -312,7 +460,16 @@ export default function TimeSlider({
                   >
                     {dayName}
                     {isFirstPill && (
-                      <span style={{ marginLeft: 2, opacity: 0.55, fontSize: 8 }}>▾</span>
+                      <span
+                        style={{
+                          marginLeft: 2,
+                          opacity: 0.5,
+                          fontSize: 7,
+                          display: "inline-block",
+                          transform: calendarOpen ? "rotate(180deg)" : "rotate(0deg)",
+                          transition: "transform 0.2s",
+                        }}
+                      >▾</span>
                     )}
                   </span>
                   <span
