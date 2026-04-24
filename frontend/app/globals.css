@@ -87,6 +87,29 @@ body {
 .marker-unconfirmed { display: none !important; }
 .show-badges .marker-unconfirmed { display: block !important; }
 
+/* User location marker — pulsing blue dot */
+.user-location-dot {
+  width: 18px;
+  height: 18px;
+  background: #3b82f6;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);
+  position: relative;
+}
+.user-location-dot::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.25);
+  animation: user-location-pulse 2s ease-out infinite;
+}
+@keyframes user-location-pulse {
+  0%   { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
 /* Category badges — glassmorphism labels, visible at zoom >= 17 */
 .marker-badge {
   display: none;

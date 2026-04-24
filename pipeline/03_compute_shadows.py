@@ -29,6 +29,7 @@ from pysolar.solar import get_altitude, get_azimuth
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 VENUES_FILE = os.path.join(DATA_DIR, "venues.geojson")
 BUILDINGS_FILE = os.path.join(DATA_DIR, "buildings.gpkg")
+DEM_FILE = os.path.join(DATA_DIR, "dem_stockholm.tif")
 OUTPUT_FILE = os.path.join(DATA_DIR, "shadow_results.json")
 
 # Tidszon: Sverige sommartid (CEST = UTC+2)
@@ -138,6 +139,41 @@ def precompute_sun_positions(ref_lat: float, ref_lng: float) -> dict:
     return positions
 
 
+def load_dem_sampler():
+    """
+    Ladda DEM och returnera en funktion som ger markhöjd (meter) för (lng, lat).
+    Returnerar None om DEM-filen saknas — fallback till MARK_Z används då.
+    """
+    if not os.path.exists(DEM_FILE):
+        print(f"  OBS: {DEM_FILE} saknas — kör 02c_load_dem.py för bättre terrängdata")
+        print("  Faller tillbaka på MARK_Z från byggnadsdata")
+        return None
+
+    try:
+        import rasterio
+        src = rasterio.open(DEM_FILE)
+        data = src.read(1).astype(float)
+        nodata = src.nodata
+        if nodata is not None:
+            data[data == nodata] = 0.0
+        transform = src.transform
+        src.close()
+
+        def sampler(lng: float, lat: float) -> float:
+            col = int((lng - transform.c) / transform.a)
+            row = int((lat - transform.f) / transform.e)
+            h, w = data.shape
+            if 0 <= row < h and 0 <= col < w:
+                return float(data[row, col])
+            return 0.0
+
+        print(f"  DEM laddad: {DEM_FILE}")
+        return sampler
+    except Exception as e:
+        print(f"  Kunde inte ladda DEM: {e} — faller tillbaka på MARK_Z")
+        return None
+
+
 def compute_shadows():
     print("=== Steg 3: Beräkna skuggor ===")
 
@@ -149,6 +185,20 @@ def compute_shadows():
     print("Laddar byggnader...")
     buildings_gdf = gpd.read_file(BUILDINGS_FILE)
     print(f"  {len(buildings_gdf)} byggnader")
+
+    # Ladda höjdmodell
+    print("Laddar höjdmodell (DEM)...")
+    dem_sample = load_dem_sampler()
+
+    # Förberäkna markhöjd per byggnad (en gång, inte per venue)
+    if dem_sample:
+        print("  Förberäknar byggnadsmarkhöjder från DEM...")
+        building_ground_z = np.array([
+            dem_sample(row.geometry.centroid.x, row.geometry.centroid.y)
+            for _, row in buildings_gdf.iterrows()
+        ])
+    else:
+        building_ground_z = buildings_gdf["MARK_Z"].fillna(0).values
 
     # Bygg spatial index
     print("Bygger rumsligt index...")
@@ -178,25 +228,28 @@ def compute_shadows():
             venue_lat + SEARCH_RADIUS,
         )
         candidate_idxs = list(buildings_sindex.intersection(search_box.bounds))
-        nearby_buildings = buildings_gdf.iloc[candidate_idxs]
+
+        # Venue markhöjd — DEM om tillgänglig, annars närmaste byggnads MARK_Z
+        if dem_sample:
+            venue_ground_z = dem_sample(venue_lng, venue_lat)
+        else:
+            venue_ground_z = 0
+            for idx in candidate_idxs:
+                row = buildings_gdf.iloc[idx]
+                if row.geometry.distance(venue_point) * M_PER_DEG_LAT < 5:
+                    venue_ground_z = row.get("MARK_Z", 0) or 0
+                    break
 
         # Förbered byggnadsdata — exkludera byggnader som venue-punkten
-        # ligger väldigt nära (< 2m), dvs den egna byggnaden
+        # ligger väldigt nära (< 0.5m), dvs den egna byggnaden
         nearby_list = []
-        for _, row in nearby_buildings.iterrows():
+        for idx in candidate_idxs:
+            row = buildings_gdf.iloc[idx]
             dist_m = row.geometry.distance(venue_point) * M_PER_DEG_LAT
             if dist_m < 0.5:
-                # Skippa byggnaden som restaurangen sitter i/vid
-                # (den skuggar inte sin egen uteservering)
                 continue
-            nearby_list.append((row.geometry, row["BYGG_H"], row.get("MARK_Z", 0)))
-
-        # Venue markhöjd (ta från närmaste byggnad)
-        venue_ground_z = 0
-        for _, row in nearby_buildings.iterrows():
-            if row.geometry.distance(venue_point) * M_PER_DEG_LAT < 5:
-                venue_ground_z = row.get("MARK_Z", 0)
-                break
+            bground = building_ground_z[idx]
+            nearby_list.append((row.geometry, row["BYGG_H"], bground))
 
         # Venue elevation (rooftop terraces etc.)
         venue_elevation = venue.get("venue_elevation_m", 0) or 0

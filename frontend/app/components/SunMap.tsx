@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useDeferredValue } from "react";
+import { useEffect, useRef, useMemo, useDeferredValue, useState } from "react";
 import L from "leaflet";
 
 // Load computed data if available, otherwise mock
@@ -321,6 +321,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const metroMarkersRef = useRef<L.Marker[]>([]);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const userMarkerRef = useRef<L.Marker | null>(null);
+  const geoWatchRef = useRef<number | null>(null);
+  const hasCenteredRef = useRef(false);
+  const [geoState, setGeoState] = useState<"idle" | "locating" | "located" | "error">("idle");
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
 
@@ -854,6 +858,58 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       .catch(() => {});
   }, [hour, dateKey, showShadows]);
 
+  // Geolocation — watch position and show blue dot on map
+  function handleLocate() {
+    if (!navigator.geolocation) { setGeoState("error"); return; }
+    if (geoState === "located") {
+      // Second click: stop watching and remove marker
+      if (geoWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(geoWatchRef.current);
+        geoWatchRef.current = null;
+      }
+      userMarkerRef.current?.remove();
+      userMarkerRef.current = null;
+      hasCenteredRef.current = false;
+      setGeoState("idle");
+      return;
+    }
+    setGeoState("locating");
+    hasCenteredRef.current = false;
+    if (geoWatchRef.current !== null) navigator.geolocation.clearWatch(geoWatchRef.current);
+    geoWatchRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const map = mapRef.current;
+        if (!map) return;
+        setGeoState("located");
+        if (!userMarkerRef.current) {
+          const icon = L.divIcon({
+            className: "",
+            html: `<div class="user-location-dot"></div>`,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+          });
+          userMarkerRef.current = L.marker([latitude, longitude], { icon, zIndexOffset: 2000, interactive: false }).addTo(map);
+        } else {
+          userMarkerRef.current.setLatLng([latitude, longitude]);
+        }
+        if (!hasCenteredRef.current) {
+          map.setView([latitude, longitude], 16, { animate: true });
+          hasCenteredRef.current = true;
+        }
+      },
+      () => setGeoState("error"),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+
+  // Cleanup geolocation watch on unmount
+  useEffect(() => {
+    return () => {
+      if (geoWatchRef.current !== null) navigator.geolocation.clearWatch(geoWatchRef.current);
+    };
+  }, []);
+
   const currentWeatherSymbol = weather?.hourly[hour]?.symbolCode;
   const darkness = getAmbientDarkness(hour, date, currentWeatherSymbol);
   const ambientColor = getAmbientColor(hour, date, currentWeatherSymbol);
@@ -889,9 +945,47 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     container.style.setProperty("--marker-dot-filter", `brightness(${markerBrightness}) saturate(${markerSaturate})`);
   }, [darkness, ambientColor]);
 
+  const locateBtnTitle = geoState === "located" ? "Dölj min position" : "Visa min position";
+  const locateBtnColor = geoState === "located" ? "#3b82f6" : geoState === "error" ? "#ef4444" : "#374151";
+
   return (
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
+      <button
+        onClick={handleLocate}
+        title={locateBtnTitle}
+        style={{
+          position: "absolute",
+          top: "80px",
+          right: "10px",
+          zIndex: 1000,
+          width: "30px",
+          height: "30px",
+          background: "#fff",
+          border: "2px solid rgba(0,0,0,0.2)",
+          borderRadius: "4px",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: locateBtnColor,
+          boxShadow: "0 1px 5px rgba(0,0,0,0.15)",
+        }}
+      >
+        {geoState === "locating" ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 1s linear infinite" }}>
+            <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
+            <path d="M12 2a10 10 0 0 1 10 10" />
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill={geoState === "located" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+            <circle cx="12" cy="12" r="8" />
+          </svg>
+        )}
+      </button>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
