@@ -1021,47 +1021,84 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     container.style.setProperty("--marker-dot-filter", `brightness(${markerBrightness}) saturate(${markerSaturate})`);
   }, [darkness, ambientColor]);
 
-  const locateBtnTitle = geoState === "located" ? "Dölj min position" : "Visa min position";
-  const locateBtnColor = geoState === "located" ? "#3b82f6" : geoState === "error" ? "#ef4444" : "#374151";
+  const [showTooltip, setShowTooltip] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setShowTooltip(false), 4500);
+    return () => clearTimeout(t);
+  }, []);
+
+  const locateBtnColor = geoState === "located" ? "#3b82f6" : geoState === "error" ? "#ef4444" : "#1e293b";
+  const glassStyle: React.CSSProperties = {
+    background: "rgba(255, 255, 255, 0.3)",
+    backdropFilter: "blur(14px) saturate(1.3)",
+    WebkitBackdropFilter: "blur(14px) saturate(1.3)",
+    border: "0.5px solid rgba(255, 255, 255, 0.55)",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+  };
 
   return (
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
-      <button
-        onClick={handleLocate}
-        title={locateBtnTitle}
-        style={{
-          position: "absolute",
-          top: "80px",
-          right: "10px",
-          zIndex: 1000,
-          width: "30px",
-          height: "30px",
-          background: "#fff",
-          border: "2px solid rgba(0,0,0,0.2)",
-          borderRadius: "4px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: locateBtnColor,
-          boxShadow: "0 1px 5px rgba(0,0,0,0.15)",
-        }}
-      >
-        {geoState === "locating" ? (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 1s linear infinite" }}>
-            <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
-            <path d="M12 2a10 10 0 0 1 10 10" />
-          </svg>
-        ) : (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill={geoState === "located" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-            <circle cx="12" cy="12" r="8" />
-          </svg>
+
+      {/* GPS locate button — bottom-right above time slider */}
+      <div style={{ position: "absolute", bottom: "225px", right: "12px", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}>
+        {/* Tooltip — fades in then out, only when idle */}
+        {showTooltip && geoState === "idle" && (
+          <div style={{
+            ...glassStyle,
+            borderRadius: 12,
+            padding: "7px 12px",
+            fontSize: 12,
+            fontWeight: 500,
+            color: "#0f172a",
+            whiteSpace: "nowrap",
+            animation: "gps-tip 4.5s ease forwards",
+            fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+          }}>
+            Aktivera GPS för att se din position
+          </div>
         )}
-      </button>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+        <button
+          onClick={() => { setShowTooltip(false); handleLocate(); }}
+          title={geoState === "located" ? "Dölj min position" : "Visa min position"}
+          style={{
+            ...glassStyle,
+            width: 48,
+            height: 48,
+            borderRadius: 14,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: locateBtnColor,
+            flexShrink: 0,
+          }}
+        >
+          {geoState === "locating" ? (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 1s linear infinite" }}>
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill={geoState === "located" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+              <circle cx="12" cy="12" r="8" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes gps-tip {
+          0%   { opacity: 0; transform: translateX(6px); }
+          12%  { opacity: 1; transform: translateX(0); }
+          75%  { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }
