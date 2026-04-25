@@ -61,7 +61,14 @@ export default function FavoritesPanel({ venues, onSelectVenue }: FavoritesPanel
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="rounded-xl shadow-lg backdrop-blur-md px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all bg-white/95 text-slate-600 hover:bg-white"
+        className="rounded-xl px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all text-slate-700"
+        style={{
+          background: "rgba(255,255,255,0.3)",
+          backdropFilter: "blur(14px) saturate(1.3)",
+          WebkitBackdropFilter: "blur(14px) saturate(1.3)",
+          border: "0.5px solid rgba(255,255,255,0.55)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+        }}
         title="Mina favoriter"
       >
         <span className="text-red-500">{favIds.size > 0 ? "\u2764\uFE0F" : "\u2661"}</span>
@@ -73,7 +80,7 @@ export default function FavoritesPanel({ venues, onSelectVenue }: FavoritesPanel
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 bg-white/95 backdrop-blur-md rounded-xl shadow-lg p-2 min-w-[240px] max-w-[280px] z-10">
+        <div className="absolute top-full left-0 mt-1 rounded-xl p-2 min-w-[240px] max-w-[280px] z-[2000]" style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", border: "0.5px solid rgba(255,255,255,0.7)", boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}>
           <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide px-1 mb-1.5">
             Mina favoriter ({favIds.size})
           </div>
