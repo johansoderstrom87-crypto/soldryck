@@ -347,7 +347,6 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       }
     ).addTo(map);
 
-    L.control.zoom({ position: "topright" }).addTo(map);
 
     map.on("zoomend", () => {
       const container = map.getContainer();
