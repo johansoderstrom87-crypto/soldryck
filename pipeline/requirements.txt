@@ -5,3 +5,4 @@ pysolar>=0.11
 pyproj>=3.6
 numpy>=1.26
 rasterio>=1.3
+duckdb>=1.0

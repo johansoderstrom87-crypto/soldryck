@@ -21,6 +21,7 @@ from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
 import geopandas as gpd
+import pandas as pd
 import numpy as np
 from shapely.geometry import Point, Polygon, MultiPolygon, box
 from shapely.ops import unary_union
@@ -29,6 +30,7 @@ from pysolar.solar import get_altitude, get_azimuth
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 VENUES_FILE = os.path.join(DATA_DIR, "venues.geojson")
 BUILDINGS_FILE = os.path.join(DATA_DIR, "buildings.gpkg")
+BUILDINGS_OVERTURE_FILE = os.path.join(DATA_DIR, "buildings_overture.gpkg")
 DEM_FILE = os.path.join(DATA_DIR, "dem_stockholm.tif")
 OUTPUT_FILE = os.path.join(DATA_DIR, "shadow_results.json")
 
@@ -183,8 +185,15 @@ def compute_shadows():
     print(f"  {len(venues_gdf)} uteserveringar")
 
     print("Laddar byggnader...")
-    buildings_gdf = gpd.read_file(BUILDINGS_FILE)
-    print(f"  {len(buildings_gdf)} byggnader")
+    if os.path.exists(BUILDINGS_OVERTURE_FILE):
+        buildings_gdf = gpd.read_file(BUILDINGS_OVERTURE_FILE)
+        height_col = "height"
+        print(f"  {len(buildings_gdf)} byggnads-objekt (Overture + LOD1-fallback)")
+    else:
+        buildings_gdf = gpd.read_file(BUILDINGS_FILE)
+        height_col = "BYGG_H"
+        print(f"  {len(buildings_gdf)} byggnader (LOD1)")
+        print("  Tips: kör 02d_load_overture_buildings.py för mer detaljerade skuggor")
 
     # Ladda höjdmodell
     print("Laddar höjdmodell (DEM)...")
@@ -198,7 +207,8 @@ def compute_shadows():
             for _, row in buildings_gdf.iterrows()
         ])
     else:
-        building_ground_z = buildings_gdf["MARK_Z"].fillna(0).values
+        mark_z = buildings_gdf["MARK_Z"].fillna(0) if "MARK_Z" in buildings_gdf.columns else pd.Series(0, index=buildings_gdf.index)
+        building_ground_z = mark_z.values
 
     # Bygg spatial index
     print("Bygger rumsligt index...")
@@ -249,7 +259,7 @@ def compute_shadows():
             if dist_m < 0.5:
                 continue
             bground = building_ground_z[idx]
-            nearby_list.append((row.geometry, row["BYGG_H"], bground))
+            nearby_list.append((row.geometry, row[height_col], bground))
 
         # Venue elevation (rooftop terraces etc.)
         venue_elevation = venue.get("venue_elevation_m", 0) or 0
