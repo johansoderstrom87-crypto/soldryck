@@ -546,7 +546,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
               title="Spara som favorit"
             >${getFavorites().has(venue.id) ? "&#10084;&#65039;" : "&#9825;"}</button>
             <a
-              href="https://maps.google.com/?q=${encodeURIComponent(venue.name)}&ll=${venue.lat},${venue.lng}"
+              href="https://www.google.com/maps/place/${encodeURIComponent(venue.name)}/@${venue.lat},${venue.lng},17z"
               target="_blank"
               rel="noopener noreferrer"
               title="Öppna i Google Maps"
