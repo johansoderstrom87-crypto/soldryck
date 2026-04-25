@@ -564,16 +564,19 @@ export default function TimeSlider({
                       onDateChange(d);
                     }
                   }}
-                  className="flex-1 rounded-full px-1 py-1 transition-all duration-200 flex flex-col items-center justify-center"
+                  className="flex-1 rounded-full px-1 py-2 transition-all duration-200 flex flex-col items-center justify-center"
                   style={{
                     background: isSelected
                       ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
                       : calendarOpen && isFirstPill
-                      ? "rgba(251, 146, 60, 0.2)"
-                      : isFirstPill
-                      ? "rgba(255, 255, 255, 0.75)"
-                      : "rgba(255, 255, 255, 0.6)",
-                    boxShadow: isSelected ? "0 3px 12px rgba(251, 146, 60, 0.45)" : "none",
+                      ? "rgba(251, 146, 60, 0.25)"
+                      : "rgba(255, 255, 255, 0.3)",
+                    backdropFilter: isSelected ? undefined : "blur(14px) saturate(1.3)",
+                    WebkitBackdropFilter: isSelected ? undefined : "blur(14px) saturate(1.3)",
+                    border: isSelected ? "none" : "0.5px solid rgba(255, 255, 255, 0.5)",
+                    boxShadow: isSelected
+                      ? "0 0 18px rgba(251,146,60,0.5), 0 3px 12px rgba(251, 146, 60, 0.4)"
+                      : "0 1px 3px rgba(0,0,0,0.04)",
                     color: "#000",
                     minWidth: 0,
                   }}
