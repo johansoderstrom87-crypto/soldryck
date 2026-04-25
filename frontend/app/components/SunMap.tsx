@@ -591,6 +591,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             name: venue.name,
             lat: String(venue.lat),
             lng: String(venue.lng),
+            type: venue.type,
           });
           fetch(`/api/venue-photo?${params}`)
             .then((r) => r.ok ? r.json() : null)
@@ -610,6 +611,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             name: venue.name,
             lat: String(venue.lat),
             lng: String(venue.lng),
+            type: venue.type,
           });
           fetch(`/api/venue-hours?${params}`)
             .then((r) => r.ok ? r.json() : null)
@@ -827,7 +829,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
           if (hoursContainer && !hoursContainer.dataset.loaded) {
             hoursContainer.dataset.loaded = "1";
-            const params = new URLSearchParams({ id: venue.id, name: venue.name, lat: String(venue.lat), lng: String(venue.lng) });
+            const params = new URLSearchParams({ id: venue.id, name: venue.name, lat: String(venue.lat), lng: String(venue.lng), type: venue.type });
             fetch(`/api/venue-hours?${params}`)
               .then((r) => r.ok ? r.json() : null)
               .then((data: { openNow: boolean | null; closesAt: string | null; week: { open: string; close: string }[][] | null } | null) => {

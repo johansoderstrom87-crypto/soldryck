@@ -3,8 +3,7 @@ import { NextRequest } from "next/server";
 type DaySegment = { open: string; close: string };
 type HoursInfo = {
   openNow: boolean | null;
-  closesAt: string | null; // "22:00"
-  // 7 entries, Monday..Sunday. Each day may have zero or more open/close segments.
+  closesAt: string | null;
   week: DaySegment[][] | null;
 };
 
@@ -19,7 +18,6 @@ function hhmm(h?: number, m?: number): string {
   return `${String(h ?? 0).padStart(2, "0")}:${String(m ?? 0).padStart(2, "0")}`;
 }
 
-// Places API day index: 0=Sun..6=Sat. Our UI uses 0=Mon..6=Sun.
 function toMon0(d: number): number {
   return (d + 6) % 7;
 }
@@ -30,8 +28,7 @@ function buildWeek(periods: unknown): DaySegment[][] | null {
   for (const p of periods as Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }>) {
     const openDay = p.open?.day;
     if (typeof openDay !== "number") continue;
-    const dayIdx = toMon0(openDay);
-    week[dayIdx].push({
+    week[toMon0(openDay)].push({
       open: hhmm(p.open?.hour, p.open?.minute),
       close: hhmm(p.close?.hour, p.close?.minute),
     });
@@ -39,56 +36,70 @@ function buildWeek(periods: unknown): DaySegment[][] | null {
   return week;
 }
 
+function venueTypeToPlacesTypes(type: string): string[] {
+  switch (type) {
+    case "restaurant": return ["restaurant"];
+    case "cafe": return ["cafe"];
+    case "bar": case "pub": return ["bar"];
+    default: return ["restaurant", "bar", "cafe"];
+  }
+}
+
+const FIELD_MASK =
+  "places.id,places.regularOpeningHours.periods,places.currentOpeningHours.openNow,places.currentOpeningHours.periods";
+
+async function findPlace(apiKey: string, name: string, lat: number, lng: number, venueType: string): Promise<any | null> {
+  // 1. Text search by name — works when OSM name matches Google
+  const textRes = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": FIELD_MASK },
+    body: JSON.stringify({
+      textQuery: `${name} Stockholm`,
+      locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 200 } },
+      maxResultCount: 1,
+    }),
+  });
+  if (textRes.ok) {
+    const data = await textRes.json();
+    if (data.places?.[0]) return data.places[0];
+  }
+
+  // 2. Fallback: nearby search by coordinates — finds whatever is actually there
+  const nearbyRes = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": FIELD_MASK },
+    body: JSON.stringify({
+      includedTypes: venueTypeToPlacesTypes(venueType),
+      maxResultCount: 1,
+      locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius: 50 } },
+    }),
+  });
+  if (nearbyRes.ok) {
+    const data = await nearbyRes.json();
+    if (data.places?.[0]) return data.places[0];
+  }
+
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const key = process.env.GOOGLE_PLACES_API_KEY;
-  if (!key) {
-    return Response.json(emptyInfo());
-  }
+  if (!key) return Response.json(emptyInfo());
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id") ?? "";
   const name = searchParams.get("name") ?? "";
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
+  const venueType = searchParams.get("type") ?? "";
 
-  if (!name || !lat || !lng) {
-    return Response.json({ error: "Saknar params" }, { status: 400 });
-  }
+  if (!name || !lat || !lng) return Response.json({ error: "Saknar params" }, { status: 400 });
 
   const cached = cache.get(id);
-  if (cached && Date.now() - cached.ts < CACHE_TTL) {
-    return Response.json(cached.info);
-  }
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return Response.json(cached.info);
 
   try {
-    const searchRes = await fetch("https://places.googleapis.com/v1/places:searchText", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": key,
-        "X-Goog-FieldMask":
-          "places.id,places.regularOpeningHours.periods,places.currentOpeningHours.openNow,places.currentOpeningHours.periods",
-      },
-      body: JSON.stringify({
-        textQuery: `${name} Stockholm`,
-        locationBias: {
-          circle: {
-            center: { latitude: Number(lat), longitude: Number(lng) },
-            radius: 200,
-          },
-        },
-        maxResultCount: 1,
-      }),
-    });
-
-    if (!searchRes.ok) {
-      const info = emptyInfo();
-      cache.set(id, { info, ts: Date.now() });
-      return Response.json(info);
-    }
-
-    const data = await searchRes.json();
-    const place = data.places?.[0];
+    const place = await findPlace(key, name, Number(lat), Number(lng), venueType);
     if (!place) {
       const info = emptyInfo();
       cache.set(id, { info, ts: Date.now() });
@@ -98,23 +109,15 @@ export async function GET(req: NextRequest) {
     const current = place.currentOpeningHours;
     const regular = place.regularOpeningHours;
     const openNow = typeof current?.openNow === "boolean" ? current.openNow : null;
-
-    // Build the week view from regular hours (stable week-over-week), fall back
-    // to current if regular is missing.
     const week = buildWeek(regular?.periods) ?? buildWeek(current?.periods);
 
-    // Find today's closing time if open now. Use currentOpeningHours.periods
-    // since it reflects today's actual state (holiday hours etc).
     let closesAt: string | null = null;
     if (openNow && Array.isArray(current?.periods)) {
       const todayMon0 = toMon0(new Date().getDay());
       for (const p of current.periods as Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { day?: number; hour?: number; minute?: number } }>) {
         if (typeof p.open?.day !== "number") continue;
-        // Match either the period starting today or spilling into today.
         if (toMon0(p.open.day) === todayMon0 || (typeof p.close?.day === "number" && toMon0(p.close.day) === todayMon0)) {
-          if (typeof p.close?.hour === "number") {
-            closesAt = hhmm(p.close.hour, p.close.minute);
-          }
+          if (typeof p.close?.hour === "number") closesAt = hhmm(p.close.hour, p.close.minute);
           break;
         }
       }
