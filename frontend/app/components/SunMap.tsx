@@ -803,6 +803,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
               <div style="color:#64748b;font-size:11px;margin-top:1px">${typeToLabel(venue.type)}</div>
               ${address}
             </div>
+            <div id="venue-photo-${venue.id}" style="margin-top:6px"></div>
             <div id="venue-hours-${venue.id}" style="margin-top:4px"></div>
             <div style="background:${noticeBg};border:1px solid ${noticeBorder};border-radius:7px;padding:6px 9px;margin-top:8px;font-size:11px;color:${noticeColor}">
               ${noticeText}
@@ -825,6 +826,26 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           .bindPopup(popup);
 
         marker.on("popupopen", () => {
+          // Fetch venue photo
+          const photoContainer = document.getElementById(`venue-photo-${venue.id}`);
+          if (photoContainer && !photoContainer.dataset.loaded) {
+            photoContainer.dataset.loaded = "1";
+            const params = new URLSearchParams({
+              id: venue.id,
+              name: venue.name,
+              lat: String(venue.lat),
+              lng: String(venue.lng),
+              type: venue.type,
+            });
+            fetch(`/api/venue-photo?${params}`)
+              .then((r) => r.ok ? r.json() : null)
+              .then((data) => {
+                if (!data?.photoUrl) return;
+                photoContainer.innerHTML = `<img src="${data.photoUrl}" alt="${venue.name}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;display:block" loading="lazy" />`;
+              })
+              .catch(() => {});
+          }
+
           // Fetch opening hours
           const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
           if (hoursContainer && !hoursContainer.dataset.loaded) {
