@@ -27,6 +27,7 @@ export interface FeedbackVenue {
   name: string;
   type: string;
   currentSchedule: Record<number, "sun" | "shade" | "night">;
+  mode?: "schedule" | "seating";
 }
 
 export const VENUE_TYPES = ["restaurant", "cafe", "bar", "rooftop"] as const;
@@ -783,29 +784,96 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           ? `<div style="color:#94a3b8;font-size:11px;margin-top:1px">${venue.address}</div>`
           : "";
 
+        const noticeBg = venue.source === "google_denied" ? "#fef2f2" : "#fffbeb";
+        const noticeBorder = venue.source === "google_denied" ? "#fecaca" : "#fde68a";
+        const noticeColor = venue.source === "google_denied" ? "#991b1b" : "#92400e";
+        const noticeText = venue.source === "google_denied"
+          ? "Enligt Google: <b>ingen uteservering</b>"
+          : "Ingen bekr&auml;ftad uteservering";
+
+        const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(venue.name)}/@${venue.lat},${venue.lng},17z`;
+        const mapsPinSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg>`;
+
         const popup = L.popup({ maxWidth: 280 }).setContent(`
-          <div style="min-width:200px">
-            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">
-              <div>
-                <strong style="font-size:15px">${venue.name}</strong>
-                <div style="color:#64748b;font-size:12px;margin-top:2px">${typeToLabel(venue.type)}</div>
-                ${address}
-              </div>
+          <div style="min-width:220px">
+            <div style="margin-bottom:4px">
+              <strong style="font-size:14px;line-height:1.2">${venue.name}</strong>
+              <div style="color:#64748b;font-size:11px;margin-top:1px">${typeToLabel(venue.type)}</div>
+              ${address}
             </div>
-            <div style="background:#f1f5f9;border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:#64748b">
-              ${venue.source === "google_denied"
-                ? "Enligt Google har detta st&auml;lle <b>ingen uteservering</b>."
-                : "Ingen bekr&auml;ftad uteservering i v&aring;r data."
-              }
-              <br/>St&auml;mmer inte? Anv&auml;nd knappen nedan f&ouml;r att meddela oss!
+            <div id="venue-hours-${venue.id}" style="margin-top:4px"></div>
+            <div style="background:${noticeBg};border:1px solid ${noticeBorder};border-radius:7px;padding:6px 9px;margin-top:8px;font-size:11px;color:${noticeColor}">
+              ${noticeText}
             </div>
-            <div id="venue-hours-${venue.id}" style="margin-top:8px"></div>
+            <div style="display:flex;gap:4px;margin-top:8px">
+              <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" title="Öppna i Google Maps"
+                style="flex:0 0 32px;padding:3px;border:1px solid #fca5a5;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none">
+                ${mapsPinSvg}
+              </a>
+              <button class="seating-btn" data-venue-id="${venue.id}"
+                style="flex:1;padding:3px 8px;border:1px solid #d1fae5;border-radius:6px;background:#ecfdf5;color:#065f46;font-size:10px;cursor:pointer;text-align:center;font-weight:500">
+                Vet du?
+              </button>
+            </div>
           </div>
         `);
 
         const marker = L.marker([venue.lat, venue.lng], { icon, zIndexOffset: -200 })
           .addTo(m)
           .bindPopup(popup);
+
+        marker.on("popupopen", () => {
+          // Fetch opening hours
+          const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
+          if (hoursContainer && !hoursContainer.dataset.loaded) {
+            hoursContainer.dataset.loaded = "1";
+            const params = new URLSearchParams({ id: venue.id, name: venue.name, lat: String(venue.lat), lng: String(venue.lng) });
+            fetch(`/api/venue-hours?${params}`)
+              .then((r) => r.ok ? r.json() : null)
+              .then((data: { openNow: boolean | null; closesAt: string | null; week: { open: string; close: string }[][] | null } | null) => {
+                if (!data || (data.openNow === null && !data.week)) return;
+                const DAYS = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
+                const todayMon0 = (new Date().getDay() + 6) % 7;
+                const dotColor = data.openNow ? "#10b981" : data.openNow === false ? "#ef4444" : "#94a3b8";
+                const statusText = data.openNow
+                  ? `Öppet${data.closesAt ? ` — stänger ${data.closesAt}` : ""}`
+                  : data.openNow === false ? "Stängt just nu" : "Öppettider";
+                const weekRows = data.week?.map((segments, i) => {
+                  const isToday = i === todayMon0;
+                  const timeText = segments.length ? segments.map((s) => `${s.open}–${s.close}`).join(", ") : "Stängt";
+                  return `<div class="venue-hours-row${isToday ? " venue-hours-row-today" : ""}"><span class="venue-hours-day">${DAYS[i]}</span><span class="venue-hours-time${!segments.length ? " venue-hours-closed" : ""}">${timeText}</span></div>`;
+                }).join("") ?? "";
+                const weekHtml = data.week?.length ? `<div class="venue-hours-week" style="display:none">${weekRows}</div>` : "";
+                hoursContainer.innerHTML = `
+                  <div class="venue-hours-status">
+                    <span class="venue-hours-dot" style="background:${dotColor}"></span>
+                    <span class="venue-hours-status-text">${statusText}</span>
+                    ${weekHtml ? `<button class="hours-toggle" aria-expanded="false"><span class="hours-toggle-label">Visa alla</span><svg class="hours-toggle-caret" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 3.5L5 6.5L8 3.5" /></svg></button>` : ""}
+                  </div>${weekHtml}`;
+                const toggle = hoursContainer.querySelector<HTMLButtonElement>(".hours-toggle");
+                const week = hoursContainer.querySelector<HTMLDivElement>(".venue-hours-week");
+                if (toggle && week) {
+                  toggle.onclick = () => {
+                    const visible = week.style.display !== "none";
+                    week.style.display = visible ? "none" : "block";
+                    toggle.setAttribute("aria-expanded", visible ? "false" : "true");
+                    const label = toggle.querySelector(".hours-toggle-label");
+                    if (label) label.textContent = visible ? "Visa alla" : "Dölj";
+                  };
+                }
+              })
+              .catch(() => {});
+          }
+
+          // "Vet du?" button → open feedback modal in seating mode
+          const seatingBtn = document.querySelector(`.seating-btn[data-venue-id="${venue.id}"]`);
+          if (seatingBtn && onFeedback) {
+            (seatingBtn as HTMLElement).onclick = () => {
+              onFeedback({ id: venue.id, name: venue.name, type: venue.type, currentSchedule: {}, mode: "seating" });
+              m.closePopup();
+            };
+          }
+        });
 
         unconfirmedMarkersRef.current.push(marker);
       }

@@ -22,11 +22,13 @@ export async function ensureTable() {
       id SERIAL PRIMARY KEY,
       venue_id TEXT NOT NULL,
       venue_name TEXT NOT NULL,
-      schedule JSONB NOT NULL,
+      type TEXT NOT NULL DEFAULT 'schedule',
+      schedule JSONB NOT NULL DEFAULT '{}'::jsonb,
       comment TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  await p.query(`ALTER TABLE feedback ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'schedule'`);
 }
 
 export async function ensurePushTable() {

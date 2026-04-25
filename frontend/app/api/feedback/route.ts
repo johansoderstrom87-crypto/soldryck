@@ -11,15 +11,15 @@ export async function POST(req: NextRequest) {
     await ensureTable();
 
     const body = await req.json();
-    const { venueId, venueName, schedule, comment } = body;
+    const { venueId, venueName, schedule, comment, type } = body;
 
-    if (!venueId || !schedule) {
-      return Response.json({ error: "venueId och schedule krävs" }, { status: 400 });
+    if (!venueId) {
+      return Response.json({ error: "venueId krävs" }, { status: 400 });
     }
 
     await pool.query(
-      `INSERT INTO feedback (venue_id, venue_name, schedule, comment) VALUES ($1, $2, $3, $4)`,
-      [venueId, venueName || "", JSON.stringify(schedule), comment || null]
+      `INSERT INTO feedback (venue_id, venue_name, type, schedule, comment) VALUES ($1, $2, $3, $4, $5)`,
+      [venueId, venueName || "", type || "schedule", JSON.stringify(schedule || {}), comment || null]
     );
 
     return Response.json({ ok: true });
@@ -29,7 +29,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const key = req.nextUrl.searchParams.get("key");
+  const adminKey = process.env.ADMIN_KEY;
+  if (!adminKey || key !== adminKey) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const pool = getPool();
   if (!pool) {
     return Response.json({ error: "Databas ej konfigurerad" }, { status: 503 });
@@ -38,7 +44,7 @@ export async function GET() {
   try {
     await ensureTable();
     const result = await pool.query(
-      `SELECT * FROM feedback ORDER BY created_at DESC LIMIT 200`
+      `SELECT * FROM feedback ORDER BY created_at DESC LIMIT 500`
     );
     return Response.json(result.rows);
   } catch (err: any) {
