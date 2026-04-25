@@ -145,15 +145,15 @@ export default function Home() {
                 width: 48,
                 height: 52,
                 background: active
-                  ? "rgba(245, 130, 32, 0.58)"
+                  ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
                   : "rgba(255,255,255,0.28)",
-                backdropFilter: "blur(16px) saturate(1.5)",
-                WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+                backdropFilter: active ? undefined : "blur(16px) saturate(1.5)",
+                WebkitBackdropFilter: active ? undefined : "blur(16px) saturate(1.5)",
                 border: active
-                  ? "0.5px solid rgba(255,180,80,0.55)"
+                  ? "0.5px solid rgba(255,180,80,0.6)"
                   : "0.5px solid rgba(255,255,255,0.55)",
                 boxShadow: active
-                  ? "0 4px 16px rgba(251,146,60,0.4), inset 0 1px 1px rgba(255,220,140,0.3)"
+                  ? "0 0 24px rgba(251,146,60,0.55), 0 4px 12px rgba(251,146,60,0.4), inset 0 1px 1px rgba(255,255,255,0.3)"
                   : "0 2px 8px rgba(0,0,0,0.08)",
                 color: active ? "#000" : "#888",
                 opacity: active ? 1 : 0.72,

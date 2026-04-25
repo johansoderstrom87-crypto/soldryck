@@ -334,12 +334,16 @@ export default function TimeSlider({
           style={{
             width: 36,
             height: 36,
-            background: rangeMode ? "rgba(245,130,32,0.58)" : "rgba(255,255,255,0.28)",
-            backdropFilter: "blur(14px) saturate(1.3)",
-            WebkitBackdropFilter: "blur(14px) saturate(1.3)",
-            border: rangeMode ? "0.5px solid rgba(255,180,80,0.55)" : "0.5px solid rgba(255,255,255,0.55)",
-            boxShadow: rangeMode ? "0 4px 16px rgba(251,146,60,0.35)" : "0 2px 8px rgba(0,0,0,0.08)",
-            color: rangeMode ? "#7c2d12" : "#64748b",
+            background: rangeMode
+              ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
+              : "rgba(255,255,255,0.28)",
+            backdropFilter: rangeMode ? undefined : "blur(14px) saturate(1.3)",
+            WebkitBackdropFilter: rangeMode ? undefined : "blur(14px) saturate(1.3)",
+            border: rangeMode ? "0.5px solid rgba(255,180,80,0.6)" : "0.5px solid rgba(255,255,255,0.55)",
+            boxShadow: rangeMode
+              ? "0 0 18px rgba(251,146,60,0.55), 0 3px 8px rgba(251,146,60,0.4), inset 0 1px 1px rgba(255,255,255,0.3)"
+              : "0 2px 8px rgba(0,0,0,0.08)",
+            color: rangeMode ? "#000" : "#64748b",
           }}
         >
           <svg width="18" height="10" viewBox="0 0 18 10" fill="none" xmlns="http://www.w3.org/2000/svg">
