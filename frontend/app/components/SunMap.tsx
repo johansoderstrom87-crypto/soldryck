@@ -546,6 +546,13 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
               style="flex:0 0 32px;padding:3px;border:1px solid #fecaca;border-radius:6px;background:#fff;color:#ef4444;font-size:14px;cursor:pointer;text-align:center"
               title="Spara som favorit"
             >${getFavorites().has(venue.id) ? "&#10084;&#65039;" : "&#9825;"}</button>
+            <a
+              href="https://maps.google.com/?q=${encodeURIComponent(venue.name)}&ll=${venue.lat},${venue.lng}"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Öppna i Google Maps"
+              style="flex:0 0 32px;padding:3px;border:1px solid #fca5a5;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none"
+            ><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></a>
             <button
               class="share-btn"
               data-venue-id="${venue.id}"
