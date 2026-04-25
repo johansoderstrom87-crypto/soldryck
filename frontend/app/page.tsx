@@ -179,6 +179,8 @@ export default function Home() {
         weatherLoading={weatherLoading}
         sunCount={sunCount}
         totalCount={allVenues.length}
+        sunRange={sunRange}
+        onSunRangeChange={setSunRange}
       />
 
       {feedbackVenue && (

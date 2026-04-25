@@ -86,7 +86,6 @@ function SettingsButton({
   const activeCount =
     (filter !== "all" ? 1 : 0) +
     typeFilter.size +
-    (sunRange ? 1 : 0) +
     (metroStation ? 1 : 0) +
     (showShadows ? 1 : 0);
 
@@ -195,56 +194,6 @@ function SettingsButton({
                 <span className="text-slate-600">{t.label}</span>
               </label>
             ))}
-          </div>
-
-          <div className="border-t border-slate-200 my-1" />
-
-          {/* Sun time range filter */}
-          <div className="px-1.5 py-0.5">
-            <div className="flex items-center justify-between mb-1">
-              <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">Sol mellan</div>
-              {sunRange && (
-                <button onClick={() => onSunRangeChange(null)} className="text-[9px] text-amber-500 hover:text-amber-600 font-medium">
-                  Rensa
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <select
-                value={sunRange?.from ?? ""}
-                onChange={(e) => {
-                  const from = Number(e.target.value);
-                  if (!from && from !== 0) { onSunRangeChange(null); return; }
-                  onSunRangeChange({ from, to: sunRange?.to ?? Math.min(from + 4, 22) });
-                }}
-                className="flex-1 px-1.5 py-1 rounded-lg text-xs border border-slate-200 bg-white text-slate-600 cursor-pointer"
-              >
-                <option value="">Från</option>
-                {Array.from({ length: 15 }, (_, i) => i + 8).map((h) => (
-                  <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
-                ))}
-              </select>
-              <span className="text-slate-400 text-xs">–</span>
-              <select
-                value={sunRange?.to ?? ""}
-                onChange={(e) => {
-                  const to = Number(e.target.value);
-                  if (!to) { onSunRangeChange(null); return; }
-                  onSunRangeChange({ from: sunRange?.from ?? 8, to });
-                }}
-                className="flex-1 px-1.5 py-1 rounded-lg text-xs border border-slate-200 bg-white text-slate-600 cursor-pointer"
-              >
-                <option value="">Till</option>
-                {Array.from({ length: 15 }, (_, i) => i + 8).map((h) => (
-                  <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
-                ))}
-              </select>
-            </div>
-            {sunRange && (
-              <div className="text-[9px] text-amber-600 mt-1">
-                Visar ställen med sol {String(sunRange.from).padStart(2, "0")}–{String(sunRange.to).padStart(2, "0")}
-              </div>
-            )}
           </div>
 
           <div className="border-t border-slate-200 my-1" />

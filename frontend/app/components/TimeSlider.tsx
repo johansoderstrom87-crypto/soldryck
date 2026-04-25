@@ -4,6 +4,8 @@ import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import { type WeatherData, type HourlyWeather, getSymbolInfo, toLocalDateStr } from "../lib/weather";
 import DirectionGauges from "./DirectionGauges";
 
+type SunRange = { from: number; to: number } | null;
+
 interface TimeSliderProps {
   hour: number;
   onHourChange: (hour: number) => void;
@@ -13,6 +15,8 @@ interface TimeSliderProps {
   weatherLoading: boolean;
   sunCount: number;
   totalCount: number;
+  sunRange: SunRange;
+  onSunRangeChange: (r: SunRange) => void;
 }
 
 const DAY_NAMES = ["SÖN", "MÅN", "TIS", "ONS", "TOR", "FRE", "LÖR"];
@@ -170,12 +174,17 @@ export default function TimeSlider({
   date,
   onDateChange,
   weather,
+  sunRange,
+  onSunRangeChange,
 }: TimeSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [draggingHandle, setDraggingHandle] = useState<"from" | "to" | null>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const [calendarOpen, setCalendarOpen] = useState(false);
+
+  const rangeMode = sunRange !== null;
 
   // baseDate determines the start of the 7-day window; always resets to today on mount
   const [baseDate, setBaseDate] = useState<Date>(() => {
@@ -246,33 +255,55 @@ export default function TimeSlider({
 
   const currentWeather = getHourWeather(hour);
 
-  const updateHourFromClientX = useCallback(
-    (clientX: number) => {
-      const el = trackRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      const idx = Math.round(ratio * (HOURS.length - 1));
-      const h = HOURS[idx];
-      if (h !== undefined && h !== hour) onHourChange(h);
-    },
-    [hour, onHourChange]
-  );
+  const clientXToHour = useCallback((clientX: number): number => {
+    const el = trackRef.current;
+    if (!el) return hour;
+    const rect = el.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return HOURS[Math.round(ratio * (HOURS.length - 1))] ?? hour;
+  }, [hour]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setDragging(true);
-    updateHourFromClientX(e.clientX);
+    const h = clientXToHour(e.clientX);
+    if (rangeMode && sunRange) {
+      const distFrom = Math.abs(h - sunRange.from);
+      const distTo = Math.abs(h - sunRange.to);
+      const handle = distFrom <= distTo ? "from" : "to";
+      setDraggingHandle(handle);
+      if (handle === "from") {
+        const newFrom = Math.min(h, sunRange.to - 1);
+        onSunRangeChange({ from: newFrom, to: sunRange.to });
+        onHourChange(newFrom);
+      } else {
+        onSunRangeChange({ from: sunRange.from, to: Math.max(h, sunRange.from + 1) });
+      }
+    } else {
+      if (h !== hour) onHourChange(h);
+    }
   };
+
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragging) return;
-    updateHourFromClientX(e.clientX);
+    const h = clientXToHour(e.clientX);
+    if (rangeMode && sunRange && draggingHandle) {
+      if (draggingHandle === "from") {
+        const newFrom = Math.min(h, sunRange.to - 1);
+        if (newFrom !== sunRange.from) { onSunRangeChange({ from: newFrom, to: sunRange.to }); onHourChange(newFrom); }
+      } else {
+        const newTo = Math.max(h, sunRange.from + 1);
+        if (newTo !== sunRange.to) onSunRangeChange({ from: sunRange.from, to: newTo });
+      }
+    } else if (!rangeMode) {
+      if (h !== hour) onHourChange(h);
+    }
   };
+
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
     setDragging(false);
+    setDraggingHandle(null);
   };
 
   const handleCalendarSelect = (picked: Date) => {
@@ -286,9 +317,40 @@ export default function TimeSlider({
       className="absolute bottom-0 left-0 right-0 z-[1000] p-3 pointer-events-none"
       style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}
     >
-      {/* Sun / temp / wind bar */}
-      <div className="pointer-events-none mb-1">
-        <DirectionGauges hour={hour} date={date} currentWeather={currentWeather} />
+      {/* Sun / temp / wind bar + range toggle button */}
+      <div className="max-w-md mx-auto mb-1 flex items-center gap-2">
+        <button
+          onClick={() => {
+            if (rangeMode) {
+              onSunRangeChange(null);
+            } else {
+              const from = hour;
+              const to = Math.min(hour + 3, 22);
+              onSunRangeChange({ from, to });
+            }
+          }}
+          title={rangeMode ? "Visa enstaka timme" : "Filtrera på soltimmar"}
+          className="pointer-events-auto flex-shrink-0 rounded-xl flex items-center justify-center transition-all"
+          style={{
+            width: 36,
+            height: 36,
+            background: rangeMode ? "rgba(245,130,32,0.58)" : "rgba(255,255,255,0.28)",
+            backdropFilter: "blur(14px) saturate(1.3)",
+            WebkitBackdropFilter: "blur(14px) saturate(1.3)",
+            border: rangeMode ? "0.5px solid rgba(255,180,80,0.55)" : "0.5px solid rgba(255,255,255,0.55)",
+            boxShadow: rangeMode ? "0 4px 16px rgba(251,146,60,0.35)" : "0 2px 8px rgba(0,0,0,0.08)",
+            color: rangeMode ? "#7c2d12" : "#64748b",
+          }}
+        >
+          <svg width="18" height="10" viewBox="0 0 18 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="3" cy="5" r="3" fill="currentColor" />
+            <line x1="6" y1="5" x2="12" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="15" cy="5" r="3" fill="currentColor" />
+          </svg>
+        </button>
+        <div className="flex-1 pointer-events-none">
+          <DirectionGauges hour={hour} date={date} currentWeather={currentWeather} />
+        </div>
       </div>
 
       <div
@@ -373,7 +435,9 @@ export default function TimeSlider({
             />
 
             {HOURS.map((h) => {
-              const isSelected = h === hour;
+              const hidden = rangeMode
+                ? h === sunRange?.from || h === sunRange?.to
+                : h === hour;
               const past = isPastHour(h);
               return (
                 <div
@@ -385,7 +449,7 @@ export default function TimeSlider({
                     fontSize: 10,
                     fontWeight: 700,
                     color: past ? "rgba(0,0,0,0.38)" : "rgba(0,0,0,0.85)",
-                    opacity: isSelected ? 0 : 1,
+                    opacity: hidden ? 0 : 1,
                     transition: "opacity 0.15s ease-out, color 0.2s",
                   }}
                 >
@@ -394,29 +458,85 @@ export default function TimeSlider({
               );
             })}
 
-            <div
-              className="absolute flex items-center justify-center rounded-full pointer-events-none tabular-nums"
-              style={{
-                top: "50%",
-                left: 0,
-                width: 46,
-                height: 46,
-                transform: `translate3d(${
-                  ((hour - 7 + 0.5) / HOURS.length) * trackWidth - 23
-                }px, -50%, 0)`,
-                willChange: "transform",
-                transition: dragging ? "none" : "transform 0.22s ease-out",
-                background: "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)",
-                boxShadow:
-                  "0 0 24px rgba(251, 146, 60, 0.65), 0 4px 12px rgba(251, 146, 60, 0.45), inset 0 1px 1px rgba(255,255,255,0.3)",
-                color: "#000",
-                fontSize: 18,
-                fontWeight: 900,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              {hour}
-            </div>
+            {rangeMode && sunRange ? (
+              <>
+                {/* Highlight strip between handles */}
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    top: 0,
+                    height: "100%",
+                    left: `${((sunRange.from - 7 + 0.5) / HOURS.length) * 100}%`,
+                    right: `${100 - ((sunRange.to - 7 + 0.5) / HOURS.length) * 100}%`,
+                    background: "rgba(251,146,60,0.22)",
+                    borderRadius: 4,
+                  }}
+                />
+                {/* From handle */}
+                <div
+                  className="absolute flex items-center justify-center rounded-full pointer-events-none tabular-nums"
+                  style={{
+                    top: "50%",
+                    left: 0,
+                    width: 40,
+                    height: 40,
+                    transform: `translate3d(${((sunRange.from - 7 + 0.5) / HOURS.length) * trackWidth - 20}px, -50%, 0)`,
+                    willChange: "transform",
+                    transition: draggingHandle === "from" ? "none" : "transform 0.15s ease-out",
+                    background: "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)",
+                    boxShadow: "0 0 18px rgba(251,146,60,0.6), 0 3px 8px rgba(251,146,60,0.4), inset 0 1px 1px rgba(255,255,255,0.3)",
+                    color: "#000",
+                    fontSize: 15,
+                    fontWeight: 900,
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  {sunRange.from}
+                </div>
+                {/* To handle */}
+                <div
+                  className="absolute flex items-center justify-center rounded-full pointer-events-none tabular-nums"
+                  style={{
+                    top: "50%",
+                    left: 0,
+                    width: 40,
+                    height: 40,
+                    transform: `translate3d(${((sunRange.to - 7 + 0.5) / HOURS.length) * trackWidth - 20}px, -50%, 0)`,
+                    willChange: "transform",
+                    transition: draggingHandle === "to" ? "none" : "transform 0.15s ease-out",
+                    background: "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)",
+                    boxShadow: "0 0 18px rgba(251,146,60,0.6), 0 3px 8px rgba(251,146,60,0.4), inset 0 1px 1px rgba(255,255,255,0.3)",
+                    color: "#000",
+                    fontSize: 15,
+                    fontWeight: 900,
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  {sunRange.to}
+                </div>
+              </>
+            ) : (
+              <div
+                className="absolute flex items-center justify-center rounded-full pointer-events-none tabular-nums"
+                style={{
+                  top: "50%",
+                  left: 0,
+                  width: 46,
+                  height: 46,
+                  transform: `translate3d(${((hour - 7 + 0.5) / HOURS.length) * trackWidth - 23}px, -50%, 0)`,
+                  willChange: "transform",
+                  transition: dragging ? "none" : "transform 0.22s ease-out",
+                  background: "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)",
+                  boxShadow: "0 0 24px rgba(251,146,60,0.65), 0 4px 12px rgba(251,146,60,0.45), inset 0 1px 1px rgba(255,255,255,0.3)",
+                  color: "#000",
+                  fontSize: 18,
+                  fontWeight: 900,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {hour}
+              </div>
+            )}
           </div>
 
           {/* Day pills */}
