@@ -37,6 +37,8 @@ interface HeaderProps {
   onSunRangeChange: (range: SunRange) => void;
   showShadows: boolean;
   onToggleShadows: () => void;
+  showMetro: boolean;
+  onToggleMetro: () => void;
   metroStation: MetroStation | null;
   onMetroStationChange: (station: MetroStation | null) => void;
   venues: { id: string; name: string; type: string; address: string; lat: number; lng: number }[];
@@ -51,7 +53,7 @@ const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: str
 
 function SettingsButton({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
-  metroStation, onMetroStationChange, showShadows, onToggleShadows,
+  metroStation, onMetroStationChange, showShadows, onToggleShadows, showMetro, onToggleMetro,
 }: {
   filter: "all" | "sun" | "shade";
   onFilterChange: (f: "all" | "sun" | "shade") => void;
@@ -63,6 +65,8 @@ function SettingsButton({
   onMetroStationChange: (station: MetroStation | null) => void;
   showShadows: boolean;
   onToggleShadows: () => void;
+  showMetro: boolean;
+  onToggleMetro: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -115,7 +119,8 @@ function SettingsButton({
     (filter !== "all" ? 1 : 0) +
     typeFilter.size +
     (metroStation ? 1 : 0) +
-    (showShadows ? 1 : 0);
+    (showShadows ? 1 : 0) +
+    (showMetro ? 1 : 0);
 
   return (
     <div ref={ref} className="relative">
@@ -199,6 +204,27 @@ function SettingsButton({
             </span>
             <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${showShadows ? "bg-white/30" : "bg-slate-200"}`}>
               <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${showShadows ? "translate-x-3" : "translate-x-0"}`} />
+            </span>
+          </button>
+
+          {/* Tunnelbana toggle */}
+          <button
+            onClick={() => { onToggleMetro(); }}
+            className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
+              showMetro ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              {/* Three small dots in SL line colors — recognisable as the metro */}
+              <span className="flex items-center gap-[2px]">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#e3000b" }} />
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#00a14e" }} />
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#0065bd" }} />
+              </span>
+              Tunnelbana
+            </span>
+            <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${showMetro ? "bg-white/30" : "bg-slate-200"}`}>
+              <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${showMetro ? "translate-x-3" : "translate-x-0"}`} />
             </span>
           </button>
 
@@ -334,7 +360,8 @@ function SettingsButton({
 
 export default function Header({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
-  showShadows, onToggleShadows, metroStation, onMetroStationChange, venues, onSelectVenue,
+  showShadows, onToggleShadows, showMetro, onToggleMetro,
+  metroStation, onMetroStationChange, venues, onSelectVenue,
 }: HeaderProps) {
   return (
     <div className="absolute top-0 left-0 right-0 z-[1100] pointer-events-none">
@@ -351,6 +378,8 @@ export default function Header({
             onMetroStationChange={onMetroStationChange}
             showShadows={showShadows}
             onToggleShadows={onToggleShadows}
+            showMetro={showMetro}
+            onToggleMetro={onToggleMetro}
           />
           <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} />
         </div>

@@ -18,6 +18,7 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
     /data
       venues-computed.ts    Auto-genererad: 2 514 platser med soldata (~5.5 MB)
       venues-unconfirmed.ts Auto-genererad: 1 568 platser utan bekräftad uteservering
+      metro-network.ts      Auto-genererad: tunnelbanespår + perronger (~144 KB)
       mock-venues.ts        Testdata (8 platser, används som fallback)
     /lib
       weather.ts       SMHI API-integration (prognos + symbolkoder 1-27)
@@ -39,6 +40,7 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
   06_compress_shadows.py          Komprimerar shadow-data för deploy
   07_verify_outdoor_seating.py    Verifierar uteservering via Google Places API
   08_merge_verified_venues.py     Slår ihop Google-verifierade venues med huvudlistan
+  09_fetch_metro.py               Hämtar tunnelbanespår + perronger från OSM
   requirements.txt                Python-beroenden
   /data                           Genererad data (gitignored)
     /raw                          Nedladdade råfiler
@@ -111,6 +113,14 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
 - Utan data → `venues-unconfirmed.ts` med `source: "unknown"`
 - OSM-bekräftade taggas `source: "osm_confirmed"`
 
+### Steg 9: Tunnelbanenät (`09_fetch_metro.py`)
+- **Källa:** OpenStreetMap via Overpass API
+- **Spårlinjer:** `railway=subway` ways, grupperade per linjefärg via `route=subway`-relationer (T10/T11=blå, T13/T14=röd, T17/T18/T19=grön)
+- **Perronger:** `railway=platform` + `public_transport=platform`+`subway=yes`
+- **Resultat:** ~519 spårsegment, 57 perronger (~144 KB)
+- **Output:** `frontend/app/data/metro-network.ts` (TypeScript export, statisk data)
+- **Toggle:** Visas via "Tunnelbana"-toggle i Header — av som default
+
 ## Venue-täckning
 
 | Källa | Antal | Visning |
@@ -164,6 +174,7 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
 | Solpositioner | Pysolar (Python-bibliotek) | GPL |
 | Väderprognos | SMHI SNOW1gv1 API | Öppna data |
 | Baskarta | CARTO / OpenStreetMap | ODbL |
+| Tunnelbanespår + perronger | OpenStreetMap Overpass API | ODbL |
 
 ## Kör pipelinen (uppdatera data)
 
@@ -183,6 +194,7 @@ python 05_generate_shadow_geojson.py        # ~3-4h, shadow overlay
 python 06_compress_shadows.py               # ~20 min, komprimerar shadow-data
 python 07_verify_outdoor_seating.py         # ~5h (env: GOOGLE_PLACES_API_KEY)
 python 08_merge_verified_venues.py          # ~5s, slår ihop verifierade
+python 09_fetch_metro.py                    # ~30s, tunnelbanespår + perronger
 
 # Om du bara lagt till nya venues (t.ex. takbarer):
 python 03b_compute_shadows_incremental.py   # Räknar bara venues utan befintlig data

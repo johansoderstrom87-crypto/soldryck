@@ -48,6 +48,7 @@ export default function Home() {
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [feedbackVenue, setFeedbackVenue] = useState<FeedbackVenue | null>(null);
   const [showShadows, setShowShadows] = useState(false);
+  const [showMetro, setShowMetro] = useState(false);
   const [typeFilter, setTypeFilter] = useState<Set<VenueType>>(new Set());
   const [sunRange, setSunRange] = useState<SunRange>(null);
   const [focusVenueId, setFocusVenueId] = useState<string | null>(initialVenue);
@@ -125,6 +126,8 @@ export default function Home() {
         onSunRangeChange={setSunRange}
         showShadows={showShadows}
         onToggleShadows={() => setShowShadows((s) => !s)}
+        showMetro={showMetro}
+        onToggleMetro={() => setShowMetro((s) => !s)}
         metroStation={metroStation}
         onMetroStationChange={setMetroStation}
         venues={allVenues}
@@ -168,7 +171,7 @@ export default function Home() {
         })}
       </div>
 
-      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} />
+      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} showMetro={showMetro} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} />
 
       <TimeSlider
         hour={hour}
