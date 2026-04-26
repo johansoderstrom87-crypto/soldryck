@@ -10,10 +10,12 @@ const SHADOW_DIRS = [
   join(process.cwd(), "..", "pipeline", "data", "shadows"),
 ];
 
-function findShadowFile(key: string): string | null {
+function findShadowFile(key: string): { path: string; gzipped: boolean } | null {
   for (const dir of SHADOW_DIRS) {
+    const gzPath = join(dir, `${key}.json.gz`);
+    if (existsSync(gzPath)) return { path: gzPath, gzipped: true };
     const fp = join(dir, `${key}.json`);
-    if (existsSync(fp)) return fp;
+    if (existsSync(fp)) return { path: fp, gzipped: false };
   }
   return null;
 }
@@ -24,16 +26,18 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: "Invalid key" }, { status: 400 });
   }
 
-  const filePath = findShadowFile(key);
-  if (!filePath) {
+  const file = findShadowFile(key);
+  if (!file) {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
-  const data = await readFile(filePath);
-  return new Response(data, {
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "public, max-age=86400, immutable",
-    },
-  });
+  const data = await readFile(file.path);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Cache-Control": "public, max-age=86400, immutable",
+  };
+  if (file.gzipped) {
+    headers["Content-Encoding"] = "gzip";
+  }
+  return new Response(data, { headers });
 }

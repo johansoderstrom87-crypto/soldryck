@@ -25,6 +25,7 @@ from pysolar.solar import get_altitude, get_azimuth
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 BUILDINGS_FILE = os.path.join(DATA_DIR, "buildings.gpkg")
+BUILDINGS_OVERTURE_FILE = os.path.join(DATA_DIR, "buildings_overture.gpkg")
 OUTPUT_DIR = os.path.join(DATA_DIR, "shadows")
 
 DATES = []
@@ -182,16 +183,21 @@ def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     print("Laddar byggnader...")
-    buildings_gdf = gpd.read_file(BUILDINGS_FILE)
-    print(f"  {len(buildings_gdf)} byggnader")
+    if os.path.exists(BUILDINGS_OVERTURE_FILE):
+        buildings_gdf = gpd.read_file(BUILDINGS_OVERTURE_FILE)
+        height_col = "height"
+        print(f"  {len(buildings_gdf)} byggnads-objekt (Overture + LOD1-fallback)")
+    else:
+        buildings_gdf = gpd.read_file(BUILDINGS_FILE)
+        height_col = "BYGG_H"
+        print(f"  {len(buildings_gdf)} byggnader (LOD1 + OSM)")
 
     # Pre-serialize building geometries + heights
-    # FIX: Use only BYGG_H (building height), NOT mark_z (absolute ground elevation)
     print("Forbereder byggnadsdata...")
     from shapely import wkb
     buildings_data = []
     for _, row in buildings_gdf.iterrows():
-        h = row.get("BYGG_H", 10)
+        h = row.get(height_col, 10)
         if h and h > 0:
             buildings_data.append((row.geometry.wkb, float(h)))
     print(f"  {len(buildings_data)} byggnader med hojd")
