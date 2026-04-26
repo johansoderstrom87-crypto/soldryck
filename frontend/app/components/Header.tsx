@@ -1,9 +1,25 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { type VenueType, type SunRange } from "./SunMap";
 import { METRO_STATIONS, type MetroStation } from "../data/metro-stations";
 import FavoritesPanel from "./FavoritesPanel";
+
+const LINE_COLORS: Record<string, string> = {
+  red: "#e3000b",
+  green: "#00a14e",
+  blue: "#0065bd",
+};
+
+function LineDots({ lines }: { lines: string[] }) {
+  return (
+    <span className="flex gap-0.5 flex-shrink-0 items-center">
+      {lines.map((l) => (
+        <span key={l} className="w-2 h-2 rounded-full" style={{ background: LINE_COLORS[l] ?? "#94a3b8" }} />
+      ))}
+    </span>
+  );
+}
 
 const TYPE_OPTIONS: { value: VenueType; label: string; icon: string }[] = [
   { value: "restaurant", label: "Restaurang", icon: "🍽️" },
@@ -50,7 +66,19 @@ function SettingsButton({
 }) {
   const [open, setOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [metroOpen, setMetroOpen] = useState(false);
+  const [metroSearch, setMetroSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+
+  const sortedStations = useMemo(
+    () => [...METRO_STATIONS].sort((a, b) => a.name.localeCompare(b.name, "sv")),
+    [],
+  );
+  const filteredStations = useMemo(() => {
+    const q = metroSearch.trim().toLowerCase();
+    if (!q) return sortedStations;
+    return sortedStations.filter((s) => s.name.toLowerCase().includes(q));
+  }, [metroSearch, sortedStations]);
 
   useEffect(() => {
     if (!open) return;
@@ -198,9 +226,9 @@ function SettingsButton({
 
           <div className="border-t border-slate-200 my-1" />
 
-          {/* Metro station filter */}
+          {/* Metro station filter — searchable picker */}
           <div className="px-1.5 py-0.5">
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1.5">
               <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">Nära T-bana</div>
               {metroStation && (
                 <button onClick={() => onMetroStationChange(null)} className="text-[9px] text-amber-500 hover:text-amber-600 font-medium">
@@ -208,24 +236,92 @@ function SettingsButton({
                 </button>
               )}
             </div>
-            <select
-              value={metroStation?.name ?? ""}
-              onChange={(e) => {
-                if (!e.target.value) { onMetroStationChange(null); return; }
-                const station = METRO_STATIONS.find((s) => s.name === e.target.value) ?? null;
-                onMetroStationChange(station);
+
+            <button
+              onClick={() => setMetroOpen((o) => !o)}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-all"
+              style={{
+                background: "rgba(255,255,255,0.5)",
+                border: "0.5px solid rgba(255,255,255,0.7)",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
               }}
-              className="w-full px-1.5 py-1 rounded-lg text-xs border border-slate-200 bg-white text-slate-600 cursor-pointer"
             >
-              <option value="">Alla stationer</option>
-              {METRO_STATIONS
-                .sort((a, b) => a.name.localeCompare(b.name, "sv"))
-                .map((s) => (
-                  <option key={s.name} value={s.name}>{s.name}</option>
-                ))}
-            </select>
-            {metroStation && (
-              <div className="text-[9px] text-amber-600 mt-1">
+              {metroStation ? (
+                <>
+                  <LineDots lines={metroStation.lines} />
+                  <span className="text-xs font-medium text-slate-700 flex-1 truncate">{metroStation.name}</span>
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  <span className="text-xs text-slate-500 flex-1">Alla stationer</span>
+                </>
+              )}
+              <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform text-slate-400 flex-shrink-0 ${metroOpen ? "rotate-180" : ""}`}>
+                <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            {metroOpen && (
+              <div className="mt-1.5 rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,0.6)", border: "0.5px solid rgba(255,255,255,0.7)" }}>
+                {/* Search */}
+                <div className="relative p-1.5 pb-1">
+                  <svg width="11" height="11" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={metroSearch}
+                    onChange={(e) => setMetroSearch(e.target.value)}
+                    placeholder="Sök station..."
+                    autoFocus
+                    className="w-full pl-7 pr-2 py-1.5 rounded-lg text-xs border border-slate-200 bg-white/80 text-slate-700 focus:border-amber-400 focus:outline-none"
+                  />
+                </div>
+
+                {/* List */}
+                <div className="overflow-y-auto px-1 pb-1" style={{ maxHeight: 200 }}>
+                  {!metroSearch && (
+                    <button
+                      onClick={() => { onMetroStationChange(null); setMetroOpen(false); setMetroSearch(""); }}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition ${!metroStation ? "bg-amber-100/80 text-amber-800 font-semibold" : "text-slate-500 hover:bg-white/60"}`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-slate-300 flex-shrink-0" />
+                      <span className="flex-1">Alla stationer</span>
+                      {!metroStation && <span className="text-amber-500 text-sm leading-none">✓</span>}
+                    </button>
+                  )}
+
+                  {filteredStations.map((s) => {
+                    const isSelected = metroStation?.name === s.name;
+                    return (
+                      <button
+                        key={s.name}
+                        onClick={() => { onMetroStationChange(s); setMetroOpen(false); setMetroSearch(""); }}
+                        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition ${isSelected ? "bg-amber-100/80 text-amber-800 font-semibold" : "text-slate-600 hover:bg-white/60"}`}
+                      >
+                        <LineDots lines={s.lines} />
+                        <span className="flex-1 truncate">{s.name}</span>
+                        {isSelected && <span className="text-amber-500 text-sm leading-none">✓</span>}
+                      </button>
+                    );
+                  })}
+
+                  {filteredStations.length === 0 && (
+                    <div className="px-2 py-3 text-center text-[10px] text-slate-400">
+                      Inga stationer hittades
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {metroStation && !metroOpen && (
+              <div className="text-[9px] text-amber-600 mt-1.5 px-1">
                 Visar inom 500m från {metroStation.name}
               </div>
             )}
