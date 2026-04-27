@@ -1,9 +1,10 @@
 """
-Steg 9: Hämta tunnelbane-spår och perronger.
+Steg 9: Hämta tunnelbane-spår, perronger och uppgångar.
 
 Källa: OpenStreetMap via Overpass API
 - Spårlinjer: railway=subway, grupperade per linje (röd/grön/blå) via route=subway-relationer
-- Perronger: railway=platform inom tunnelbane-nätverk
+- Perronger: railway=platform — reduceras till långaxel-streck (PCA på koordinaterna)
+- Uppgångar: railway=subway_entrance — varje uppgång kopplas till sin närmsta perrong med en linje
 
 Resultat:
 - frontend/app/data/metro-network.ts (TypeScript export)
@@ -68,6 +69,8 @@ OVERPASS_QUERY = f"""[out:json][timeout:300];
   // Perronger — bägge taggningskonventioner
   way["railway"="platform"]({BBOX});
   way["public_transport"="platform"]["subway"="yes"]({BBOX});
+  // Uppgångar — noder med tag railway=subway_entrance
+  node["railway"="subway_entrance"]({BBOX});
 );
 out body;
 >;
@@ -150,8 +153,43 @@ def build_tracks(elements: list) -> dict:
     return tracks_by_color
 
 
+def long_axis_line(coords: list) -> list:
+    """Reducera en perronggeometri (öppen linje eller sluten polygon) till
+    ett enda streck längs perrongens långaxel. Använder kovariansmatrisens
+    största egenvektor (sluten form för 2x2)."""
+    n = len(coords)
+    if n < 2:
+        return coords
+    cx = sum(c[0] for c in coords) / n
+    cy = sum(c[1] for c in coords) / n
+    sxx = sum((c[0] - cx) ** 2 for c in coords) / n
+    syy = sum((c[1] - cy) ** 2 for c in coords) / n
+    sxy = sum((c[0] - cx) * (c[1] - cy) for c in coords) / n
+
+    trace = sxx + syy
+    det = sxx * syy - sxy ** 2
+    disc = max(0.0, (trace / 2) ** 2 - det)
+    lam1 = trace / 2 + disc ** 0.5  # största egenvärde
+
+    if abs(sxy) > 1e-14:
+        ex, ey = lam1 - syy, sxy
+    elif sxx >= syy:
+        ex, ey = 1.0, 0.0
+    else:
+        ex, ey = 0.0, 1.0
+    norm = (ex ** 2 + ey ** 2) ** 0.5 or 1.0
+    ex, ey = ex / norm, ey / norm
+
+    projs = [(c[0] - cx) * ex + (c[1] - cy) * ey for c in coords]
+    pmin, pmax = min(projs), max(projs)
+    return [
+        [round(cx + pmin * ex, 5), round(cy + pmin * ey, 5)],
+        [round(cx + pmax * ex, 5), round(cy + pmax * ey, 5)],
+    ]
+
+
 def build_platforms(elements: list) -> list[dict]:
-    """Hämta perronggeometrier (linjer, inte areor — vi vill ha streck på kartan)."""
+    """Hämta perronggeometrier och reducera till långaxellinjer."""
     nodes_by_id = {el["id"]: (el["lat"], el["lon"]) for el in elements if el["type"] == "node"}
 
     platforms = []
@@ -174,25 +212,88 @@ def build_platforms(elements: list) -> list[dict]:
         if tags.get("tram") == "yes" and tags.get("subway") != "yes":
             continue
 
-        coords = []
+        raw_coords = []
         for nd in el.get("nodes", []):
             if nd in nodes_by_id:
                 lat, lon = nodes_by_id[nd]
-                coords.append([round(lat, 5), round(lon, 5)])
-        if len(coords) < 2:
+                raw_coords.append([lat, lon])
+        if len(raw_coords) < 2:
             continue
 
-        key = (coords[0][0], coords[0][1], coords[-1][0], coords[-1][1])
+        axis = long_axis_line(raw_coords)
+        key = (axis[0][0], axis[0][1], axis[1][0], axis[1][1])
         if key in seen:
             continue
         seen.add(key)
 
-        platforms.append({"name": tags.get("name", ""), "coordinates": coords})
+        platforms.append({"name": tags.get("name", ""), "coordinates": axis})
 
     return platforms
 
 
-def export_typescript(tracks: dict, platforms: list, output_path: str) -> None:
+def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    from math import radians, sin, cos, asin, sqrt
+
+    R = 6371000.0
+    p1, p2 = radians(lat1), radians(lat2)
+    dp = radians(lat2 - lat1)
+    dl = radians(lon2 - lon1)
+    a = sin(dp / 2) ** 2 + cos(p1) * cos(p2) * sin(dl / 2) ** 2
+    return 2 * R * asin(sqrt(a))
+
+
+def closest_platform_point(lat: float, lon: float, platforms: list) -> tuple:
+    """Hitta perrong-punkten närmast (lat, lon). Returnerar (dist_m, [lat, lon])."""
+    best_dist = float("inf")
+    best_point = None
+    for plat in platforms:
+        for pt in plat["coordinates"]:
+            d = haversine_m(lat, lon, pt[0], pt[1])
+            if d < best_dist:
+                best_dist = d
+                best_point = pt
+    return best_dist, best_point
+
+
+def build_entrances(elements: list, platforms: list) -> list[dict]:
+    """Hämta uppgångar (railway=subway_entrance) och koppla varje till
+    närmsta perrong inom 250 m. Returnerar listor med {lat, lng, name, link: [[lat,lng],[lat,lng]]}."""
+    entrances = []
+    seen = set()
+    for el in elements:
+        if el["type"] != "node":
+            continue
+        tags = el.get("tags", {})
+        if tags.get("railway") != "subway_entrance":
+            continue
+
+        lat, lon = el.get("lat"), el.get("lon")
+        if lat is None or lon is None:
+            continue
+        key = (round(lat, 5), round(lon, 5))
+        if key in seen:
+            continue
+        seen.add(key)
+
+        dist, plat_point = closest_platform_point(lat, lon, platforms)
+        if not plat_point or dist > 250:
+            # Uppgångar utan perrong i närheten skippar vi — troligtvis fel-taggade
+            continue
+
+        entrances.append(
+            {
+                "lat": round(lat, 5),
+                "lng": round(lon, 5),
+                "name": tags.get("name", ""),
+                "ref": tags.get("ref", ""),
+                "link": [plat_point, [round(lat, 5), round(lon, 5)]],
+            }
+        )
+
+    return entrances
+
+
+def export_typescript(tracks: dict, platforms: list, entrances: list, output_path: str) -> None:
     lines = [
         "/** Auto-generated by pipeline/09_fetch_metro.py — do not edit by hand */",
         "",
@@ -207,6 +308,14 @@ def export_typescript(tracks: dict, platforms: list, output_path: str) -> None:
         "  coords: [number, number][];",
         "}",
         "",
+        "export interface MetroEntrance {",
+        "  lat: number;",
+        "  lng: number;",
+        "  name: string;",
+        "  /** Anslutningslinje [perrongpunkt, uppgångspunkt] — visar vart man kommer ut */",
+        "  link: [[number, number], [number, number]];",
+        "}",
+        "",
         "export const METRO_TRACKS: MetroTrack[] = [",
     ]
     for color in ("red", "green", "blue"):
@@ -217,6 +326,15 @@ def export_typescript(tracks: dict, platforms: list, output_path: str) -> None:
     lines.append("export const METRO_PLATFORMS: MetroPlatform[] = [")
     for plat in platforms:
         lines.append(f'  {{ coords: {json.dumps(plat["coordinates"])} }},')
+    lines.append("];")
+    lines.append("")
+    lines.append("export const METRO_ENTRANCES: MetroEntrance[] = [")
+    for ent in entrances:
+        name_safe = ent["name"].replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(
+            f'  {{ lat: {ent["lat"]}, lng: {ent["lng"]}, name: "{name_safe}", '
+            f'link: {json.dumps(ent["link"])} }},'
+        )
     lines.append("];")
     lines.append("")
 
@@ -248,6 +366,7 @@ def main():
 
     tracks = build_tracks(elements)
     platforms = build_platforms(elements)
+    entrances = build_entrances(elements, platforms)
 
     print("\nSpårsegment per linje:")
     for color in ("red", "green", "blue"):
@@ -255,8 +374,9 @@ def main():
         nodes = sum(len(w) for w in ways)
         print(f"  {color}: {len(ways)} segment ({nodes} noder)")
     print(f"\nPerronger: {len(platforms)}")
+    print(f"Uppgångar: {len(entrances)} (kopplade till perrong inom 250 m)")
 
-    export_typescript(tracks, platforms, FRONTEND_OUT)
+    export_typescript(tracks, platforms, entrances, FRONTEND_OUT)
     print(f"\nExporterat till {FRONTEND_OUT}")
 
 
