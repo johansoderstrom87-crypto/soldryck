@@ -409,9 +409,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       L.polyline(track.coords, {
         color: lineColors[track.color],
         weight: 4,
-        opacity: 0.7,
+        opacity: 0.72,
         lineCap: "round",
         lineJoin: "round",
+        smoothFactor: 2,
         interactive: false,
       }).addTo(layer);
     }

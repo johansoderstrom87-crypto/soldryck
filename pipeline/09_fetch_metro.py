@@ -101,8 +101,68 @@ def fetch_overpass(query: str, max_retries: int = 3) -> dict:
     raise RuntimeError("Kunde inte nå Overpass API efter alla försök")
 
 
+def dedup_parallel_ways(ways: list) -> list:
+    """Ta bort dubblettspår (OSM har en way per körriktning — de ser ut som dubbla rails).
+    Jämför midpunkterna: om två ways är < 18 m från varandra, behåll bara den längre."""
+    kept = []
+    for way in sorted(ways, key=lambda w: -len(w)):  # längsta way vinner
+        mid = way[len(way) // 2]
+        is_dup = any(
+            haversine_m(mid[0], mid[1], k[len(k) // 2][0], k[len(k) // 2][1]) < 18
+            for k in kept
+        )
+        if not is_dup:
+            kept.append(way)
+    return kept
+
+
+def merge_chains(ways: list) -> list:
+    """Slå ihop angränsande ways (delar endpoints) till färre, längre kedjor.
+    Resulterar i mjukare kurvor och färre polyline-objekt i frontend."""
+    from collections import defaultdict as _dd
+
+    endpoint_idx: dict[tuple, list[int]] = _dd(list)
+    for i, w in enumerate(ways):
+        endpoint_idx[tuple(w[0])].append(i)
+        endpoint_idx[tuple(w[-1])].append(i)
+
+    used = [False] * len(ways)
+    chains = []
+
+    for start in range(len(ways)):
+        if used[start]:
+            continue
+        chain = list(ways[start])
+        used[start] = True
+
+        # Förläng framåt
+        while True:
+            tip = tuple(chain[-1])
+            nxt = next((i for i in endpoint_idx[tip] if not used[i]), None)
+            if nxt is None:
+                break
+            used[nxt] = True
+            seg = ways[nxt]
+            chain += seg[1:] if tuple(seg[0]) == tip else list(reversed(seg))[1:]
+
+        # Förläng bakåt
+        while True:
+            tip = tuple(chain[0])
+            nxt = next((i for i in endpoint_idx[tip] if not used[i]), None)
+            if nxt is None:
+                break
+            used[nxt] = True
+            seg = ways[nxt]
+            prefix = list(reversed(seg))[:-1] if tuple(seg[-1]) == tip else seg[:-1]
+            chain = prefix + chain
+
+        chains.append(chain)
+
+    return chains
+
+
 def build_tracks(elements: list) -> dict:
-    """Gruppera subway-ways per linjefärg via route-relationer."""
+    """Gruppera subway-ways per linjefärg, deduplicera dubbelspår och slå ihop till kedjor."""
     nodes_by_id: dict[int, tuple[float, float]] = {}
     ways_by_id: dict[int, dict] = {}
     relations: list[dict] = []
@@ -135,7 +195,7 @@ def build_tracks(elements: list) -> dict:
                 # Första matchningen vinner — undviker duplicering på delade segment
                 way_colors.setdefault(member["ref"], color)
 
-    tracks_by_color: dict[str, list[list[list[float]]]] = defaultdict(list)
+    raw_by_color: dict[str, list] = defaultdict(list)
     for way_id, way in ways_by_id.items():
         if way.get("tags", {}).get("railway") != "subway":
             continue
@@ -148,7 +208,13 @@ def build_tracks(elements: list) -> dict:
                 lat, lon = nodes_by_id[nd]
                 coords.append([round(lat, 5), round(lon, 5)])
         if len(coords) >= 2:
-            tracks_by_color[color].append(coords)
+            raw_by_color[color].append(coords)
+
+    tracks_by_color: dict[str, list] = {}
+    for color, ways in raw_by_color.items():
+        deduped = dedup_parallel_ways(ways)
+        merged = merge_chains(deduped)
+        tracks_by_color[color] = merged
 
     return tracks_by_color
 
