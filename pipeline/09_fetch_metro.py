@@ -101,18 +101,25 @@ def fetch_overpass(query: str, max_retries: int = 3) -> dict:
     raise RuntimeError("Kunde inte nå Overpass API efter alla försök")
 
 
-def dedup_parallel_ways(ways: list) -> list:
-    """Ta bort dubblettspår (OSM har en way per körriktning — de ser ut som dubbla rails).
-    Jämför midpunkterna: om två ways är < 18 m från varandra, behåll bara den längre."""
+def chain_is_parallel_to(chain: list, other: list, threshold_m: float = 40) -> bool:
+    """True om kedjan löper parallellt med other: minst 70% av samplade
+    punkter i chain ligger inom threshold_m från närmaste punkt på other."""
+    step = max(1, len(chain) // 10)
+    samples = chain[::step]
+    hits = sum(
+        1 for pt in samples
+        if min(haversine_m(pt[0], pt[1], p[0], p[1]) for p in other) < threshold_m
+    )
+    return hits >= max(1, len(samples) * 0.70)
+
+
+def dedup_parallel_chains(chains: list) -> list:
+    """Deduplicera parallella kedjor EFTER sammanslaget — längre kedjor ger
+    mer tillförlitlig jämförelse än de korta råsegmenten."""
     kept = []
-    for way in sorted(ways, key=lambda w: -len(w)):  # längsta way vinner
-        mid = way[len(way) // 2]
-        is_dup = any(
-            haversine_m(mid[0], mid[1], k[len(k) // 2][0], k[len(k) // 2][1]) < 18
-            for k in kept
-        )
-        if not is_dup:
-            kept.append(way)
+    for chain in sorted(chains, key=len, reverse=True):  # längsta vinner
+        if not any(chain_is_parallel_to(chain, k) for k in kept):
+            kept.append(chain)
     return kept
 
 
@@ -212,9 +219,9 @@ def build_tracks(elements: list) -> dict:
 
     tracks_by_color: dict[str, list] = {}
     for color, ways in raw_by_color.items():
-        deduped = dedup_parallel_ways(ways)
-        merged = merge_chains(deduped)
-        tracks_by_color[color] = merged
+        merged = merge_chains(ways)               # slå ihop korta råsegment till långa kedjor
+        deduped = dedup_parallel_chains(merged)   # deduplicera parallella kedjor (tunnelrör etc.)
+        tracks_by_color[color] = deduped
 
     return tracks_by_color
 
