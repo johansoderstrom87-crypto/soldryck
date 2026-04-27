@@ -252,18 +252,35 @@ body {
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
 }
 
-/* Subway entrance markers — slim white-bordered dot at the end of each connector line */
+/* Subway station pill — minimalist rounded rectangle oriented along the platform's axis.
+   Wrapper is square so the rotated child can never get clipped. */
+.metro-station {
+  background: none !important;
+  border: none !important;
+  overflow: visible !important;
+}
+.metro-station-pill {
+  width: 14px;
+  height: 5px;
+  border-radius: 3px;
+  background: #ffffff;
+  border: 1.5px solid #1e293b;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+  margin: 7.5px 3px;
+}
+
+/* Subway entrance markers — small dark slate dot at the exit location */
 .metro-entrance {
   background: none !important;
   border: none !important;
 }
 .metro-entrance-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #0f172a;
+  background: #475569;
   border: 1.5px solid #f8fafc;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
 }
 
 /* Venue opening hours — premium look inside popup */

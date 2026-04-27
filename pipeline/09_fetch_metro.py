@@ -123,9 +123,21 @@ def dedup_parallel_chains(chains: list) -> list:
     return kept
 
 
+def _alignment(v1: list, v2: list) -> float:
+    """Cosinuslikhet mellan två 2D-vektorer (-1..1, 1=samma riktning)."""
+    n1 = (v1[0] ** 2 + v1[1] ** 2) ** 0.5
+    n2 = (v2[0] ** 2 + v2[1] ** 2) ** 0.5
+    if n1 == 0 or n2 == 0:
+        return 0.0
+    return (v1[0] * v2[0] + v1[1] * v2[1]) / (n1 * n2)
+
+
 def merge_chains(ways: list) -> list:
     """Slå ihop angränsande ways (delar endpoints) till färre, längre kedjor.
-    Resulterar i mjukare kurvor och färre polyline-objekt i frontend."""
+
+    Vid junctions (>1 kandidat) väljer vi den mest linjeriktade fortsättningen
+    via cos-likhet med kedjans utgående riktning. Det undviker zigzag-mönster
+    där algoritmen hoppar in på en gren och sen tillbaka."""
     from collections import defaultdict as _dd
 
     endpoint_idx: dict[tuple, list[int]] = _dd(list)
@@ -136,28 +148,57 @@ def merge_chains(ways: list) -> list:
     used = [False] * len(ways)
     chains = []
 
+    def pick_aligned(cur_dir: list, candidates: list, tip: tuple, going_forward: bool) -> int:
+        """Välj kandidaten som matchar bäst med kedjans riktning."""
+        best, best_score = candidates[0], -2.0
+        for c in candidates:
+            seg = ways[c]
+            # Riktningsvektor som lämnar tip in i segmentet
+            if going_forward:
+                seg_dir = (
+                    [seg[1][0] - seg[0][0], seg[1][1] - seg[0][1]]
+                    if tuple(seg[0]) == tip
+                    else [seg[-2][0] - seg[-1][0], seg[-2][1] - seg[-1][1]]
+                )
+            else:
+                # Vid bakåt-extension är cur_dir riktad UT från kedjans start,
+                # och vi vill ha segmentriktning UT från tip på samma sätt
+                seg_dir = (
+                    [seg[1][0] - seg[0][0], seg[1][1] - seg[0][1]]
+                    if tuple(seg[0]) == tip
+                    else [seg[-2][0] - seg[-1][0], seg[-2][1] - seg[-1][1]]
+                )
+            score = _alignment(cur_dir, seg_dir)
+            if score > best_score:
+                best_score, best = score, c
+        return best
+
     for start in range(len(ways)):
         if used[start]:
             continue
         chain = list(ways[start])
         used[start] = True
 
-        # Förläng framåt
+        # Förläng framåt — riktning vid kedjans slut: chain[-2] → chain[-1]
         while True:
             tip = tuple(chain[-1])
-            nxt = next((i for i in endpoint_idx[tip] if not used[i]), None)
-            if nxt is None:
+            cands = [i for i in endpoint_idx[tip] if not used[i]]
+            if not cands:
                 break
+            cur_dir = [chain[-1][0] - chain[-2][0], chain[-1][1] - chain[-2][1]]
+            nxt = pick_aligned(cur_dir, cands, tip, going_forward=True)
             used[nxt] = True
             seg = ways[nxt]
             chain += seg[1:] if tuple(seg[0]) == tip else list(reversed(seg))[1:]
 
-        # Förläng bakåt
+        # Förläng bakåt — riktning vid kedjans start: chain[1] → chain[0] (utåt)
         while True:
             tip = tuple(chain[0])
-            nxt = next((i for i in endpoint_idx[tip] if not used[i]), None)
-            if nxt is None:
+            cands = [i for i in endpoint_idx[tip] if not used[i]]
+            if not cands:
                 break
+            cur_dir = [chain[0][0] - chain[1][0], chain[0][1] - chain[1][1]]
+            nxt = pick_aligned(cur_dir, cands, tip, going_forward=False)
             used[nxt] = True
             seg = ways[nxt]
             prefix = list(reversed(seg))[:-1] if tuple(seg[-1]) == tip else seg[:-1]
@@ -304,6 +345,78 @@ def build_platforms(elements: list) -> list[dict]:
     return platforms
 
 
+def cluster_stations(platforms: list, threshold_m: float = 80) -> list[dict]:
+    """Klustra perronger som tillhör samma station — flera perronger nära
+    varandra (T-Centralen har t.ex. 3-4 perronger) blir en station-pill.
+
+    Returnerar en station per kluster med:
+    - lat, lng: centroiden
+    - angle: rotation i grader (CSS-kompatibel) längs primär perrongaxel
+    - len_m: längd på pillen (klampad till rimligt intervall)
+    - name: namn från längsta perrongen i klustret
+    """
+    import math
+
+    items = []
+    for p in platforms:
+        c = p["coordinates"]
+        center = [(c[0][0] + c[1][0]) / 2, (c[0][1] + c[1][1]) / 2]
+        length = haversine_m(c[0][0], c[0][1], c[1][0], c[1][1])
+        items.append({"name": p.get("name", ""), "coords": c, "center": center, "length": length})
+
+    used = [False] * len(items)
+    stations = []
+    cos_lat = math.cos(math.radians(59.33))  # Mercator-justering för Stockholm
+
+    for i in range(len(items)):
+        if used[i]:
+            continue
+        cluster = [items[i]]
+        used[i] = True
+        for j in range(i + 1, len(items)):
+            if used[j]:
+                continue
+            d = haversine_m(*items[i]["center"], *items[j]["center"])
+            if d < threshold_m:
+                cluster.append(items[j])
+                used[j] = True
+
+        # Centroid över alla perronger i klustret
+        cy = sum(it["center"][0] for it in cluster) / len(cluster)
+        cx = sum(it["center"][1] for it in cluster) / len(cluster)
+
+        # Primär = längsta perrong → bestämmer riktning + namn
+        primary = max(cluster, key=lambda it: it["length"])
+        c = primary["coords"]
+        # CSS rotation: 0° = horisontell (öster), positiv vinkel = medurs
+        # På Mercator är dx i pixlar = dlng × cos(lat). Skärmens y går nedåt
+        # medan latitud ökar uppåt → invertera lat-deltat för screen-vinkel.
+        dx_screen = (c[1][1] - c[0][1]) * cos_lat
+        dy_screen = -(c[1][0] - c[0][0])
+        angle_deg = math.degrees(math.atan2(dy_screen, dx_screen))
+        # Pillen är symmetrisk → modulo 180° räcker för rotation
+        if angle_deg > 90:
+            angle_deg -= 180
+        elif angle_deg < -90:
+            angle_deg += 180
+
+        # Klamp pill-längd till rimligt visuellt intervall (px sätts i frontend
+        # baserat på meter-distans + zoomnivå)
+        length_m = max(60, min(180, primary["length"]))
+
+        stations.append(
+            {
+                "name": primary["name"],
+                "lat": round(cy, 5),
+                "lng": round(cx, 5),
+                "angle": round(angle_deg, 1),
+                "len_m": round(length_m, 1),
+            }
+        )
+
+    return stations
+
+
 def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     from math import radians, sin, cos, asin, sqrt
 
@@ -315,22 +428,22 @@ def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * R * asin(sqrt(a))
 
 
-def closest_platform_point(lat: float, lon: float, platforms: list) -> tuple:
-    """Hitta perrong-punkten närmast (lat, lon). Returnerar (dist_m, [lat, lon])."""
+def closest_station(lat: float, lon: float, stations: list) -> tuple:
+    """Hitta station närmast (lat, lon). Returnerar (dist_m, station-dict)."""
     best_dist = float("inf")
-    best_point = None
-    for plat in platforms:
-        for pt in plat["coordinates"]:
-            d = haversine_m(lat, lon, pt[0], pt[1])
-            if d < best_dist:
-                best_dist = d
-                best_point = pt
-    return best_dist, best_point
+    best = None
+    for s in stations:
+        d = haversine_m(lat, lon, s["lat"], s["lng"])
+        if d < best_dist:
+            best_dist = d
+            best = s
+    return best_dist, best
 
 
-def build_entrances(elements: list, platforms: list) -> list[dict]:
+def build_entrances(elements: list, stations: list) -> list[dict]:
     """Hämta uppgångar (railway=subway_entrance) och koppla varje till
-    närmsta perrong inom 250 m. Returnerar listor med {lat, lng, name, link: [[lat,lng],[lat,lng]]}."""
+    närmsta station inom 250 m. Connector-linjen går från stationscentrum
+    till uppgången — visar tydligt vart man kommer ut."""
     entrances = []
     seen = set()
     for el in elements:
@@ -348,9 +461,9 @@ def build_entrances(elements: list, platforms: list) -> list[dict]:
             continue
         seen.add(key)
 
-        dist, plat_point = closest_platform_point(lat, lon, platforms)
-        if not plat_point or dist > 250:
-            # Uppgångar utan perrong i närheten skippar vi — troligtvis fel-taggade
+        dist, station = closest_station(lat, lon, stations)
+        if not station or dist > 250:
+            # Uppgångar utan station i närheten skippar vi — troligtvis fel-taggade
             continue
 
         entrances.append(
@@ -359,14 +472,17 @@ def build_entrances(elements: list, platforms: list) -> list[dict]:
                 "lng": round(lon, 5),
                 "name": tags.get("name", ""),
                 "ref": tags.get("ref", ""),
-                "link": [plat_point, [round(lat, 5), round(lon, 5)]],
+                "link": [
+                    [station["lat"], station["lng"]],
+                    [round(lat, 5), round(lon, 5)],
+                ],
             }
         )
 
     return entrances
 
 
-def export_typescript(tracks: dict, platforms: list, entrances: list, output_path: str) -> None:
+def export_typescript(tracks: dict, stations: list, entrances: list, output_path: str) -> None:
     lines = [
         "/** Auto-generated by pipeline/09_fetch_metro.py — do not edit by hand */",
         "",
@@ -377,15 +493,21 @@ def export_typescript(tracks: dict, platforms: list, entrances: list, output_pat
         "  coords: [number, number][];",
         "}",
         "",
-        "export interface MetroPlatform {",
-        "  coords: [number, number][];",
+        "export interface MetroStation {",
+        "  lat: number;",
+        "  lng: number;",
+        "  name: string;",
+        "  /** CSS-rotationsvinkel i grader längs perrongens långaxel */",
+        "  angle: number;",
+        "  /** Perronglängd i meter — frontend skalar pillen efter zoom */",
+        "  lenM: number;",
         "}",
         "",
         "export interface MetroEntrance {",
         "  lat: number;",
         "  lng: number;",
         "  name: string;",
-        "  /** Anslutningslinje [perrongpunkt, uppgångspunkt] — visar vart man kommer ut */",
+        "  /** Anslutningslinje [stationscentrum, uppgångspunkt] — visar vart man kommer ut */",
         "  link: [[number, number], [number, number]];",
         "}",
         "",
@@ -396,9 +518,13 @@ def export_typescript(tracks: dict, platforms: list, entrances: list, output_pat
             lines.append(f'  {{ color: "{color}", coords: {json.dumps(way)} }},')
     lines.append("];")
     lines.append("")
-    lines.append("export const METRO_PLATFORMS: MetroPlatform[] = [")
-    for plat in platforms:
-        lines.append(f'  {{ coords: {json.dumps(plat["coordinates"])} }},')
+    lines.append("export const METRO_STATIONS: MetroStation[] = [")
+    for s in stations:
+        name_safe = s["name"].replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(
+            f'  {{ lat: {s["lat"]}, lng: {s["lng"]}, name: "{name_safe}", '
+            f'angle: {s["angle"]}, lenM: {s["len_m"]} }},'
+        )
     lines.append("];")
     lines.append("")
     lines.append("export const METRO_ENTRANCES: MetroEntrance[] = [")
@@ -439,17 +565,18 @@ def main():
 
     tracks = build_tracks(elements)
     platforms = build_platforms(elements)
-    entrances = build_entrances(elements, platforms)
+    stations = cluster_stations(platforms)
+    entrances = build_entrances(elements, stations)
 
     print("\nSpårsegment per linje:")
     for color in ("red", "green", "blue"):
         ways = tracks.get(color, [])
         nodes = sum(len(w) for w in ways)
         print(f"  {color}: {len(ways)} segment ({nodes} noder)")
-    print(f"\nPerronger: {len(platforms)}")
-    print(f"Uppgångar: {len(entrances)} (kopplade till perrong inom 250 m)")
+    print(f"\nStationer: {len(stations)} (klustrade från {len(platforms)} perronger)")
+    print(f"Uppgångar: {len(entrances)} (kopplade till station inom 250 m)")
 
-    export_typescript(tracks, platforms, entrances, FRONTEND_OUT)
+    export_typescript(tracks, stations, entrances, FRONTEND_OUT)
     print(f"\nExporterat till {FRONTEND_OUT}")
 
 
