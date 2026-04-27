@@ -101,15 +101,53 @@ def fetch_overpass(query: str, max_retries: int = 3) -> dict:
     raise RuntimeError("Kunde inte nå Overpass API efter alla försök")
 
 
-def build_tracks(elements: list) -> dict:
-    """Bygg en kedja per OSM route-relation (T10, T11, T13, T14, T17, T18, T19).
+def way_is_parallel_dup(way: list, others: list, threshold_m: float = 35) -> bool:
+    """True om `way` är en parallell dubblett av någon way i `others`.
+    Använder båda: (1) sample-baserad parallell-check, (2) endpoint-likhet
+    för att inte felaktigt fånga korta grenar som divergerar från trunken."""
+    step = max(1, len(way) // 8)
+    samples = way[::step]
+    if len(samples) < 2:
+        return False
 
-    Vi tar bara en riktning per linje (route-relationer finns för båda hållen),
-    följer ways i relationens medlemsordning och matchar koordinater så att
-    kedjan blir kontinuerlig. Resulterar i max 7 polylines totalt — inga
-    geometriska dubbletter eller artefakter eftersom vi inte stitcharkedjor
-    själva. Linjer som delar trunk (T10/T11, T13/T14, T17/T18/T19) staplas
-    ovanpå varandra med samma färg → ser ut som en linje visuellt."""
+    for other in others:
+        # Räkna sampelpunkter som ligger nära other-polylinen
+        hits = sum(
+            1
+            for pt in samples
+            if min(haversine_m(pt[0], pt[1], p[0], p[1]) for p in other) < threshold_m
+        )
+        if hits < max(2, len(samples) * 0.7):
+            continue
+
+        # Endpoint-test: way:s båda ändar måste ligga någorlunda nära other
+        # (samma riktning eller omvänd). Skyddar grenar som börjar på trunken
+        # men leder bort.
+        a0, a1 = way[0], way[-1]
+        b0, b1 = other[0], other[-1]
+        same = max(haversine_m(*a0, *b0), haversine_m(*a1, *b1))
+        rev = max(haversine_m(*a0, *b1), haversine_m(*a1, *b0))
+        if min(same, rev) < 80:
+            return True
+        # Eller: om way är klart kortare än other och alla samplade punkter
+        # ligger nära other ⇒ way är ett delsegment av other
+        if len(way) * 1.5 <= len(other) and hits == len(samples):
+            return True
+
+    return False
+
+
+def build_tracks(elements: list) -> dict:
+    """Bygg spårdata per linjefärg.
+
+    1. Samla alla ways som någon route-relation refererar till + deras färg
+       (första route som ser way:n vinner — undviker färgkonflikter).
+    2. Filtrera till railway=subway.
+    3. Deduplicera parallella ways inom samma färg (catches Stockholm-tunnelbanans
+       separata nord/syd-spår-mappning som annars renderas som dubbla linjer).
+    4. Returnera per-way (ingen kedjesammanslagning — undviker zigzag-artefakter).
+       Leaflet renderar ways som delar exakta endpoint-koordinater som en
+       kontinuerlig linje, så det ser sammanhängande ut."""
     nodes_by_id: dict[int, tuple[float, float]] = {}
     ways_by_id: dict[int, dict] = {}
     relations: list[dict] = []
@@ -118,8 +156,6 @@ def build_tracks(elements: list) -> dict:
         if el["type"] == "node":
             nodes_by_id[el["id"]] = (el["lat"], el["lon"])
         elif el["type"] == "way":
-            # Overpass `>; out skel qt;` recurses to add untagged skeleton copies of relation
-            # member ways alongside the directly-fetched tagged ways. Always keep the tagged copy.
             existing = ways_by_id.get(el["id"])
             if existing and existing.get("tags") and not el.get("tags"):
                 continue
@@ -127,59 +163,48 @@ def build_tracks(elements: list) -> dict:
         elif el["type"] == "relation":
             relations.append(el)
 
-    # Per linjenummer: behåll bara FÖRSTA route-relationen (en riktning räcker)
-    routes_by_ref: dict[str, dict] = {}
+    # Bestäm färg per way_id via route-relationer (första vinner)
+    way_colors: dict[int, str] = {}
     for rel in relations:
         tags = rel.get("tags", {})
         if tags.get("route") != "subway":
             continue
         ref = tags.get("ref", "").lstrip("Tt").strip()
-        if not ref:
-            continue
-        routes_by_ref.setdefault(ref, rel)
-
-    tracks_by_color: dict[str, list] = defaultdict(list)
-    for ref, rel in routes_by_ref.items():
-        tags = rel.get("tags", {})
         color = LINE_REF_COLOR.get(ref) or color_from_hex(tags.get("colour", ""))
         if not color:
             continue
-
-        # Konkatenera ways i relationsordning. Varje way kan vara orienterad
-        # framåt eller bakåt — vi matchar mot kedjans aktuella ändpunkt.
-        chain: list = []
         for member in rel.get("members", []):
-            if member.get("type") != "way":
-                continue
-            way = ways_by_id.get(member["ref"])
-            if not way or way.get("tags", {}).get("railway") != "subway":
-                continue
-            way_coords = []
-            for nd in way.get("nodes", []):
-                if nd in nodes_by_id:
-                    lat, lon = nodes_by_id[nd]
-                    way_coords.append([round(lat, 5), round(lon, 5)])
-            if len(way_coords) < 2:
-                continue
+            if member.get("type") == "way":
+                way_colors.setdefault(member["ref"], color)
 
-            if not chain:
-                chain = list(way_coords)
-                continue
+    # Materialisera ways per färg
+    ways_by_color: dict[str, list] = defaultdict(list)
+    for way_id, way in ways_by_id.items():
+        if way.get("tags", {}).get("railway") != "subway":
+            continue
+        color = way_colors.get(way_id)
+        if not color:
+            continue
+        coords = []
+        for nd in way.get("nodes", []):
+            if nd in nodes_by_id:
+                lat, lon = nodes_by_id[nd]
+                coords.append([round(lat, 5), round(lon, 5)])
+        if len(coords) >= 2:
+            ways_by_color[color].append(coords)
 
-            last = chain[-1]
-            if way_coords[0] == last:
-                chain.extend(way_coords[1:])
-            elif way_coords[-1] == last:
-                chain.extend(reversed(way_coords[:-1]))
-            else:
-                # Diskontinuitet — flush nuvarande kedja, börja ny
-                tracks_by_color[color].append(chain)
-                chain = list(way_coords)
+    # Deduplicera parallella ways per färg
+    tracks_by_color: dict[str, list] = {}
+    for color, ways in ways_by_color.items():
+        # Sortera efter längd (flest noder) — längsta way:n vinner som
+        # "kanonisk" representation av sektionen
+        kept: list = []
+        for way in sorted(ways, key=len, reverse=True):
+            if not way_is_parallel_dup(way, kept):
+                kept.append(way)
+        tracks_by_color[color] = kept
 
-        if len(chain) >= 2:
-            tracks_by_color[color].append(chain)
-
-    return dict(tracks_by_color)
+    return tracks_by_color
 
 
 def long_axis_line(coords: list) -> list:
@@ -261,15 +286,12 @@ def build_platforms(elements: list) -> list[dict]:
 
 
 def cluster_stations(platforms: list, threshold_m: float = 80) -> list[dict]:
-    """Klustra perronger som tillhör samma station — flera perronger nära
-    varandra (T-Centralen har t.ex. 3-4 perronger) blir en station-pill.
+    """Klustra perronger som tillhör samma station (T-Centralen har 3-4 perronger).
 
-    Returnerar en station per kluster med:
-    - lat, lng: centroiden
-    - angle: rotation i grader (CSS-kompatibel) längs primär perrongaxel
-    - len_m: längd på pillen (klampad till rimligt intervall)
-    - name: namn från längsta perrongen i klustret
-    """
+    Returnerar en station per kluster med geografiska ändpunkter för perrong-
+    pillen — på det sättet skalas pillen med zoom precis som en riktig perrong
+    skulle göra på en karta. Längden klampas till 100-180 m (en typisk
+    Stockholm-tunnelbaneperrong är ~140 m)."""
     import math
 
     items = []
@@ -281,7 +303,7 @@ def cluster_stations(platforms: list, threshold_m: float = 80) -> list[dict]:
 
     used = [False] * len(items)
     stations = []
-    cos_lat = math.cos(math.radians(59.33))  # Mercator-justering för Stockholm
+    cos_lat = math.cos(math.radians(59.33))
 
     for i in range(len(items)):
         if used[i]:
@@ -303,29 +325,35 @@ def cluster_stations(platforms: list, threshold_m: float = 80) -> list[dict]:
         # Primär = längsta perrong → bestämmer riktning + namn
         primary = max(cluster, key=lambda it: it["length"])
         c = primary["coords"]
-        # CSS rotation: 0° = horisontell (öster), positiv vinkel = medurs
-        # På Mercator är dx i pixlar = dlng × cos(lat). Skärmens y går nedåt
-        # medan latitud ökar uppåt → invertera lat-deltat för screen-vinkel.
+
+        # Riktningsvektor i lat/lng — normalisera över Mercator-skärmplan
+        # (dx_screen = dlng × cos_lat, dy_screen = -dlat)
         dx_screen = (c[1][1] - c[0][1]) * cos_lat
         dy_screen = -(c[1][0] - c[0][0])
-        angle_deg = math.degrees(math.atan2(dy_screen, dx_screen))
-        # Pillen är symmetrisk → modulo 180° räcker för rotation
-        if angle_deg > 90:
-            angle_deg -= 180
-        elif angle_deg < -90:
-            angle_deg += 180
+        norm_screen = (dx_screen ** 2 + dy_screen ** 2) ** 0.5 or 1.0
+        unit_dx_screen = dx_screen / norm_screen
+        unit_dy_screen = dy_screen / norm_screen
 
-        # Klamp pill-längd till rimligt visuellt intervall (px sätts i frontend
-        # baserat på meter-distans + zoomnivå)
-        length_m = max(60, min(180, primary["length"]))
+        # Klamp längd till 100-180 m (typisk Stockholm-tunnelbaneperrong är ~140 m)
+        len_m = max(100, min(180, primary["length"]))
+        half_m = len_m / 2
+
+        # Ändpunkter: centroiden ± half_m i screen-riktningen, konverterat tillbaka
+        # till lat/lng. 1 m ≈ 1/111 000 grader latitud, 1/(111 000 × cos_lat) longitud.
+        dlat = -unit_dy_screen * half_m / 111_000
+        dlng = unit_dx_screen * half_m / (111_000 * cos_lat)
+
+        endpoints = [
+            [round(cy - dlat, 5), round(cx - dlng, 5)],
+            [round(cy + dlat, 5), round(cx + dlng, 5)],
+        ]
 
         stations.append(
             {
                 "name": primary["name"],
                 "lat": round(cy, 5),
                 "lng": round(cx, 5),
-                "angle": round(angle_deg, 1),
-                "len_m": round(length_m, 1),
+                "endpoints": endpoints,
             }
         )
 
@@ -412,10 +440,9 @@ def export_typescript(tracks: dict, stations: list, entrances: list, output_path
         "  lat: number;",
         "  lng: number;",
         "  name: string;",
-        "  /** CSS-rotationsvinkel i grader längs perrongens långaxel */",
-        "  angle: number;",
-        "  /** Perronglängd i meter — frontend skalar pillen efter zoom */",
-        "  lenM: number;",
+        "  /** Geografiska ändpunkter på perrongen — renderas som polyline så",
+        "   *  pillen skalas med zoom precis som en riktig perrong skulle göra */",
+        "  endpoints: [[number, number], [number, number]];",
         "}",
         "",
         "export interface MetroEntrance {",
@@ -438,7 +465,7 @@ def export_typescript(tracks: dict, stations: list, entrances: list, output_path
         name_safe = s["name"].replace("\\", "\\\\").replace('"', '\\"')
         lines.append(
             f'  {{ lat: {s["lat"]}, lng: {s["lng"]}, name: "{name_safe}", '
-            f'angle: {s["angle"]}, lenM: {s["len_m"]} }},'
+            f'endpoints: {json.dumps(s["endpoints"])} }},'
         )
     lines.append("];")
     lines.append("")
