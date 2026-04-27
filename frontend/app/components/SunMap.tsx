@@ -407,11 +407,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     for (const track of metroNetwork.METRO_TRACKS) {
       L.polyline(track.coords, {
         color: lineColors[track.color],
-        weight: 4.5,
-        opacity: 0.78,
+        weight: 4,
+        opacity: 0.82,
         lineCap: "round",
         lineJoin: "round",
-        smoothFactor: 3,
+        smoothFactor: 1.5,
         interactive: false,
       }).addTo(layer);
     }

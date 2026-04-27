@@ -101,116 +101,15 @@ def fetch_overpass(query: str, max_retries: int = 3) -> dict:
     raise RuntimeError("Kunde inte nå Overpass API efter alla försök")
 
 
-def chain_is_parallel_to(chain: list, other: list, threshold_m: float = 40) -> bool:
-    """True om kedjan löper parallellt med other: minst 70% av samplade
-    punkter i chain ligger inom threshold_m från närmaste punkt på other."""
-    step = max(1, len(chain) // 10)
-    samples = chain[::step]
-    hits = sum(
-        1 for pt in samples
-        if min(haversine_m(pt[0], pt[1], p[0], p[1]) for p in other) < threshold_m
-    )
-    return hits >= max(1, len(samples) * 0.70)
-
-
-def dedup_parallel_chains(chains: list) -> list:
-    """Deduplicera parallella kedjor EFTER sammanslaget — längre kedjor ger
-    mer tillförlitlig jämförelse än de korta råsegmenten."""
-    kept = []
-    for chain in sorted(chains, key=len, reverse=True):  # längsta vinner
-        if not any(chain_is_parallel_to(chain, k) for k in kept):
-            kept.append(chain)
-    return kept
-
-
-def _alignment(v1: list, v2: list) -> float:
-    """Cosinuslikhet mellan två 2D-vektorer (-1..1, 1=samma riktning)."""
-    n1 = (v1[0] ** 2 + v1[1] ** 2) ** 0.5
-    n2 = (v2[0] ** 2 + v2[1] ** 2) ** 0.5
-    if n1 == 0 or n2 == 0:
-        return 0.0
-    return (v1[0] * v2[0] + v1[1] * v2[1]) / (n1 * n2)
-
-
-def merge_chains(ways: list) -> list:
-    """Slå ihop angränsande ways (delar endpoints) till färre, längre kedjor.
-
-    Vid junctions (>1 kandidat) väljer vi den mest linjeriktade fortsättningen
-    via cos-likhet med kedjans utgående riktning. Det undviker zigzag-mönster
-    där algoritmen hoppar in på en gren och sen tillbaka."""
-    from collections import defaultdict as _dd
-
-    endpoint_idx: dict[tuple, list[int]] = _dd(list)
-    for i, w in enumerate(ways):
-        endpoint_idx[tuple(w[0])].append(i)
-        endpoint_idx[tuple(w[-1])].append(i)
-
-    used = [False] * len(ways)
-    chains = []
-
-    def pick_aligned(cur_dir: list, candidates: list, tip: tuple, going_forward: bool) -> int:
-        """Välj kandidaten som matchar bäst med kedjans riktning."""
-        best, best_score = candidates[0], -2.0
-        for c in candidates:
-            seg = ways[c]
-            # Riktningsvektor som lämnar tip in i segmentet
-            if going_forward:
-                seg_dir = (
-                    [seg[1][0] - seg[0][0], seg[1][1] - seg[0][1]]
-                    if tuple(seg[0]) == tip
-                    else [seg[-2][0] - seg[-1][0], seg[-2][1] - seg[-1][1]]
-                )
-            else:
-                # Vid bakåt-extension är cur_dir riktad UT från kedjans start,
-                # och vi vill ha segmentriktning UT från tip på samma sätt
-                seg_dir = (
-                    [seg[1][0] - seg[0][0], seg[1][1] - seg[0][1]]
-                    if tuple(seg[0]) == tip
-                    else [seg[-2][0] - seg[-1][0], seg[-2][1] - seg[-1][1]]
-                )
-            score = _alignment(cur_dir, seg_dir)
-            if score > best_score:
-                best_score, best = score, c
-        return best
-
-    for start in range(len(ways)):
-        if used[start]:
-            continue
-        chain = list(ways[start])
-        used[start] = True
-
-        # Förläng framåt — riktning vid kedjans slut: chain[-2] → chain[-1]
-        while True:
-            tip = tuple(chain[-1])
-            cands = [i for i in endpoint_idx[tip] if not used[i]]
-            if not cands:
-                break
-            cur_dir = [chain[-1][0] - chain[-2][0], chain[-1][1] - chain[-2][1]]
-            nxt = pick_aligned(cur_dir, cands, tip, going_forward=True)
-            used[nxt] = True
-            seg = ways[nxt]
-            chain += seg[1:] if tuple(seg[0]) == tip else list(reversed(seg))[1:]
-
-        # Förläng bakåt — riktning vid kedjans start: chain[1] → chain[0] (utåt)
-        while True:
-            tip = tuple(chain[0])
-            cands = [i for i in endpoint_idx[tip] if not used[i]]
-            if not cands:
-                break
-            cur_dir = [chain[0][0] - chain[1][0], chain[0][1] - chain[1][1]]
-            nxt = pick_aligned(cur_dir, cands, tip, going_forward=False)
-            used[nxt] = True
-            seg = ways[nxt]
-            prefix = list(reversed(seg))[:-1] if tuple(seg[-1]) == tip else seg[:-1]
-            chain = prefix + chain
-
-        chains.append(chain)
-
-    return chains
-
-
 def build_tracks(elements: list) -> dict:
-    """Gruppera subway-ways per linjefärg, deduplicera dubbelspår och slå ihop till kedjor."""
+    """Bygg en kedja per OSM route-relation (T10, T11, T13, T14, T17, T18, T19).
+
+    Vi tar bara en riktning per linje (route-relationer finns för båda hållen),
+    följer ways i relationens medlemsordning och matchar koordinater så att
+    kedjan blir kontinuerlig. Resulterar i max 7 polylines totalt — inga
+    geometriska dubbletter eller artefakter eftersom vi inte stitcharkedjor
+    själva. Linjer som delar trunk (T10/T11, T13/T14, T17/T18/T19) staplas
+    ovanpå varandra med samma färg → ser ut som en linje visuellt."""
     nodes_by_id: dict[int, tuple[float, float]] = {}
     ways_by_id: dict[int, dict] = {}
     relations: list[dict] = []
@@ -228,43 +127,59 @@ def build_tracks(elements: list) -> dict:
         elif el["type"] == "relation":
             relations.append(el)
 
-    # Bestäm färg per way från relationerna
-    way_colors: dict[int, str] = {}
+    # Per linjenummer: behåll bara FÖRSTA route-relationen (en riktning räcker)
+    routes_by_ref: dict[str, dict] = {}
     for rel in relations:
         tags = rel.get("tags", {})
         if tags.get("route") != "subway":
             continue
         ref = tags.get("ref", "").lstrip("Tt").strip()
+        if not ref:
+            continue
+        routes_by_ref.setdefault(ref, rel)
+
+    tracks_by_color: dict[str, list] = defaultdict(list)
+    for ref, rel in routes_by_ref.items():
+        tags = rel.get("tags", {})
         color = LINE_REF_COLOR.get(ref) or color_from_hex(tags.get("colour", ""))
         if not color:
             continue
+
+        # Konkatenera ways i relationsordning. Varje way kan vara orienterad
+        # framåt eller bakåt — vi matchar mot kedjans aktuella ändpunkt.
+        chain: list = []
         for member in rel.get("members", []):
-            if member.get("type") == "way":
-                # Första matchningen vinner — undviker duplicering på delade segment
-                way_colors.setdefault(member["ref"], color)
+            if member.get("type") != "way":
+                continue
+            way = ways_by_id.get(member["ref"])
+            if not way or way.get("tags", {}).get("railway") != "subway":
+                continue
+            way_coords = []
+            for nd in way.get("nodes", []):
+                if nd in nodes_by_id:
+                    lat, lon = nodes_by_id[nd]
+                    way_coords.append([round(lat, 5), round(lon, 5)])
+            if len(way_coords) < 2:
+                continue
 
-    raw_by_color: dict[str, list] = defaultdict(list)
-    for way_id, way in ways_by_id.items():
-        if way.get("tags", {}).get("railway") != "subway":
-            continue
-        color = way_colors.get(way_id)
-        if not color:
-            continue
-        coords = []
-        for nd in way.get("nodes", []):
-            if nd in nodes_by_id:
-                lat, lon = nodes_by_id[nd]
-                coords.append([round(lat, 5), round(lon, 5)])
-        if len(coords) >= 2:
-            raw_by_color[color].append(coords)
+            if not chain:
+                chain = list(way_coords)
+                continue
 
-    tracks_by_color: dict[str, list] = {}
-    for color, ways in raw_by_color.items():
-        merged = merge_chains(ways)               # slå ihop korta råsegment till långa kedjor
-        deduped = dedup_parallel_chains(merged)   # deduplicera parallella kedjor (tunnelrör etc.)
-        tracks_by_color[color] = deduped
+            last = chain[-1]
+            if way_coords[0] == last:
+                chain.extend(way_coords[1:])
+            elif way_coords[-1] == last:
+                chain.extend(reversed(way_coords[:-1]))
+            else:
+                # Diskontinuitet — flush nuvarande kedja, börja ny
+                tracks_by_color[color].append(chain)
+                chain = list(way_coords)
 
-    return tracks_by_color
+        if len(chain) >= 2:
+            tracks_by_color[color].append(chain)
+
+    return dict(tracks_by_color)
 
 
 def long_axis_line(coords: list) -> list:
