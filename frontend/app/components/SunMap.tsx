@@ -64,7 +64,9 @@ function nearestOnSegment(
   return [lat1 + t * dx, lng1 + t * dy];
 }
 
-/** Snap (lat,lng) to nearest track point. Returns position, color, and normalized track direction. */
+/** Snap (lat,lng) to nearest track point. Returns position, color, and a STABLE direction
+ *  computed from ±150 m along the track — avoids single-segment noise that causes platforms
+ *  to appear at wrong angles. */
 function snapToTrack(
   lat: number,
   lng: number,
@@ -73,27 +75,49 @@ function snapToTrack(
   let bestDist = Infinity;
   let bestPos: [number, number] = [lat, lng];
   let bestColor: "red" | "green" | "blue" = "red";
-  let bestDir: [number, number] = [1, 0];
+  let bestSegIdx = 0;
+  let bestCoords: [number, number][] = [];
   const cosLat = Math.cos((lat * Math.PI) / 180);
+
   for (const track of tracks) {
-    const c = track.coords;
+    const c = track.coords as [number, number][];
     for (let i = 0; i < c.length - 1; i++) {
       const pt = nearestOnSegment(lat, lng, c[i], c[i + 1]);
       const dlat = pt[0] - lat, dlng = (pt[1] - lng) * cosLat;
       const d2 = dlat * dlat + dlng * dlng;
       if (d2 < bestDist) {
-        bestDist = d2;
-        bestPos = pt;
-        bestColor = track.color;
-        // Normalized direction of this segment (Mercator-corrected for screen alignment)
-        const sdLat = c[i + 1][0] - c[i][0];
-        const sdLng = c[i + 1][1] - c[i][1];
-        const norm = Math.hypot(sdLat, sdLng * cosLat) || 1;
-        bestDir = [sdLat / norm, sdLng / norm];
+        bestDist = d2; bestPos = pt; bestColor = track.color;
+        bestSegIdx = i; bestCoords = c;
       }
     }
   }
-  return { pos: bestPos, color: bestColor, dir: bestDir };
+
+  // Walk ±150 m along the track from bestSegIdx for a stable overall direction
+  const WINDOW_M = 150;
+  const c = bestCoords;
+  let backI = bestSegIdx;
+  let distBack = 0;
+  while (backI > 0 && distBack < WINDOW_M) {
+    distBack += Math.hypot(
+      (c[backI][0] - c[backI - 1][0]) * 111_000,
+      (c[backI][1] - c[backI - 1][1]) * 111_000 * cosLat,
+    );
+    backI--;
+  }
+  let fwdI = Math.min(bestSegIdx + 1, c.length - 1);
+  let distFwd = 0;
+  while (fwdI < c.length - 1 && distFwd < WINDOW_M) {
+    distFwd += Math.hypot(
+      (c[fwdI + 1][0] - c[fwdI][0]) * 111_000,
+      (c[fwdI + 1][1] - c[fwdI][1]) * 111_000 * cosLat,
+    );
+    fwdI++;
+  }
+  const dLat = c[fwdI][0] - c[backI][0];
+  const dLng = c[fwdI][1] - c[backI][1];
+  const norm = Math.hypot(dLat, dLng * cosLat) || 1;
+
+  return { pos: bestPos, color: bestColor, dir: [dLat / norm, dLng / norm] };
 }
 
 /** Offset a map position by dist_m along a normalized direction vector. */
@@ -591,9 +615,13 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         const p1 = offsetAlongDir(pos, dir, -HALF_M);
         const p2 = offsetAlongDir(pos, dir, HALF_M);
 
-        // Platform: colored outer + white inner
-        L.polyline([p1, p2], { color: lc, weight: 8, lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
-        L.polyline([p1, p2], { color: "#ffffff", weight: 5, lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
+        // Render the track section through the platform as a STRAIGHT line
+        // (overrides any Chaikin micro-curves so platform and line are perfectly aligned)
+        L.polyline([p1, p2], { color: lc, weight: 4, opacity: 0.85, lineCap: "butt", smoothFactor: 0, interactive: false }).addTo(detail);
+
+        // Platform on top: colored outer + white inner (wider than the track)
+        L.polyline([p1, p2], { color: lc, weight: 10, lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
+        L.polyline([p1, p2], { color: "#ffffff", weight: 7, lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
 
         // Station name centered on platform
         if (showNames) {
