@@ -30,11 +30,11 @@ let metroNetwork: {
 } | null = null;
 
 /**
- * Chaikin corner-cutting — 2 iterations ger mjuka bezier-liknande kurvor.
+ * Chaikin corner-cutting — 3 iterations ger mjuka bezier-liknande kurvor.
  * Bevarar exakta start/slut-koordinater så angränsande ways fortfarande
  * möts utan glapp.
  */
-function chaikin(pts: [number, number][], iterations = 2): [number, number][] {
+function chaikin(pts: [number, number][], iterations = 3): [number, number][] {
   if (pts.length < 3) return pts;
   let cur = pts;
   for (let iter = 0; iter < iterations; iter++) {
@@ -64,15 +64,16 @@ function nearestOnSegment(
   return [lat1 + t * dx, lng1 + t * dy];
 }
 
-/** Snap (lat,lng) to the nearest point on any track, return position + track color. */
+/** Snap (lat,lng) to nearest track point. Returns position, color, and normalized track direction. */
 function snapToTrack(
   lat: number,
   lng: number,
   tracks: { color: "red" | "green" | "blue"; coords: [number, number][] }[],
-): { pos: [number, number]; color: "red" | "green" | "blue" } {
+): { pos: [number, number]; color: "red" | "green" | "blue"; dir: [number, number] } {
   let bestDist = Infinity;
   let bestPos: [number, number] = [lat, lng];
   let bestColor: "red" | "green" | "blue" = "red";
+  let bestDir: [number, number] = [1, 0];
   const cosLat = Math.cos((lat * Math.PI) / 180);
   for (const track of tracks) {
     const c = track.coords;
@@ -80,10 +81,32 @@ function snapToTrack(
       const pt = nearestOnSegment(lat, lng, c[i], c[i + 1]);
       const dlat = pt[0] - lat, dlng = (pt[1] - lng) * cosLat;
       const d2 = dlat * dlat + dlng * dlng;
-      if (d2 < bestDist) { bestDist = d2; bestPos = pt; bestColor = track.color; }
+      if (d2 < bestDist) {
+        bestDist = d2;
+        bestPos = pt;
+        bestColor = track.color;
+        // Normalized direction of this segment (Mercator-corrected for screen alignment)
+        const sdLat = c[i + 1][0] - c[i][0];
+        const sdLng = c[i + 1][1] - c[i][1];
+        const norm = Math.hypot(sdLat, sdLng * cosLat) || 1;
+        bestDir = [sdLat / norm, sdLng / norm];
+      }
     }
   }
-  return { pos: bestPos, color: bestColor };
+  return { pos: bestPos, color: bestColor, dir: bestDir };
+}
+
+/** Offset a map position by dist_m along a normalized direction vector. */
+function offsetAlongDir(
+  center: [number, number],
+  dir: [number, number],
+  dist_m: number,
+): [number, number] {
+  const cosLat = Math.cos((center[0] * Math.PI) / 180);
+  return [
+    center[0] + (dir[0] * dist_m) / 111_000,
+    center[1] + (dir[1] * dist_m) / (111_000 * cosLat),
+  ];
 }
 try {
   metroNetwork = require("../data/metro-network");
@@ -391,6 +414,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const unconfirmedMarkersRef = useRef<L.Marker[]>([]);
   const metroMarkersRef = useRef<L.Marker[]>([]);
   const metroNetworkRef = useRef<L.LayerGroup | null>(null);
+  const metroDetailRef = useRef<L.LayerGroup | null>(null);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
@@ -480,7 +504,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       }).addTo(layer);
     }
 
-    // Spår — Chaikin-smoothade, smoothFactor:0 för exakta endpoints
+    // Spår — Chaikin-smoothade (3 iterationer för extra mjuka kurvor)
     for (const track of metroNetwork.METRO_TRACKS) {
       L.polyline(chaikin(track.coords as [number, number][]), {
         color: lineColors[track.color],
@@ -488,7 +512,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         opacity: 0.85,
         lineCap: "round",
         lineJoin: "round",
-        smoothFactor: 0,
+        smoothFactor: 0.5,
         interactive: false,
       }).addTo(layer);
     }
@@ -527,6 +551,99 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         metroNetworkRef.current.remove();
         metroNetworkRef.current = null;
       }
+    };
+  }, [showMetro]);
+
+  // Zoom-dependent metro detail: platform + station name + T-markers with exit names
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !metroNetwork) return;
+
+    const LINE_COLORS = { red: "#e3000b", green: "#00a14e", blue: "#0065bd" } as const;
+
+    // Pre-group entrances by station position (link[0] = station center)
+    const entrancesByStation = new Map<string, typeof metroNetwork.METRO_ENTRANCES[number][]>();
+    for (const ent of metroNetwork.METRO_ENTRANCES) {
+      const key = `${ent.link[0][0]},${ent.link[0][1]}`;
+      if (!entrancesByStation.has(key)) entrancesByStation.set(key, []);
+      entrancesByStation.get(key)!.push(ent);
+    }
+
+    // Pre-compute snap+dir for every station once
+    const stationSnaps = metroNetwork.METRO_STATIONS.map((s) =>
+      ({ station: s, ...snapToTrack(s.lat, s.lng, metroNetwork!.METRO_TRACKS) })
+    );
+
+    function buildDetailLayer(zoom: number) {
+      if (metroDetailRef.current) {
+        metroDetailRef.current.remove();
+        metroDetailRef.current = null;
+      }
+      if (!showMetro || !mapRef.current) return;
+      if (zoom < 15) return;
+
+      const showNames = zoom >= 16;
+      const detail = L.layerGroup();
+      const HALF_M = 65; // 130m platform total
+
+      for (const { station, pos, color, dir } of stationSnaps) {
+        const lc = LINE_COLORS[color];
+        const p1 = offsetAlongDir(pos, dir, -HALF_M);
+        const p2 = offsetAlongDir(pos, dir, HALF_M);
+
+        // Platform: colored outer + white inner
+        L.polyline([p1, p2], { color: lc, weight: 8, lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
+        L.polyline([p1, p2], { color: "#ffffff", weight: 5, lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
+
+        // Station name centered on platform
+        if (showNames) {
+          const nameIcon = L.divIcon({
+            className: "metro-platform-label",
+            html: `<div class="metro-platform-name" style="--lc:${lc}">${station.name}</div>`,
+            iconSize: [180, 18],
+            iconAnchor: [90, 9],
+          });
+          L.marker(pos, { icon: nameIcon, interactive: false }).addTo(detail);
+        }
+
+        // Entrance connectors + T markers
+        const key = `${station.lat},${station.lng}`;
+        const entrances = entrancesByStation.get(key) ?? [];
+        for (const ent of entrances) {
+          // Nearest point on platform line to this entrance
+          const nearPt = nearestOnSegment(ent.lat, ent.lng, p1, p2);
+          L.polyline([nearPt, [ent.lat, ent.lng]], {
+            color: lc, weight: 1.5, opacity: 0.7,
+            dashArray: "4 4", lineCap: "round", interactive: false,
+          }).addTo(detail);
+
+          if (showNames && ent.name) {
+            const tIcon = L.divIcon({
+              className: "metro-t-wrap",
+              html: `<div class="metro-t-circle" style="background:${lc}">T</div><span class="metro-t-name">${ent.name}</span>`,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12],
+            });
+            L.marker([ent.lat, ent.lng], { icon: tIcon, interactive: false }).addTo(detail);
+          } else {
+            L.circleMarker([ent.lat, ent.lng], {
+              radius: 3, color: lc, fillColor: lc, fillOpacity: 0.9, weight: 1, interactive: false,
+            }).addTo(detail);
+          }
+        }
+      }
+
+      detail.addTo(mapRef.current!);
+      metroDetailRef.current = detail;
+    }
+
+    const onZoom = () => { if (mapRef.current) buildDetailLayer(mapRef.current.getZoom()); };
+    map.on("zoomend", onZoom);
+    buildDetailLayer(map.getZoom());
+
+    return () => {
+      map.off("zoomend", onZoom);
+      if (metroDetailRef.current) { metroDetailRef.current.remove(); metroDetailRef.current = null; }
     };
   }, [showMetro]);
 
