@@ -101,29 +101,73 @@ def fetch_overpass(query: str, max_retries: int = 3) -> dict:
     raise RuntimeError("Kunde inte nå Overpass API efter alla försök")
 
 
-def way_is_parallel_dup(way: list, others: list, threshold_m: float = 45) -> bool:
-    """True om `way` är en parallell dubblett av någon way i `others`.
+def build_unambiguous_chains(ways: list) -> list:
+    """Slår ihop ways till kedjor genom att följa endpoints — stannar exakt vid
+    junctions (2+ oanvända kandidater). Inga zigzag-artefakter eftersom vi
+    aldrig behöver välja riktning vid greningspunkter. Inga gaps eftersom vi
+    inte tar bort någon way innan sammanslaget."""
+    from collections import defaultdict as _dd
 
-    Skyddar korta ways (< 5 noder) — de är ofta junction-connectorer och
-    station-övergångar som inte ska tas bort, annars uppstår glapp i nätet."""
-    if len(way) < 5:
-        return False  # Connector-segment vid junctions/stationer — bevara alltid
+    endpoint_idx: dict[tuple, list[int]] = _dd(list)
+    for i, w in enumerate(ways):
+        endpoint_idx[tuple(w[0])].append(i)
+        endpoint_idx[tuple(w[-1])].append(i)
 
-    step = max(1, len(way) // 10)
-    samples = way[::step]
-    if len(samples) < 2:
-        return False
+    used = [False] * len(ways)
+    chains = []
 
-    for other in others:
-        hits = sum(
-            1
-            for pt in samples
-            if min(haversine_m(pt[0], pt[1], p[0], p[1]) for p in other) < threshold_m
+    for si in range(len(ways)):
+        if used[si]:
+            continue
+        chain = list(ways[si])
+        used[si] = True
+
+        # Förläng framåt — bara om exakt ETT oanvänt val finns (ingen junction-ambiguitet)
+        while True:
+            tip = tuple(chain[-1])
+            cands = [i for i in endpoint_idx[tip] if not used[i]]
+            if len(cands) != 1:
+                break
+            nxt = cands[0]
+            used[nxt] = True
+            seg = ways[nxt]
+            chain += seg[1:] if tuple(seg[0]) == tip else list(reversed(seg))[1:]
+
+        # Förläng bakåt
+        while True:
+            tip = tuple(chain[0])
+            cands = [i for i in endpoint_idx[tip] if not used[i]]
+            if len(cands) != 1:
+                break
+            prv = cands[0]
+            used[prv] = True
+            seg = ways[prv]
+            prefix = seg[:-1] if tuple(seg[-1]) == tip else list(reversed(seg))[:-1]
+            chain = prefix + chain
+
+        chains.append(chain)
+
+    return chains
+
+
+def dedup_parallel_chains(chains: list, threshold_m: float = 40) -> list:
+    """Deduplicera parallella kedjor efter sammanslagning. Dubbelspår
+    (T13/T14-rälsar, T17/T18-rälsar) syns nu som parallella kedjor och
+    är enkla att identifiera geometriskt. Längsta kedjan vinner."""
+    kept: list = []
+    for chain in sorted(chains, key=len, reverse=True):
+        step = max(1, len(chain) // 10)
+        samples = chain[::step]
+        is_dup = any(
+            sum(
+                1 for pt in samples
+                if min(haversine_m(pt[0], pt[1], p[0], p[1]) for p in other) < threshold_m
+            ) >= max(2, len(samples) * 0.70)
+            for other in kept
         )
-        if hits >= max(2, len(samples) * 0.65):
-            return True
-
-    return False
+        if not is_dup:
+            kept.append(chain)
+    return kept
 
 
 def build_tracks(elements: list) -> dict:
@@ -182,16 +226,12 @@ def build_tracks(elements: list) -> dict:
         if len(coords) >= 2:
             ways_by_color[color].append(coords)
 
-    # Deduplicera parallella ways per färg
+    # Bygg kedjor per färg: sätt ihop ways → dedup parallella kedjor
+    # Inga ways tas bort INNAN sammanslagningen → inga gap från bortplockade connectors
     tracks_by_color: dict[str, list] = {}
     for color, ways in ways_by_color.items():
-        # Sortera efter längd (flest noder) — längsta way:n vinner som
-        # "kanonisk" representation av sektionen
-        kept: list = []
-        for way in sorted(ways, key=len, reverse=True):
-            if not way_is_parallel_dup(way, kept):
-                kept.append(way)
-        tracks_by_color[color] = kept
+        chains = build_unambiguous_chains(ways)
+        tracks_by_color[color] = dedup_parallel_chains(chains)
 
     return tracks_by_color
 
