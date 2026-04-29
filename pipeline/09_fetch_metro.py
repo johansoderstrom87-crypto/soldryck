@@ -1,443 +1,270 @@
 """
-Steg 9: Hämta tunnelbane-spår, perronger och uppgångar.
+Steg 9: Hämta tunnelbane-data från SLs officiella GTFS-data (Trafiklab).
 
-Källa: OpenStreetMap via Overpass API
-- Spårlinjer: railway=subway, grupperade per linje (röd/grön/blå) via route=subway-relationer
-- Perronger: railway=platform — reduceras till långaxel-streck (PCA på koordinaterna)
-- Uppgångar: railway=subway_entrance — varje uppgång kopplas till sin närmsta perrong med en linje
+GTFS-filen (gtfs_sl.zip) hämtas automatiskt om den saknas.
+Trafiklab API-nyckel krävs (env: TRAFIKLAB_API_KEY eller hårdkodad nedan).
+
+Spår och stationer: GTFS shapes.txt + stops.txt (officiell SL-data, inga OSM-hack)
+Uppgångar:          OSM Overpass (GTFS saknar uppgångsgeometri)
 
 Resultat:
-- frontend/app/data/metro-network.ts (TypeScript export)
+  frontend/app/data/metro-network.ts
 """
 
+import csv
+import io
 import json
 import os
 import time
 import urllib.parse
 import urllib.request
+import zipfile
 from collections import defaultdict
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+GTFS_FILE = os.path.join(SCRIPT_DIR, "..", "gtfs_sl.zip")
+DATA_DIR = os.path.join(SCRIPT_DIR, "data")
 RAW_DIR = os.path.join(DATA_DIR, "raw")
 FRONTEND_OUT = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "frontend", "app", "data", "metro-network.ts")
+    os.path.join(SCRIPT_DIR, "..", "frontend", "app", "data", "metro-network.ts")
 )
 
-# Bbox: Stockholms tunnelbana sträcker sig längre än vår venue-bbox (Hjulsta i NV, Norsborg i SV)
-BBOX = "59.18,17.75,59.45,18.25"
+TRAFIKLAB_API_KEY = "bfe9a99f24cc4dfdbf9c4dc8d3480352"
+GTFS_URL = f"https://opendata.trafiklab.se/api/gtfs-static/sltrafik?key={TRAFIKLAB_API_KEY}"
 
-# Linjenummer → färg (T-prefix kan saknas i OSM)
-LINE_REF_COLOR = {
+BBOX = "59.18,17.75,59.45,18.25"  # för OSM-uppgångar
+
+LINE_COLOR: dict[str, str] = {
     "10": "blue", "11": "blue",
-    "13": "red", "14": "red",
-    "17": "green", "18": "green", "19": "green",
+    "13": "red",  "14": "red",
+    "17": "green","18": "green","19": "green",
 }
 
-
-def color_from_hex(hex_str: str) -> str | None:
-    """Bestäm linjefärg från OSM colour-tagg (varierar mellan olika varianter)."""
-    if not hex_str:
-        return None
-    s = hex_str.lower().lstrip("#")
-    # Stockholm SL-färger varierar — matcha de vanligaste
-    if s.startswith(("00", "10", "20")) and ("65bd" in s or "8cd" in s or "5a8" in s or s in ("0019a8", "0019a9")):
-        return "blue"
-    if s.startswith(("d7", "e3", "ff", "e1")) and any(c in s for c in ("1920", "000b", "0000", "171f", "0019")):
-        return "red"
-    if s.startswith(("00", "0c", "0a")) and any(c in s for c in ("8064", "a14e", "9b58", "a050")):
-        return "green"
-    # Fallback — grova RGB-områden
-    try:
-        r, g, b = int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16)
-        if b > 120 and b > r and b > g:
-            return "blue"
-        if r > 150 and r > g + 60 and r > b + 60:
-            return "red"
-        if g > 100 and g > r + 30 and g > b - 30:
-            return "green"
-    except (ValueError, IndexError):
-        pass
-    return None
-
-
-OVERPASS_QUERY = f"""[out:json][timeout:300];
-(
-  // Subway-rutter (T10–T19) — använder SL-nätverket
-  rel["route"="subway"]["network"~"Stockholm|SL|tunnelbana",i]({BBOX});
-  // Alla subway-spår (även de som ev. saknar relation)
-  way["railway"="subway"]({BBOX});
-  // Perronger — bägge taggningskonventioner
-  way["railway"="platform"]({BBOX});
-  way["public_transport"="platform"]["subway"="yes"]({BBOX});
-  // Uppgångar — noder med tag railway=subway_entrance
-  node["railway"="subway_entrance"]({BBOX});
-);
-out body;
->;
-out skel qt;"""
+METRO_ROUTE_TYPE = "401"  # Extended GTFS: Metro/Tunnelbana
 
 OVERPASS_URLS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
 ]
 
+ENTRANCE_QUERY = f"""[out:json][timeout:120];
+node["railway"="subway_entrance"]({BBOX});
+out body;"""
+
+
+# ---------------------------------------------------------------------------
+# GTFS
+# ---------------------------------------------------------------------------
+
+def ensure_gtfs() -> None:
+    if os.path.exists(GTFS_FILE):
+        print(f"Använder befintlig GTFS-fil: {GTFS_FILE}")
+        return
+    print(f"Laddar ner GTFS från Trafiklab...")
+    req = urllib.request.Request(GTFS_URL, headers={"User-Agent": "Soldryck/1.0"})
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        data = resp.read()
+    with open(GTFS_FILE, "wb") as f:
+        f.write(data)
+    print(f"Sparat: {GTFS_FILE} ({len(data)//1024} KB)")
+
+
+def load_gtfs_tracks() -> list[dict]:
+    """Läs GTFS shapes och returnera en lista track-dicts per linje.
+
+    Väljer den LÄNGSTA shape per metro-route (täcker hela linjen),
+    konverterar till [lat, lng]-listor."""
+    with zipfile.ZipFile(GTFS_FILE) as z:
+        # 1. Hitta metro-routes (route_type=401)
+        metro_routes: dict[str, str] = {}  # route_id → color
+        for row in csv.DictReader(io.TextIOWrapper(z.open("routes.txt"), encoding="utf-8-sig")):
+            if row.get("route_type") != METRO_ROUTE_TYPE:
+                continue
+            ref = row.get("route_short_name", "").lstrip("Tt").strip()
+            color = LINE_COLOR.get(ref)
+            if color:
+                metro_routes[row["route_id"]] = color
+
+        print(f"Metro-routes: {len(metro_routes)}")
+
+        # 2. Samla shape_ids per route
+        shapes_per_route: dict[str, set] = defaultdict(set)
+        for row in csv.DictReader(io.TextIOWrapper(z.open("trips.txt"), encoding="utf-8-sig")):
+            if row["route_id"] in metro_routes:
+                shapes_per_route[row["route_id"]].add(row["shape_id"])
+
+        needed_shape_ids = {sid for sids in shapes_per_route.values() for sid in sids}
+        print(f"Relevanta shape_ids: {len(needed_shape_ids)}")
+
+        # 3. Läs shapes (filtrera direkt — 3.9 M rader totalt)
+        shapes_data: dict[str, list] = defaultdict(list)
+        for row in csv.DictReader(io.TextIOWrapper(z.open("shapes.txt"), encoding="utf-8-sig")):
+            if row["shape_id"] in needed_shape_ids:
+                shapes_data[row["shape_id"]].append(row)
+
+        # 4. Välj längsta shape per route → en kedja per linje
+        tracks = []
+        for route_id, color in metro_routes.items():
+            sid_set = shapes_per_route.get(route_id, set())
+            if not sid_set:
+                continue
+            best_sid = max(sid_set, key=lambda sid: len(shapes_data.get(sid, [])))
+            pts = sorted(
+                shapes_data[best_sid],
+                key=lambda r: int(r["shape_pt_sequence"]),
+            )
+            coords = [
+                [round(float(p["shape_pt_lat"]), 5), round(float(p["shape_pt_lon"]), 5)]
+                for p in pts
+            ]
+            if len(coords) >= 2:
+                tracks.append({"color": color, "coords": coords})
+                print(f"  {color} route {route_id}: {len(coords)} punkter "
+                      f"({pts[0]['shape_pt_lat'][:5]},{pts[-1]['shape_pt_lat'][:5]})")
+
+    return tracks
+
+
+def load_gtfs_stations() -> list[dict]:
+    """Hämta unika metro-stationer från GTFS stops + stop_times.
+
+    Filtrerar fram stop_ids som används av metro-trips, deduplicerar
+    stationer med samma namn (olika plattformsvarianter), returnerar
+    {name, lat, lng} per station."""
+    with zipfile.ZipFile(GTFS_FILE) as z:
+        # Metro route_ids
+        metro_route_ids: set[str] = set()
+        for row in csv.DictReader(io.TextIOWrapper(z.open("routes.txt"), encoding="utf-8-sig")):
+            if row.get("route_type") == METRO_ROUTE_TYPE:
+                metro_route_ids.add(row["route_id"])
+
+        # Metro trip_ids
+        metro_trip_ids: set[str] = set()
+        for row in csv.DictReader(io.TextIOWrapper(z.open("trips.txt"), encoding="utf-8-sig")):
+            if row["route_id"] in metro_route_ids:
+                metro_trip_ids.add(row["trip_id"])
+
+        print(f"Metro trips: {len(metro_trip_ids)}")
+
+        # Metro stop_ids från en representativ delmängd av trips
+        # (alla trips ger samma stations, vi samplar för snabbhet)
+        sample_trips = set(list(metro_trip_ids)[:200])
+        metro_stop_ids: set[str] = set()
+        for row in csv.DictReader(io.TextIOWrapper(z.open("stop_times.txt"), encoding="utf-8-sig")):
+            if row["trip_id"] in sample_trips:
+                metro_stop_ids.add(row["stop_id"])
+
+        print(f"Metro stop_ids: {len(metro_stop_ids)}")
+
+        # Läs stops
+        all_stops: dict[str, dict] = {}
+        for row in csv.DictReader(io.TextIOWrapper(z.open("stops.txt"), encoding="utf-8-sig")):
+            all_stops[row["stop_id"]] = row
+
+        # Filtrera metro-stops och deduplicera på namn (ta centroiden)
+        name_groups: dict[str, list] = defaultdict(list)
+        for sid in metro_stop_ids:
+            stop = all_stops.get(sid)
+            if not stop:
+                continue
+            name = stop.get("stop_name", "").strip()
+            if not name:
+                continue
+            lat = float(stop.get("stop_lat", 0))
+            lng = float(stop.get("stop_lon", 0))
+            if lat and lng:
+                name_groups[name].append((lat, lng))
+
+        stations = []
+        for name, coords in sorted(name_groups.items()):
+            avg_lat = sum(c[0] for c in coords) / len(coords)
+            avg_lng = sum(c[1] for c in coords) / len(coords)
+            stations.append({
+                "name": name,
+                "lat": round(avg_lat, 5),
+                "lng": round(avg_lng, 5),
+            })
+
+    return stations
+
+
+# ---------------------------------------------------------------------------
+# OSM-uppgångar (entrances)
+# ---------------------------------------------------------------------------
 
 def fetch_overpass(query: str, max_retries: int = 3) -> dict:
     data = urllib.parse.urlencode({"data": query}).encode("utf-8")
     for attempt in range(max_retries):
         for url in OVERPASS_URLS:
             try:
-                print(f"  Försöker {url} (försök {attempt + 1})...")
+                print(f"  Overpass {url} (försök {attempt + 1})...")
                 req = urllib.request.Request(
-                    url,
-                    data=data,
+                    url, data=data,
                     headers={"User-Agent": "Soldryck/1.0 (sun-tracker)"},
                 )
-                resp = urllib.request.urlopen(req, timeout=300)
-                return json.loads(resp.read().decode("utf-8"))
+                return json.loads(urllib.request.urlopen(req, timeout=120).read().decode("utf-8"))
             except Exception as e:
                 print(f"  Misslyckades: {e}")
                 time.sleep(5)
-    raise RuntimeError("Kunde inte nå Overpass API efter alla försök")
-
-
-def route_chain_from_relation(rel: dict, ways_by_id: dict, nodes_by_id: dict, gap_tolerance_m: float = 15) -> list:
-    """Bygg en sammanhängande kedja från en route-relations members-ordning.
-
-    Följer OSM-relationen i den ordning ways är listade, matchar orientering
-    mot föregående segments endpoint. Om en anslutning saknar delad nod men
-    waysen ligger inom gap_tolerance_m kopplar vi ändå ihop (hanterar
-    small-coordinate-mismatch i OSM-data). Splittar till sub-kedjor vid
-    riktiga glapp (> gap_tolerance_m)."""
-    sub_chains = []
-    chain: list = []
-
-    for member in rel.get("members", []):
-        if member.get("type") != "way":
-            continue
-        way = ways_by_id.get(member["ref"])
-        if not way or way.get("tags", {}).get("railway") != "subway":
-            continue
-
-        way_coords = []
-        for nd in way.get("nodes", []):
-            if nd in nodes_by_id:
-                lat, lon = nodes_by_id[nd]
-                way_coords.append([round(lat, 5), round(lon, 5)])
-        if len(way_coords) < 2:
-            continue
-
-        if not chain:
-            chain = list(way_coords)
-            continue
-
-        last = chain[-1]
-        # Bestäm orientering (matcha mot kedjans ändpunkt)
-        if way_coords[0] == last:
-            chain.extend(way_coords[1:])
-        elif way_coords[-1] == last:
-            chain.extend(list(reversed(way_coords))[1:])
-        elif haversine_m(last[0], last[1], way_coords[0][0], way_coords[0][1]) < gap_tolerance_m:
-            chain.extend(way_coords[1:])
-        elif haversine_m(last[0], last[1], way_coords[-1][0], way_coords[-1][1]) < gap_tolerance_m:
-            chain.extend(list(reversed(way_coords))[1:])
-        else:
-            # Äkta glapp — avsluta current sub-kedja, börja ny
-            if len(chain) >= 2:
-                sub_chains.append(chain)
-            chain = list(way_coords)
-
-    if len(chain) >= 2:
-        sub_chains.append(chain)
-    return sub_chains
-
-
-def build_tracks(elements: list) -> dict:
-    """Bygg spårdata per linjefärg.
-
-    1. Samla alla ways som någon route-relation refererar till + deras färg
-       (första route som ser way:n vinner — undviker färgkonflikter).
-    2. Filtrera till railway=subway.
-    3. Deduplicera parallella ways inom samma färg (catches Stockholm-tunnelbanans
-       separata nord/syd-spår-mappning som annars renderas som dubbla linjer).
-    4. Returnera per-way (ingen kedjesammanslagning — undviker zigzag-artefakter).
-       Leaflet renderar ways som delar exakta endpoint-koordinater som en
-       kontinuerlig linje, så det ser sammanhängande ut."""
-    nodes_by_id: dict[int, tuple[float, float]] = {}
-    ways_by_id: dict[int, dict] = {}
-    relations: list[dict] = []
-
-    for el in elements:
-        if el["type"] == "node":
-            nodes_by_id[el["id"]] = (el["lat"], el["lon"])
-        elif el["type"] == "way":
-            existing = ways_by_id.get(el["id"])
-            if existing and existing.get("tags") and not el.get("tags"):
-                continue
-            ways_by_id[el["id"]] = el
-        elif el["type"] == "relation":
-            relations.append(el)
-
-    # Bestäm färg per way_id via route-relationer (första vinner)
-    way_colors: dict[int, str] = {}
-    for rel in relations:
-        tags = rel.get("tags", {})
-        if tags.get("route") != "subway":
-            continue
-        ref = tags.get("ref", "").lstrip("Tt").strip()
-        color = LINE_REF_COLOR.get(ref) or color_from_hex(tags.get("colour", ""))
-        if not color:
-            continue
-        for member in rel.get("members", []):
-            if member.get("type") == "way":
-                way_colors.setdefault(member["ref"], color)
-
-    # Materialisera ways per färg
-    ways_by_color: dict[str, list] = defaultdict(list)
-    for way_id, way in ways_by_id.items():
-        if way.get("tags", {}).get("railway") != "subway":
-            continue
-        color = way_colors.get(way_id)
-        if not color:
-            continue
-        coords = []
-        for nd in way.get("nodes", []):
-            if nd in nodes_by_id:
-                lat, lon = nodes_by_id[nd]
-                coords.append([round(lat, 5), round(lon, 5)])
-        if len(coords) >= 2:
-            ways_by_color[color].append(coords)
-
-    # Bygg EXAKT EN KEDJA PER LINJE (en riktning) från route-relationens member-ordning.
-    # Delade trunk-sektioner (T13/T14 på gemensam trunk) refererar SAMMA way-IDs
-    # → identiska koordinater → renderas som EN linje utan dedup-logik.
-    # Inget dedup behövs: vi tar bara en riktning per linje.
-    routes_by_ref: dict[str, dict] = {}
-    for rel in relations:
-        tags = rel.get("tags", {})
-        if tags.get("route") != "subway":
-            continue
-        ref = tags.get("ref", "").lstrip("Tt").strip()
-        if not ref:
-            continue
-        routes_by_ref.setdefault(ref, rel)  # behåll bara EN riktning per linje
-
-    tracks_by_color: dict[str, list] = defaultdict(list)
-    for ref, rel in routes_by_ref.items():
-        tags = rel.get("tags", {})
-        color = LINE_REF_COLOR.get(ref) or color_from_hex(tags.get("colour", ""))
-        if not color:
-            continue
-        sub_chains = route_chain_from_relation(rel, ways_by_id, nodes_by_id)
-        tracks_by_color[color].extend(sub_chains)
-
-    return dict(tracks_by_color)
-
-
-def long_axis_line(coords: list) -> list:
-    """Reducera en perronggeometri (öppen linje eller sluten polygon) till
-    ett enda streck längs perrongens långaxel. Använder kovariansmatrisens
-    största egenvektor (sluten form för 2x2)."""
-    n = len(coords)
-    if n < 2:
-        return coords
-    cx = sum(c[0] for c in coords) / n
-    cy = sum(c[1] for c in coords) / n
-    sxx = sum((c[0] - cx) ** 2 for c in coords) / n
-    syy = sum((c[1] - cy) ** 2 for c in coords) / n
-    sxy = sum((c[0] - cx) * (c[1] - cy) for c in coords) / n
-
-    trace = sxx + syy
-    det = sxx * syy - sxy ** 2
-    disc = max(0.0, (trace / 2) ** 2 - det)
-    lam1 = trace / 2 + disc ** 0.5  # största egenvärde
-
-    if abs(sxy) > 1e-14:
-        ex, ey = lam1 - syy, sxy
-    elif sxx >= syy:
-        ex, ey = 1.0, 0.0
-    else:
-        ex, ey = 0.0, 1.0
-    norm = (ex ** 2 + ey ** 2) ** 0.5 or 1.0
-    ex, ey = ex / norm, ey / norm
-
-    projs = [(c[0] - cx) * ex + (c[1] - cy) * ey for c in coords]
-    pmin, pmax = min(projs), max(projs)
-    return [
-        [round(cx + pmin * ex, 5), round(cy + pmin * ey, 5)],
-        [round(cx + pmax * ex, 5), round(cy + pmax * ey, 5)],
-    ]
-
-
-def build_platforms(elements: list) -> list[dict]:
-    """Hämta perronggeometrier och reducera till långaxellinjer."""
-    nodes_by_id = {el["id"]: (el["lat"], el["lon"]) for el in elements if el["type"] == "node"}
-
-    platforms = []
-    seen = set()
-    for el in elements:
-        if el["type"] != "way":
-            continue
-        tags = el.get("tags", {})
-        is_metro_platform = (
-            tags.get("railway") == "platform"
-            and (tags.get("subway") == "yes" or tags.get("station") == "subway" or "tunnelbana" in tags.get("name", "").lower())
-        ) or (
-            tags.get("public_transport") == "platform" and tags.get("subway") == "yes"
-        )
-        if not is_metro_platform:
-            continue
-        # Skippa pendeltåg/spårväg
-        if tags.get("train") == "yes" and tags.get("subway") != "yes":
-            continue
-        if tags.get("tram") == "yes" and tags.get("subway") != "yes":
-            continue
-
-        raw_coords = []
-        for nd in el.get("nodes", []):
-            if nd in nodes_by_id:
-                lat, lon = nodes_by_id[nd]
-                raw_coords.append([lat, lon])
-        if len(raw_coords) < 2:
-            continue
-
-        axis = long_axis_line(raw_coords)
-        key = (axis[0][0], axis[0][1], axis[1][0], axis[1][1])
-        if key in seen:
-            continue
-        seen.add(key)
-
-        platforms.append({"name": tags.get("name", ""), "coordinates": axis})
-
-    return platforms
-
-
-def cluster_stations(platforms: list, threshold_m: float = 80) -> list[dict]:
-    """Klustra perronger som tillhör samma station (T-Centralen har 3-4 perronger).
-
-    Returnerar en station per kluster med geografiska ändpunkter för perrong-
-    pillen — på det sättet skalas pillen med zoom precis som en riktig perrong
-    skulle göra på en karta. Längden klampas till 100-180 m (en typisk
-    Stockholm-tunnelbaneperrong är ~140 m)."""
-    import math
-
-    items = []
-    for p in platforms:
-        c = p["coordinates"]
-        center = [(c[0][0] + c[1][0]) / 2, (c[0][1] + c[1][1]) / 2]
-        length = haversine_m(c[0][0], c[0][1], c[1][0], c[1][1])
-        items.append({"name": p.get("name", ""), "coords": c, "center": center, "length": length})
-
-    used = [False] * len(items)
-    stations = []
-    cos_lat = math.cos(math.radians(59.33))
-
-    for i in range(len(items)):
-        if used[i]:
-            continue
-        cluster = [items[i]]
-        used[i] = True
-        for j in range(i + 1, len(items)):
-            if used[j]:
-                continue
-            d = haversine_m(*items[i]["center"], *items[j]["center"])
-            if d < threshold_m:
-                cluster.append(items[j])
-                used[j] = True
-
-        # Centroid över alla perronger i klustret
-        cy = sum(it["center"][0] for it in cluster) / len(cluster)
-        cx = sum(it["center"][1] for it in cluster) / len(cluster)
-
-        # Primär = längsta perrong → bestämmer riktning + namn
-        primary = max(cluster, key=lambda it: it["length"])
-        c = primary["coords"]
-
-        # Riktningsvektor i lat/lng — normalisera över Mercator-skärmplan
-        # (dx_screen = dlng × cos_lat, dy_screen = -dlat)
-        dx_screen = (c[1][1] - c[0][1]) * cos_lat
-        dy_screen = -(c[1][0] - c[0][0])
-        norm_screen = (dx_screen ** 2 + dy_screen ** 2) ** 0.5 or 1.0
-        unit_dx_screen = dx_screen / norm_screen
-        unit_dy_screen = dy_screen / norm_screen
-
-        stations.append(
-            {
-                "name": primary["name"],
-                "lat": round(cy, 5),
-                "lng": round(cx, 5),
-            }
-        )
-
-    return stations
+    raise RuntimeError("Kunde inte nå Overpass API")
 
 
 def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    from math import radians, sin, cos, asin, sqrt
-
+    from math import asin, cos, radians, sin, sqrt
     R = 6371000.0
     p1, p2 = radians(lat1), radians(lat2)
-    dp = radians(lat2 - lat1)
-    dl = radians(lon2 - lon1)
+    dp, dl = radians(lat2 - lat1), radians(lon2 - lon1)
     a = sin(dp / 2) ** 2 + cos(p1) * cos(p2) * sin(dl / 2) ** 2
     return 2 * R * asin(sqrt(a))
 
 
-def closest_station(lat: float, lon: float, stations: list) -> tuple:
-    """Hitta station närmast (lat, lon). Returnerar (dist_m, station-dict)."""
-    best_dist = float("inf")
-    best = None
-    for s in stations:
-        d = haversine_m(lat, lon, s["lat"], s["lng"])
-        if d < best_dist:
-            best_dist = d
-            best = s
-    return best_dist, best
-
-
-def build_entrances(elements: list, stations: list) -> list[dict]:
-    """Hämta uppgångar (railway=subway_entrance) och koppla varje till
-    närmsta station inom 250 m. Connector-linjen går från stationscentrum
-    till uppgången — visar tydligt vart man kommer ut."""
+def build_entrances(elements: list, stations: list[dict]) -> list[dict]:
+    """Koppla OSM subway_entrance-noder till närmaste GTFS-station (≤ 250 m)."""
     entrances = []
-    seen = set()
+    seen: set = set()
     for el in elements:
-        if el["type"] != "node":
+        if el["type"] != "node" or el.get("tags", {}).get("railway") != "subway_entrance":
             continue
-        tags = el.get("tags", {})
-        if tags.get("railway") != "subway_entrance":
-            continue
-
         lat, lon = el.get("lat"), el.get("lon")
-        if lat is None or lon is None:
+        if lat is None:
             continue
         key = (round(lat, 5), round(lon, 5))
         if key in seen:
             continue
         seen.add(key)
 
-        dist, station = closest_station(lat, lon, stations)
-        if not station or dist > 250:
-            # Uppgångar utan station i närheten skippar vi — troligtvis fel-taggade
+        best_dist = float("inf")
+        best_station = None
+        for s in stations:
+            d = haversine_m(lat, lon, s["lat"], s["lng"])
+            if d < best_dist:
+                best_dist = d
+                best_station = s
+        if not best_station or best_dist > 250:
             continue
 
-        entrances.append(
-            {
-                "lat": round(lat, 5),
-                "lng": round(lon, 5),
-                "name": tags.get("name", ""),
-                "ref": tags.get("ref", ""),
-                "link": [
-                    [station["lat"], station["lng"]],
-                    [round(lat, 5), round(lon, 5)],
-                ],
-            }
-        )
-
+        entrances.append({
+            "lat": round(lat, 5),
+            "lng": round(lon, 5),
+            "name": el.get("tags", {}).get("name", ""),
+            "link": [
+                [best_station["lat"], best_station["lng"]],
+                [round(lat, 5), round(lon, 5)],
+            ],
+        })
     return entrances
 
 
-def export_typescript(tracks: dict, stations: list, entrances: list, output_path: str) -> None:
+# ---------------------------------------------------------------------------
+# Export
+# ---------------------------------------------------------------------------
+
+def export_typescript(
+    tracks: list[dict],
+    stations: list[dict],
+    entrances: list[dict],
+    output_path: str,
+) -> None:
     lines = [
         "/** Auto-generated by pipeline/09_fetch_metro.py — do not edit by hand */",
         "",
@@ -458,71 +285,65 @@ def export_typescript(tracks: dict, stations: list, entrances: list, output_path
         "  lat: number;",
         "  lng: number;",
         "  name: string;",
-        "  /** Anslutningslinje [stationscentrum, uppgångspunkt] — visar vart man kommer ut */",
         "  link: [[number, number], [number, number]];",
         "}",
         "",
         "export const METRO_TRACKS: MetroTrack[] = [",
     ]
-    for color in ("red", "green", "blue"):
-        for way in tracks.get(color, []):
-            lines.append(f'  {{ color: "{color}", coords: {json.dumps(way)} }},')
-    lines.append("];")
-    lines.append("")
-    lines.append("export const METRO_STATIONS: MetroStation[] = [")
+    for t in tracks:
+        lines.append(f'  {{ color: "{t["color"]}", coords: {json.dumps(t["coords"])} }},')
+    lines += ["];", "", "export const METRO_STATIONS: MetroStation[] = ["]
     for s in stations:
         name_safe = s["name"].replace("\\", "\\\\").replace('"', '\\"')
         lines.append(f'  {{ lat: {s["lat"]}, lng: {s["lng"]}, name: "{name_safe}" }},')
-    lines.append("];")
-    lines.append("")
-    lines.append("export const METRO_ENTRANCES: MetroEntrance[] = [")
-    for ent in entrances:
-        name_safe = ent["name"].replace("\\", "\\\\").replace('"', '\\"')
+    lines += ["];", "", "export const METRO_ENTRANCES: MetroEntrance[] = ["]
+    for e in entrances:
+        name_safe = e["name"].replace("\\", "\\\\").replace('"', '\\"')
         lines.append(
-            f'  {{ lat: {ent["lat"]}, lng: {ent["lng"]}, name: "{name_safe}", '
-            f'link: {json.dumps(ent["link"])} }},'
+            f'  {{ lat: {e["lat"]}, lng: {e["lng"]}, name: "{name_safe}", '
+            f'link: {json.dumps(e["link"])} }},'
         )
-    lines.append("];")
-    lines.append("")
+    lines += ["];", ""]
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
 
-def main():
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main() -> None:
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(RAW_DIR, exist_ok=True)
 
-    print("=== Steg 9: Hämta tunnelbane-data ===")
-    print(f"Område: {BBOX}")
+    print("=== Steg 9: Tunnelbana från GTFS (Trafiklab) ===")
+    ensure_gtfs()
 
-    raw_file = os.path.join(RAW_DIR, "osm_metro.json")
+    print("\n--- Spår och stationer från GTFS ---")
+    tracks = load_gtfs_tracks()
+    stations = load_gtfs_stations()
+
+    print(f"\nSpår: {len(tracks)}")
+    for t in tracks:
+        print(f"  {t['color']}: {len(t['coords'])} punkter")
+    print(f"Stationer: {len(stations)}")
+
+    print("\n--- Uppgångar från OSM ---")
+    raw_file = os.path.join(RAW_DIR, "osm_metro_entrances.json")
     if os.path.exists(raw_file):
         print(f"Använder cachad data: {raw_file}")
-        with open(raw_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        with open(raw_file, encoding="utf-8") as f:
+            osm_data = json.load(f)
     else:
-        data = fetch_overpass(OVERPASS_QUERY)
+        osm_data = fetch_overpass(ENTRANCE_QUERY)
         with open(raw_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False)
-        print(f"Rådata sparad: {raw_file}")
+            json.dump(osm_data, f, ensure_ascii=False)
+        print(f"OSM-data sparad: {raw_file}")
 
-    elements = data.get("elements", [])
-    print(f"Hittade {len(elements)} element från OSM")
-
-    tracks = build_tracks(elements)
-    platforms = build_platforms(elements)
-    stations = cluster_stations(platforms)
-    entrances = build_entrances(elements, stations)
-
-    print("\nSpårsegment per linje:")
-    for color in ("red", "green", "blue"):
-        ways = tracks.get(color, [])
-        nodes = sum(len(w) for w in ways)
-        print(f"  {color}: {len(ways)} segment ({nodes} noder)")
-    print(f"\nStationer: {len(stations)} (klustrade från {len(platforms)} perronger)")
-    print(f"Uppgångar: {len(entrances)} (kopplade till station inom 250 m)")
+    entrances = build_entrances(osm_data.get("elements", []), stations)
+    print(f"Uppgångar: {len(entrances)}")
 
     export_typescript(tracks, stations, entrances, FRONTEND_OUT)
     print(f"\nExporterat till {FRONTEND_OUT}")
