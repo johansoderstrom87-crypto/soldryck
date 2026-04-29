@@ -101,13 +101,14 @@ def fetch_overpass(query: str, max_retries: int = 3) -> dict:
     raise RuntimeError("Kunde inte nå Overpass API efter alla försök")
 
 
-def way_is_parallel_dup(way: list, others: list, threshold_m: float = 50) -> bool:
-    """True om `way` löper parallellt med någon way i `others` — fångar
-    Stockholms dubbelspårsmappning där nord/syd-spåren är separata OSM-ways.
+def way_is_parallel_dup(way: list, others: list, threshold_m: float = 45) -> bool:
+    """True om `way` är en parallell dubblett av någon way i `others`.
 
-    Använder enbart geometrisk parallellitet (inga endpoint-krav) med 50 m
-    tröskel och 65% sample-träff. Längre ways sorteras in först (sorted på
-    len desc i build_tracks) så den kanoniska representationen behålls."""
+    Skyddar korta ways (< 5 noder) — de är ofta junction-connectorer och
+    station-övergångar som inte ska tas bort, annars uppstår glapp i nätet."""
+    if len(way) < 5:
+        return False  # Connector-segment vid junctions/stationer — bevara alltid
+
     step = max(1, len(way) // 10)
     samples = way[::step]
     if len(samples) < 2:

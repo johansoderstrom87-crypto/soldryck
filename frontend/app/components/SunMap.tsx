@@ -50,6 +50,41 @@ function chaikin(pts: [number, number][], iterations = 2): [number, number][] {
   }
   return cur;
 }
+
+/** Closest point on segment [p1,p2] to (lat,lng). */
+function nearestOnSegment(
+  lat: number, lng: number,
+  [lat1, lng1]: [number, number],
+  [lat2, lng2]: [number, number],
+): [number, number] {
+  const dx = lat2 - lat1, dy = lng2 - lng1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return [lat1, lng1];
+  const t = Math.max(0, Math.min(1, ((lat - lat1) * dx + (lng - lng1) * dy) / lenSq));
+  return [lat1 + t * dx, lng1 + t * dy];
+}
+
+/** Snap (lat,lng) to the nearest point on any track, return position + track color. */
+function snapToTrack(
+  lat: number,
+  lng: number,
+  tracks: { color: "red" | "green" | "blue"; coords: [number, number][] }[],
+): { pos: [number, number]; color: "red" | "green" | "blue" } {
+  let bestDist = Infinity;
+  let bestPos: [number, number] = [lat, lng];
+  let bestColor: "red" | "green" | "blue" = "red";
+  const cosLat = Math.cos((lat * Math.PI) / 180);
+  for (const track of tracks) {
+    const c = track.coords;
+    for (let i = 0; i < c.length - 1; i++) {
+      const pt = nearestOnSegment(lat, lng, c[i], c[i + 1]);
+      const dlat = pt[0] - lat, dlng = (pt[1] - lng) * cosLat;
+      const d2 = dlat * dlat + dlng * dlng;
+      if (d2 < bestDist) { bestDist = d2; bestPos = pt; bestColor = track.color; }
+    }
+  }
+  return { pos: bestPos, color: bestColor };
+}
 try {
   metroNetwork = require("../data/metro-network");
 } catch {
@@ -425,10 +460,27 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     const layer = L.layerGroup();
 
-    // Render order (later = on top): tracks → connectors → station circles → entrance dots.
+    // Render order: connectors (bakgrund) → spår → cirklar ovanpå spår → entrance-prickar
+    // Cirklar renderas EFTER spår så de syns ovanpå linjen.
 
-    // Tracks — Chaikin-smoothade för mjuka bezier-liknande kurvor.
-    // smoothFactor:0 stänger av Leaflets inbyggda förenkling (Chaikin gör jobbet).
+    // Snap varje station till närmaste punkt på närmaste spår (korrekt position + färg)
+    const snapped = metroNetwork.METRO_STATIONS.map((s) =>
+      snapToTrack(s.lat, s.lng, metroNetwork!.METRO_TRACKS)
+    );
+
+    // Dotted connectors — renderas först (längst ner)
+    for (const ent of metroNetwork.METRO_ENTRANCES) {
+      L.polyline(ent.link, {
+        color: "#64748b",
+        weight: 1.5,
+        opacity: 0.5,
+        dashArray: "1 6",
+        lineCap: "round",
+        interactive: false,
+      }).addTo(layer);
+    }
+
+    // Spår — Chaikin-smoothade, smoothFactor:0 för exakta endpoints
     for (const track of metroNetwork.METRO_TRACKS) {
       L.polyline(chaikin(track.coords as [number, number][]), {
         color: lineColors[track.color],
@@ -441,31 +493,20 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       }).addTo(layer);
     }
 
-    // Dotted connectors from station center to entrance
-    for (const ent of metroNetwork.METRO_ENTRANCES) {
-      L.polyline(ent.link, {
-        color: "#64748b",
-        weight: 1.5,
-        opacity: 0.5,
-        dashArray: "1 6",
-        lineCap: "round",
-        interactive: false,
-      }).addTo(layer);
-    }
-
-    // Station circles — vita cirklar med mörk kant, sitter på linjen (som bild 2)
-    for (const station of metroNetwork.METRO_STATIONS) {
-      L.circleMarker([station.lat, station.lng], {
-        radius: 4,
-        color: "#1e293b",
-        weight: 2,
+    // Stationscirklar — vit fyllning, linjens färg som kant, renderade OVANPÅ spåren.
+    // Snappade till exakt spårpositionen (inte perrongcentroiden).
+    for (const { pos, color } of snapped) {
+      L.circleMarker(pos, {
+        radius: 5,
+        color: lineColors[color],
+        weight: 2.5,
         fillColor: "#ffffff",
         fillOpacity: 1,
         interactive: false,
       }).addTo(layer);
     }
 
-    // Entrance dots
+    // Entrance-prickar
     for (const ent of metroNetwork.METRO_ENTRANCES) {
       const titleAttr = ent.name ? ` title="${ent.name.replace(/"/g, "&quot;")}"` : "";
       const entranceIcon = L.divIcon({
