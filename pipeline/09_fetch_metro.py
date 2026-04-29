@@ -101,37 +101,25 @@ def fetch_overpass(query: str, max_retries: int = 3) -> dict:
     raise RuntimeError("Kunde inte nå Overpass API efter alla försök")
 
 
-def way_is_parallel_dup(way: list, others: list, threshold_m: float = 35) -> bool:
-    """True om `way` är en parallell dubblett av någon way i `others`.
-    Använder båda: (1) sample-baserad parallell-check, (2) endpoint-likhet
-    för att inte felaktigt fånga korta grenar som divergerar från trunken."""
-    step = max(1, len(way) // 8)
+def way_is_parallel_dup(way: list, others: list, threshold_m: float = 50) -> bool:
+    """True om `way` löper parallellt med någon way i `others` — fångar
+    Stockholms dubbelspårsmappning där nord/syd-spåren är separata OSM-ways.
+
+    Använder enbart geometrisk parallellitet (inga endpoint-krav) med 50 m
+    tröskel och 65% sample-träff. Längre ways sorteras in först (sorted på
+    len desc i build_tracks) så den kanoniska representationen behålls."""
+    step = max(1, len(way) // 10)
     samples = way[::step]
     if len(samples) < 2:
         return False
 
     for other in others:
-        # Räkna sampelpunkter som ligger nära other-polylinen
         hits = sum(
             1
             for pt in samples
             if min(haversine_m(pt[0], pt[1], p[0], p[1]) for p in other) < threshold_m
         )
-        if hits < max(2, len(samples) * 0.7):
-            continue
-
-        # Endpoint-test: way:s båda ändar måste ligga någorlunda nära other
-        # (samma riktning eller omvänd). Skyddar grenar som börjar på trunken
-        # men leder bort.
-        a0, a1 = way[0], way[-1]
-        b0, b1 = other[0], other[-1]
-        same = max(haversine_m(*a0, *b0), haversine_m(*a1, *b1))
-        rev = max(haversine_m(*a0, *b1), haversine_m(*a1, *b0))
-        if min(same, rev) < 80:
-            return True
-        # Eller: om way är klart kortare än other och alla samplade punkter
-        # ligger nära other ⇒ way är ett delsegment av other
-        if len(way) * 1.5 <= len(other) and hits == len(samples):
+        if hits >= max(2, len(samples) * 0.65):
             return True
 
     return False
@@ -334,26 +322,11 @@ def cluster_stations(platforms: list, threshold_m: float = 80) -> list[dict]:
         unit_dx_screen = dx_screen / norm_screen
         unit_dy_screen = dy_screen / norm_screen
 
-        # Klamp längd till 100-180 m (typisk Stockholm-tunnelbaneperrong är ~140 m)
-        len_m = max(100, min(180, primary["length"]))
-        half_m = len_m / 2
-
-        # Ändpunkter: centroiden ± half_m i screen-riktningen, konverterat tillbaka
-        # till lat/lng. 1 m ≈ 1/111 000 grader latitud, 1/(111 000 × cos_lat) longitud.
-        dlat = -unit_dy_screen * half_m / 111_000
-        dlng = unit_dx_screen * half_m / (111_000 * cos_lat)
-
-        endpoints = [
-            [round(cy - dlat, 5), round(cx - dlng, 5)],
-            [round(cy + dlat, 5), round(cx + dlng, 5)],
-        ]
-
         stations.append(
             {
                 "name": primary["name"],
                 "lat": round(cy, 5),
                 "lng": round(cx, 5),
-                "endpoints": endpoints,
             }
         )
 
@@ -440,9 +413,6 @@ def export_typescript(tracks: dict, stations: list, entrances: list, output_path
         "  lat: number;",
         "  lng: number;",
         "  name: string;",
-        "  /** Geografiska ändpunkter på perrongen — renderas som polyline så",
-        "   *  pillen skalas med zoom precis som en riktig perrong skulle göra */",
-        "  endpoints: [[number, number], [number, number]];",
         "}",
         "",
         "export interface MetroEntrance {",
@@ -463,10 +433,7 @@ def export_typescript(tracks: dict, stations: list, entrances: list, output_path
     lines.append("export const METRO_STATIONS: MetroStation[] = [")
     for s in stations:
         name_safe = s["name"].replace("\\", "\\\\").replace('"', '\\"')
-        lines.append(
-            f'  {{ lat: {s["lat"]}, lng: {s["lng"]}, name: "{name_safe}", '
-            f'endpoints: {json.dumps(s["endpoints"])} }},'
-        )
+        lines.append(f'  {{ lat: {s["lat"]}, lng: {s["lng"]}, name: "{name_safe}" }},')
     lines.append("];")
     lines.append("")
     lines.append("export const METRO_ENTRANCES: MetroEntrance[] = [")
