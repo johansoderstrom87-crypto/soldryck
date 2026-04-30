@@ -64,36 +64,13 @@ function nearestOnSegment(
   return [lat1 + t * dx, lng1 + t * dy];
 }
 
-/** PCA on a window of nearby track points to find the best-fit line direction.
- *  Same algorithm as the Python pipeline's long_axis_line(). Handles curves
- *  at junctions correctly — gives the dominant direction, not a noisy single segment. */
-function pcaDirection(pts: [number, number][], cosLat: number): [number, number] {
-  const n = pts.length;
-  if (n < 2) return [1, 0];
-  // Work in screen-space: x = lng * cosLat (east), y = lat (north)
-  const mx = pts.reduce((s, p) => s + p[1] * cosLat, 0) / n;
-  const my = pts.reduce((s, p) => s + p[0], 0) / n;
-  let sxx = 0, syy = 0, sxy = 0;
-  for (const [plat, plng] of pts) {
-    const x = plng * cosLat - mx, y = plat - my;
-    sxx += x * x; syy += y * y; sxy += x * y;
-  }
-  sxx /= n; syy /= n; sxy /= n;
-  // Largest eigenvector (closed-form 2×2 covariance)
-  const tr = sxx + syy;
-  const disc = Math.max(0, (tr / 2) ** 2 - (sxx * syy - sxy * sxy));
-  const lam1 = tr / 2 + Math.sqrt(disc);
-  const ex = Math.abs(sxy) > 1e-14 ? lam1 - syy : (sxx >= syy ? 1 : 0);
-  const ey = Math.abs(sxy) > 1e-14 ? sxy               : (sxx >= syy ? 0 : 1);
-  // Convert screen eigenvector → geographic direction for offsetAlongDir
-  const geoLat = ey;
-  const geoLng = ex / cosLat;
-  const norm = Math.hypot(geoLat, geoLng * cosLat) || 1;
-  return [geoLat / norm, geoLng / norm];
-}
-
-/** Snap (lat,lng) to nearest track point. Returns position, color, and a PCA-derived direction
- *  from ±50 nearby track indices — best-fit line regardless of local curvature. */
+/**
+ * Snap (lat,lng) to the nearest point on any track.
+ *
+ * Pass PRE-SMOOTHED tracks (Chaikin ×3) — segments are then ~1-2 m long so the
+ * direction of the single nearest segment IS the tangent of the smooth curve at
+ * that point. No averaging, no PCA, no window needed.
+ */
 function snapToTrack(
   lat: number,
   lng: number,
@@ -102,8 +79,7 @@ function snapToTrack(
   let bestDist = Infinity;
   let bestPos: [number, number] = [lat, lng];
   let bestColor: "red" | "green" | "blue" = "red";
-  let bestSegIdx = 0;
-  let bestCoords: [number, number][] = [];
+  let bestDir: [number, number] = [1, 0];
   const cosLat = Math.cos((lat * Math.PI) / 180);
 
   for (const track of tracks) {
@@ -113,19 +89,18 @@ function snapToTrack(
       const dlat = pt[0] - lat, dlng = (pt[1] - lng) * cosLat;
       const d2 = dlat * dlat + dlng * dlng;
       if (d2 < bestDist) {
-        bestDist = d2; bestPos = pt; bestColor = track.color;
-        bestSegIdx = i; bestCoords = c;
+        bestDist = d2;
+        bestPos = pt;
+        bestColor = track.color;
+        // Single-segment direction — on a smooth track this IS the local tangent
+        const sdLat = c[i + 1][0] - c[i][0];
+        const sdLng = c[i + 1][1] - c[i][1];
+        const norm = Math.hypot(sdLat, sdLng * cosLat) || 1;
+        bestDir = [sdLat / norm, sdLng / norm];
       }
     }
   }
-
-  // PCA on ±50 nearest indices — dominant direction of track near station
-  const WIN = 50;
-  const c = bestCoords;
-  const pts = c.slice(Math.max(0, bestSegIdx - WIN), Math.min(c.length, bestSegIdx + WIN + 1));
-  const dir = pcaDirection(pts, cosLat);
-
-  return { pos: bestPos, color: bestColor, dir };
+  return { pos: bestPos, color: bestColor, dir: bestDir };
 }
 
 /** Offset a map position by dist_m along a normalized direction vector. */
@@ -447,6 +422,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const metroMarkersRef = useRef<L.Marker[]>([]);
   const metroNetworkRef = useRef<L.LayerGroup | null>(null);
   const metroDetailRef = useRef<L.LayerGroup | null>(null);
+  // Chaikin-smoothed tracks — computed once, shared between render and snapToTrack
+  const smoothedTracksRef = useRef<{ color: "red" | "green" | "blue"; coords: [number, number][] }[]>([]);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
@@ -514,14 +491,22 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       blue: "#0065bd",
     };
 
+    // Beräkna Chaikin-utjämnade spår EN GÅNG — används för rendering OCH snapToTrack.
+    // Med ~8× fler punkter (3 iterationer) är varje segment ~1-2 m: enstaka segment-
+    // riktning = exakt lokal tangent → plattform alignar automatiskt med det renderade spåret.
+    const smoothed = metroNetwork.METRO_TRACKS.map((t) => ({
+      color: t.color,
+      coords: chaikin(t.coords as [number, number][], 3),
+    }));
+    smoothedTracksRef.current = smoothed;
+
     const layer = L.layerGroup();
 
-    // Render order: connectors (bakgrund) → spår → cirklar ovanpå spår → entrance-prickar
-    // Cirklar renderas EFTER spår så de syns ovanpå linjen.
+    // Render order: connectors → spår → cirklar ovanpå spår → entrance-prickar
 
-    // Snap varje station till närmaste punkt på närmaste spår (korrekt position + färg)
+    // Snap stationer mot smoothed tracks (samma geometri som renderas)
     const snapped = metroNetwork.METRO_STATIONS.map((s) =>
-      snapToTrack(s.lat, s.lng, metroNetwork!.METRO_TRACKS)
+      snapToTrack(s.lat, s.lng, smoothedTracksRef.current)
     );
 
     // Dotted connectors — renderas först (längst ner)
@@ -536,21 +521,20 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       }).addTo(layer);
     }
 
-    // Spår — Chaikin-smoothade (3 iterationer för extra mjuka kurvor)
-    for (const track of metroNetwork.METRO_TRACKS) {
-      L.polyline(chaikin(track.coords as [number, number][]), {
+    // Spår — redan Chaikin-utjämnade, smoothFactor:0 för exakta punkter
+    for (const track of smoothed) {
+      L.polyline(track.coords, {
         color: lineColors[track.color],
         weight: 4,
         opacity: 0.85,
         lineCap: "round",
         lineJoin: "round",
-        smoothFactor: 0.5,
+        smoothFactor: 0,
         interactive: false,
       }).addTo(layer);
     }
 
-    // Stationscirklar — vit fyllning, linjens färg som kant, renderade OVANPÅ spåren.
-    // Snappade till exakt spårpositionen (inte perrongcentroiden).
+    // Stationscirklar — vit fyllning, linjens färg som kant, ovanpå spåren.
     for (const { pos, color } of snapped) {
       L.circleMarker(pos, {
         radius: 5,
@@ -601,9 +585,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       entrancesByStation.get(key)!.push(ent);
     }
 
-    // Pre-compute snap+dir for every station once
+    // Pre-compute snap+dir using the SAME smoothed tracks as rendering.
+    // Computed once here (not inside buildDetailLayer) so it doesn't re-run on every zoom.
     const stationSnaps = metroNetwork.METRO_STATIONS.map((s) =>
-      ({ station: s, ...snapToTrack(s.lat, s.lng, metroNetwork!.METRO_TRACKS) })
+      ({ station: s, ...snapToTrack(s.lat, s.lng, smoothedTracksRef.current) })
     );
 
     function buildDetailLayer(zoom: number) {
