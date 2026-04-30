@@ -673,48 +673,66 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         const p1 = offsetAlongDir(pos, dir, -HALF_M);
         const p2 = offsetAlongDir(pos, dir, HALF_M);
 
-        // Render the track section through the platform as a STRAIGHT line
-        // (overrides any Chaikin micro-curves so platform and line are perfectly aligned)
+        // Rakt spårsegment GENOM stationen (överskriver Chaikin-kurvan precis här)
         L.polyline([p1, p2], { color: lc, weight: 4, opacity: 0.85, lineCap: "butt", smoothFactor: 0, interactive: false }).addTo(detail);
 
-        // Platform on top: colored outer + white inner (wider than the track)
-        L.polyline([p1, p2], { color: lc, weight: 10, lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
-        L.polyline([p1, p2], { color: "#ffffff", weight: 7, lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
+        // Platform: subtil skugga → färgad ytterkant → vit inre
+        // Bredare än spårlinjen (4px) → tydlig perrong-form
+        L.polyline([p1, p2], { color: "#0f172a", weight: 16, opacity: 0.12, lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
+        L.polyline([p1, p2], { color: lc,      weight: 13, lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
+        L.polyline([p1, p2], { color: "#ffffff", weight: 9,  lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
 
-        // Station name centered on platform
+        // Stationsnamn centrerat på plattformen
         if (showNames) {
           const nameIcon = L.divIcon({
             className: "metro-platform-label",
             html: `<div class="metro-platform-name" style="--lc:${lc}">${station.name}</div>`,
-            iconSize: [180, 18],
-            iconAnchor: [90, 9],
+            iconSize: [200, 18],
+            iconAnchor: [100, 9],
           });
           L.marker(pos, { icon: nameIcon, interactive: false }).addTo(detail);
         }
 
-        // Entrance connectors + T markers
+        // EN central T-ikon per station (inte en per uppgång)
+        if (showNames) {
+          const tIcon = L.divIcon({
+            className: "metro-t-wrap",
+            html: `<div class="metro-t-circle" style="background:${lc}">T</div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10],
+          });
+          L.marker(pos, { icon: tIcon, interactive: false }).addTo(detail);
+        }
+
+        // Uppgångar: diskreta prickar + tunn grå connector från plattformskant.
+        // Bara exit-namn om det skiljer sig från stationsnamnet (undviker upprepning).
         const key = `${station.lat},${station.lng}`;
         const entrances = entrancesByStation.get(key) ?? [];
         for (const ent of entrances) {
-          // Nearest point on platform line to this entrance
           const nearPt = nearestOnSegment(ent.lat, ent.lng, p1, p2);
+
+          // Tunn grå streckad connector
           L.polyline([nearPt, [ent.lat, ent.lng]], {
-            color: lc, weight: 1.5, opacity: 0.7,
-            dashArray: "4 4", lineCap: "round", interactive: false,
+            color: "#94a3b8", weight: 1, opacity: 0.6,
+            dashArray: "3 5", lineCap: "round", interactive: false,
           }).addTo(detail);
 
-          if (showNames && ent.name) {
-            const tIcon = L.divIcon({
-              className: "metro-t-wrap",
-              html: `<div class="metro-t-circle" style="background:${lc}">T</div><span class="metro-t-name">${ent.name}</span>`,
-              iconSize: [24, 24],
-              iconAnchor: [12, 12],
+          // Liten uppgångsprick i linjens färg
+          L.circleMarker([ent.lat, ent.lng], {
+            radius: 3, color: lc, weight: 1.5,
+            fillColor: "#ffffff", fillOpacity: 1, interactive: false,
+          }).addTo(detail);
+
+          // Namn-label bara om det är ett unikt gatunamn (inte stationsnamnet)
+          const entNameClean = ent.name.toLowerCase().trim();
+          const stationNameClean = station.name.toLowerCase().trim();
+          if (showNames && ent.name && !entNameClean.startsWith(stationNameClean)) {
+            const exitLabel = L.divIcon({
+              className: "metro-exit-label",
+              html: `<span class="metro-exit-name">${ent.name}</span>`,
+              iconAnchor: [-5, 9],
             });
-            L.marker([ent.lat, ent.lng], { icon: tIcon, interactive: false }).addTo(detail);
-          } else {
-            L.circleMarker([ent.lat, ent.lng], {
-              radius: 3, color: lc, fillColor: lc, fillOpacity: 0.9, weight: 1, interactive: false,
-            }).addTo(detail);
+            L.marker([ent.lat, ent.lng], { icon: exitLabel, interactive: false }).addTo(detail);
           }
         }
       }

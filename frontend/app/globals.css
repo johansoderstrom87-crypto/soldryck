@@ -309,6 +309,27 @@ body {
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
 }
 
+/* Small street-name label at exit dots */
+.metro-exit-label {
+  background: none !important;
+  border: none !important;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: visible !important;
+}
+.metro-exit-name {
+  font-size: 8.5px;
+  font-weight: 600;
+  color: #334155;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
+}
+
 /* Subway entrance markers — small dark slate dot at the exit location */
 .metro-entrance {
   background: none !important;

@@ -161,26 +161,32 @@ def load_gtfs_stations() -> list[dict]:
         for row in csv.DictReader(io.TextIOWrapper(z.open("stops.txt"), encoding="utf-8-sig")):
             all_stops[row["stop_id"]] = row
 
-        # Filtrera metro-stops och deduplicera på namn (ta centroiden)
+        # Filtrera metro-stops och deduplicera.
+        # Normalisera namn: ta bara delen FÖRE semikolon (t.ex. "Stadshagen;Idrottsplatsen" → "Stadshagen")
+        # och strippa whitespace. Stops inom 100 m med samma normaliserade namn slås ihop.
+        def norm_name(n: str) -> str:
+            return n.split(";")[0].strip()
+
+        # Kluster: {normalized_name: [(lat, lng), ...]}
         name_groups: dict[str, list] = defaultdict(list)
         for sid in metro_stop_ids:
             stop = all_stops.get(sid)
             if not stop:
                 continue
-            name = stop.get("stop_name", "").strip()
-            if not name:
+            raw_name = stop.get("stop_name", "").strip()
+            if not raw_name:
                 continue
             lat = float(stop.get("stop_lat", 0))
             lng = float(stop.get("stop_lon", 0))
             if lat and lng:
-                name_groups[name].append((lat, lng))
+                name_groups[norm_name(raw_name)].append((lat, lng))
 
         stations = []
-        for name, coords in sorted(name_groups.items()):
+        for canonical_name, coords in sorted(name_groups.items()):
             avg_lat = sum(c[0] for c in coords) / len(coords)
             avg_lng = sum(c[1] for c in coords) / len(coords)
             stations.append({
-                "name": name,
+                "name": canonical_name,
                 "lat": round(avg_lat, 5),
                 "lng": round(avg_lng, 5),
             })
