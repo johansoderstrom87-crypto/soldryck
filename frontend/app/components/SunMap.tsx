@@ -104,50 +104,97 @@ function snapToTrack(
   return { pos: bestPos, color: bestColor, dir: bestDir, trackIdx: bestTrackIdx, segIdx: bestSegIdx };
 }
 
-/** Find the index in coords (smoothed track) closest to target, searching near hint. */
-function closestIdxNear(
-  target: [number, number],
+/** Walk along a track by exactly distM meters from fromIdx.
+ *  Returns the index reached — follows the track curve, no geometric shortcuts. */
+function walkTrack(
   coords: [number, number][],
-  hint: number,
-  radius = 1200,
+  fromIdx: number,
+  distM: number,
+  forward: boolean,
+  cosLat: number,
 ): number {
-  const lo = Math.max(0, hint - radius), hi = Math.min(coords.length - 1, hint + radius);
-  let bestD = Infinity, bestIdx = hint;
-  for (let i = lo; i <= hi; i++) {
-    const d = (coords[i][0] - target[0]) ** 2 + (coords[i][1] - target[1]) ** 2;
-    if (d < bestD) { bestD = d; bestIdx = i; }
+  let dist = 0;
+  let i = fromIdx;
+  const step = forward ? 1 : -1;
+  while (i + step >= 0 && i + step < coords.length && dist < distM) {
+    const a = coords[i], b = coords[i + step];
+    dist += Math.hypot((b[0] - a[0]) * 111_000, (b[1] - a[1]) * 111_000 * cosLat);
+    i += step;
   }
-  return bestIdx;
+  return i;
+}
+
+/** Approximate distance (m) from a point to any coord on the track (sampled). */
+function approxDistToTrack(
+  lat: number, lng: number,
+  coords: [number, number][],
+  cosLat: number,
+): number {
+  let best = Infinity;
+  const step = Math.max(1, Math.floor(coords.length / 120));
+  for (let i = 0; i < coords.length; i += step) {
+    const d = Math.hypot((coords[i][0] - lat) * 111_000, (coords[i][1] - lng) * 111_000 * cosLat);
+    if (d < best) best = d;
+  }
+  return best;
 }
 
 /** Replace the track section through each station with a perfectly straight segment.
- *  Curves happen only BETWEEN stations — line enters/exits each platform at its ends. */
+ *
+ *  This function finds each station's position on THESE specific coords (not on a
+ *  different track), then walks exactly halfM meters along the track in each direction
+ *  to compute the clip points. No geometric search → no wrong clips near curves. */
 function platformizeTrack(
   coords: [number, number][],
-  stations: { pos: [number, number]; dir: [number, number]; segIdx: number }[],
+  stations: { pos: [number, number]; dir: [number, number] }[],
   halfM: number,
 ): [number, number][] {
-  if (stations.length === 0) return coords;
-  const sorted = [...stations].sort((a, b) => a.segIdx - b.segIdx);
+  if (stations.length === 0 || coords.length < 4) return coords;
+
+  const midLat = coords[Math.floor(coords.length / 2)][0];
+  const cosLat = Math.cos((midLat * Math.PI) / 180);
+
+  // For each station find its LOCAL index on these coords (two-pass: coarse then fine)
+  const located = stations.map((s) => {
+    const step = Math.max(1, Math.floor(coords.length / 200));
+    let bestD = Infinity, bestIdx = 0;
+    for (let i = 0; i < coords.length; i += step) {
+      const d = (coords[i][0] - s.pos[0]) ** 2 + ((coords[i][1] - s.pos[1]) * cosLat) ** 2;
+      if (d < bestD) { bestD = d; bestIdx = i; }
+    }
+    const lo = Math.max(0, bestIdx - step), hi = Math.min(coords.length - 1, bestIdx + step);
+    for (let i = lo; i <= hi; i++) {
+      const d = (coords[i][0] - s.pos[0]) ** 2 + ((coords[i][1] - s.pos[1]) * cosLat) ** 2;
+      if (d < bestD) { bestD = d; bestIdx = i; }
+    }
+    return { pos: s.pos, dir: s.dir, localIdx: bestIdx };
+  }).sort((a, b) => a.localIdx - b.localIdx);
+
   const result: [number, number][] = [];
   let i = 0;
 
-  for (const s of sorted) {
+  for (const s of located) {
+    // Walk halfM meters along the track in each direction from the station center
+    const ia = walkTrack(coords, s.localIdx, halfM, false, cosLat); // backward
+    const ib = walkTrack(coords, s.localIdx, halfM, true,  cosLat); // forward
+
+    const fromIdx = Math.min(ia, ib);
+    const toIdx   = Math.max(ia, ib);
+
+    if (fromIdx <= i) continue; // already past this station
+    if (toIdx <= fromIdx) continue;
+
+    // Copy track up to the start of the platform section
+    for (let j = i; j < fromIdx; j++) result.push(coords[j]);
+
+    // Insert perfectly straight segment using the neighbor-direction endpoints
     const pa = offsetAlongDir(s.pos, s.dir, -halfM);
-    const pb = offsetAlongDir(s.pos, s.dir, halfM);
-    let ia = closestIdxNear(pa, coords, s.segIdx);
-    let ib = closestIdxNear(pb, coords, s.segIdx);
-    if (ia > ib) { [ia, ib] = [ib, ia]; } // ensure ascending order
+    const pb = offsetAlongDir(s.pos, s.dir,  halfM);
+    // Orient so the lower-index end comes first (matches track flow)
+    if (ia <= ib) { result.push(pa); result.push(pb); }
+    else          { result.push(pb); result.push(pa); }
 
-    if (ia <= i) { ia = i; } // don't back up
-    if (ia >= ib) continue;
-
-    // Copy track up to start of platform
-    for (let j = i; j < ia; j++) result.push(coords[j]);
-    // Insert perfectly straight platform segment
-    result.push(pa[0] < pb[0] || (pa[0] === pb[0] && pa[1] < pb[1]) ? pa : pb);
-    result.push(pa[0] < pb[0] || (pa[0] === pb[0] && pa[1] < pb[1]) ? pb : pa);
-    i = ib + 1;
+    i = toIdx + 1;
   }
   for (let j = i; j < coords.length; j++) result.push(coords[j]);
   return result;
@@ -580,12 +627,21 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     const allSnaps = Array.from(byTrack.values()).flat();
     stationSnapsRef.current = allSnaps;
 
-    // 4. Bygg "plattformiserade" spår: rak linje GENOM varje station, kurvor MELLAN
-    const platformized = smoothed.map((track, ti) => {
-      const stationsOnTrack = (byTrack.get(ti) ?? []).map((s) => ({
-        pos: s.pos, dir: s.dir, segIdx: s.segIdx,
-      }));
-      return { color: track.color, coords: platformizeTrack(track.coords, stationsOnTrack, HALF_M) };
+    // 4. Bygg "plattformiserade" spår: rak linje GENOM varje station, kurvor MELLAN.
+    //    Inkludera ALLA stationer med samma färg som ligger inom 150m av spåret —
+    //    inte bara de som snappade till just detta spår. Det innebär att t.ex. Mariatorget
+    //    klipps korrekt på båda T13 och T14, utan att överbara stationer på andra grenar stör.
+    const platformized = smoothed.map((track) => {
+      const midLat = track.coords[Math.floor(track.coords.length / 2)][0];
+      const cosLat = Math.cos((midLat * Math.PI) / 180);
+      const DIST_THRESHOLD = 150; // meter
+
+      const stationsForThisTrack = allSnaps
+        .filter((s) => s.color === track.color &&
+          approxDistToTrack(s.pos[0], s.pos[1], track.coords, cosLat) < DIST_THRESHOLD)
+        .map((s) => ({ pos: s.pos, dir: s.dir }));
+
+      return { color: track.color, coords: platformizeTrack(track.coords, stationsForThisTrack, HALF_M) };
     });
 
     const layer = L.layerGroup();
