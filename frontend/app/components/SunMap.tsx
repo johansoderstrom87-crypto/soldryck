@@ -104,26 +104,6 @@ function snapToTrack(
   return { pos: bestPos, color: bestColor, dir: bestDir, trackIdx: bestTrackIdx, segIdx: bestSegIdx };
 }
 
-/** Walk along a track by exactly distM meters from fromIdx.
- *  Returns the index reached — follows the track curve, no geometric shortcuts. */
-function walkTrack(
-  coords: [number, number][],
-  fromIdx: number,
-  distM: number,
-  forward: boolean,
-  cosLat: number,
-): number {
-  let dist = 0;
-  let i = fromIdx;
-  const step = forward ? 1 : -1;
-  while (i + step >= 0 && i + step < coords.length && dist < distM) {
-    const a = coords[i], b = coords[i + step];
-    dist += Math.hypot((b[0] - a[0]) * 111_000, (b[1] - a[1]) * 111_000 * cosLat);
-    i += step;
-  }
-  return i;
-}
-
 /** Approximate distance (m) from a point to any coord on the track (sampled). */
 function approxDistToTrack(
   lat: number, lng: number,
@@ -139,64 +119,91 @@ function approxDistToTrack(
   return best;
 }
 
-/** Replace the track section through each station with a perfectly straight segment.
+/**
+ * "The Clean Cut" — raderar ALLA spårpunkter inom DEAD_M meter av varje station
+ * och injicerar exakt [P_start, P_end] i deras ställe.
  *
- *  This function finds each station's position on THESE specific coords (not on a
- *  different track), then walks exactly halfM meters along the track in each direction
- *  to compute the clip points. No geometric search → no wrong clips near curves. */
+ * Inga gamla punkter lämnas kvar inuti perrongområdet → inga loopar eller trianglar.
+ * Chaikin-kurvan appliceras bara MELLAN stationerna, aldrig PÅ perrong-segmentet.
+ */
 function platformizeTrack(
-  coords: [number, number][],
+  rawCoords: [number, number][],
   stations: { pos: [number, number]; dir: [number, number] }[],
   halfM: number,
 ): [number, number][] {
-  if (stations.length === 0 || coords.length < 4) return coords;
+  if (stations.length === 0 || rawCoords.length < 4) return rawCoords;
 
-  const midLat = coords[Math.floor(coords.length / 2)][0];
+  const midLat = rawCoords[Math.floor(rawCoords.length / 2)][0];
   const cosLat = Math.cos((midLat * Math.PI) / 180);
 
-  // For each station find its LOCAL index on these coords (two-pass: coarse then fine)
-  const located = stations.map((s) => {
-    const step = Math.max(1, Math.floor(coords.length / 200));
-    let bestD = Infinity, bestIdx = 0;
-    for (let i = 0; i < coords.length; i += step) {
-      const d = (coords[i][0] - s.pos[0]) ** 2 + ((coords[i][1] - s.pos[1]) * cosLat) ** 2;
-      if (d < bestD) { bestD = d; bestIdx = i; }
+  // Dead zone = 100m runt stationscentrum — alla punkter häri raderas
+  const DEAD_M = 100;
+  const deadThresh = (DEAD_M / 111_000) ** 2; // squared lat-degree equiv.
+
+  // keep[i] = 1 → behåll punkten; 0 → radera den
+  const keep = new Uint8Array(rawCoords.length).fill(1);
+
+  // För varje station: hitta centerIdx, markera dead zone, spara insert-info
+  type Ins = { insertAt: number; pa: [number, number]; pb: [number, number] };
+  const inserts: Ins[] = [];
+
+  for (const s of stations) {
+    // Grov sökning → förfina
+    const step = Math.max(1, Math.floor(rawCoords.length / 200));
+    let bestD = Infinity, centerIdx = 0;
+    for (let i = 0; i < rawCoords.length; i += step) {
+      const dlat = rawCoords[i][0] - s.pos[0], dlng = (rawCoords[i][1] - s.pos[1]) * cosLat;
+      const d = dlat * dlat + dlng * dlng;
+      if (d < bestD) { bestD = d; centerIdx = i; }
     }
-    const lo = Math.max(0, bestIdx - step), hi = Math.min(coords.length - 1, bestIdx + step);
-    for (let i = lo; i <= hi; i++) {
-      const d = (coords[i][0] - s.pos[0]) ** 2 + ((coords[i][1] - s.pos[1]) * cosLat) ** 2;
-      if (d < bestD) { bestD = d; bestIdx = i; }
+    const rlo = Math.max(0, centerIdx - step), rhi = Math.min(rawCoords.length - 1, centerIdx + step);
+    for (let i = rlo; i <= rhi; i++) {
+      const dlat = rawCoords[i][0] - s.pos[0], dlng = (rawCoords[i][1] - s.pos[1]) * cosLat;
+      const d = dlat * dlat + dlng * dlng;
+      if (d < bestD) { bestD = d; centerIdx = i; }
     }
-    return { pos: s.pos, dir: s.dir, localIdx: bestIdx };
-  }).sort((a, b) => a.localIdx - b.localIdx);
 
-  const result: [number, number][] = [];
-  let i = 0;
+    // Radera alla punkter inom DEAD_M; spara index för första raderade punkten
+    const searchR = Math.ceil(DEAD_M / 1.5) + 20; // räcker väl för 100m / ~1.5m per segment
+    let firstDelIdx = rawCoords.length;
+    const slo = Math.max(0, centerIdx - searchR), shi = Math.min(rawCoords.length - 1, centerIdx + searchR);
+    for (let i = slo; i <= shi; i++) {
+      const dlat = rawCoords[i][0] - s.pos[0], dlng = (rawCoords[i][1] - s.pos[1]) * cosLat;
+      if (dlat * dlat + dlng * dlng <= deadThresh) {
+        keep[i] = 0;
+        if (i < firstDelIdx) firstDelIdx = i;
+      }
+    }
 
-  for (const s of located) {
-    // Walk halfM meters along the track in each direction from the station center
-    const ia = walkTrack(coords, s.localIdx, halfM, false, cosLat); // backward
-    const ib = walkTrack(coords, s.localIdx, halfM, true,  cosLat); // forward
+    if (firstDelIdx === rawCoords.length) continue; // inget att radera
 
-    const fromIdx = Math.min(ia, ib);
-    const toIdx   = Math.max(ia, ib);
-
-    if (fromIdx <= i) continue; // already past this station
-    if (toIdx <= fromIdx) continue;
-
-    // Copy track up to the start of the platform section
-    for (let j = i; j < fromIdx; j++) result.push(coords[j]);
-
-    // Insert perfectly straight segment using the neighbor-direction endpoints
     const pa = offsetAlongDir(s.pos, s.dir, -halfM);
     const pb = offsetAlongDir(s.pos, s.dir,  halfM);
-    // Orient so the lower-index end comes first (matches track flow)
-    if (ia <= ib) { result.push(pa); result.push(pb); }
-    else          { result.push(pb); result.push(pa); }
-
-    i = toIdx + 1;
+    inserts.push({ insertAt: firstDelIdx, pa, pb });
   }
-  for (let j = i; j < coords.length; j++) result.push(coords[j]);
+
+  inserts.sort((a, b) => a.insertAt - b.insertAt);
+
+  // Bygg resultat-arrayen
+  const result: [number, number][] = [];
+  let insIdx = 0;
+
+  for (let i = 0; i < rawCoords.length; i++) {
+    // Injicera [pa, pb] när vi når rätt position
+    while (insIdx < inserts.length && inserts[insIdx].insertAt === i) {
+      result.push(inserts[insIdx].pa);
+      result.push(inserts[insIdx].pb);
+      insIdx++;
+    }
+    if (keep[i]) result.push(rawCoords[i]);
+  }
+  // Flush eventuella kvarvarande inserts
+  while (insIdx < inserts.length) {
+    result.push(inserts[insIdx].pa);
+    result.push(inserts[insIdx].pb);
+    insIdx++;
+  }
+
   return result;
 }
 
