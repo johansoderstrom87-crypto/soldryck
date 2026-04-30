@@ -64,43 +64,93 @@ function nearestOnSegment(
   return [lat1 + t * dx, lng1 + t * dy];
 }
 
-/**
- * Snap (lat,lng) to the nearest point on any track.
- *
- * Pass PRE-SMOOTHED tracks (Chaikin ×3) — segments are then ~1-2 m long so the
- * direction of the single nearest segment IS the tangent of the smooth curve at
- * that point. No averaging, no PCA, no window needed.
- */
+type SnapResult = {
+  pos: [number, number];
+  color: "red" | "green" | "blue";
+  dir: [number, number];
+  trackIdx: number;
+  segIdx: number;
+};
+
+/** Snap (lat,lng) to nearest point on pre-smoothed tracks. Returns position, color,
+ *  local tangent direction, plus which track and segment index for neighbor computation. */
 function snapToTrack(
   lat: number,
   lng: number,
   tracks: { color: "red" | "green" | "blue"; coords: [number, number][] }[],
-): { pos: [number, number]; color: "red" | "green" | "blue"; dir: [number, number] } {
+): SnapResult {
   let bestDist = Infinity;
   let bestPos: [number, number] = [lat, lng];
   let bestColor: "red" | "green" | "blue" = "red";
   let bestDir: [number, number] = [1, 0];
+  let bestTrackIdx = 0, bestSegIdx = 0;
   const cosLat = Math.cos((lat * Math.PI) / 180);
 
-  for (const track of tracks) {
-    const c = track.coords as [number, number][];
+  for (let ti = 0; ti < tracks.length; ti++) {
+    const c = tracks[ti].coords as [number, number][];
     for (let i = 0; i < c.length - 1; i++) {
       const pt = nearestOnSegment(lat, lng, c[i], c[i + 1]);
       const dlat = pt[0] - lat, dlng = (pt[1] - lng) * cosLat;
       const d2 = dlat * dlat + dlng * dlng;
       if (d2 < bestDist) {
-        bestDist = d2;
-        bestPos = pt;
-        bestColor = track.color;
-        // Single-segment direction — on a smooth track this IS the local tangent
-        const sdLat = c[i + 1][0] - c[i][0];
-        const sdLng = c[i + 1][1] - c[i][1];
+        bestDist = d2; bestPos = pt; bestColor = tracks[ti].color;
+        bestTrackIdx = ti; bestSegIdx = i;
+        const sdLat = c[i + 1][0] - c[i][0], sdLng = c[i + 1][1] - c[i][1];
         const norm = Math.hypot(sdLat, sdLng * cosLat) || 1;
         bestDir = [sdLat / norm, sdLng / norm];
       }
     }
   }
-  return { pos: bestPos, color: bestColor, dir: bestDir };
+  return { pos: bestPos, color: bestColor, dir: bestDir, trackIdx: bestTrackIdx, segIdx: bestSegIdx };
+}
+
+/** Find the index in coords (smoothed track) closest to target, searching near hint. */
+function closestIdxNear(
+  target: [number, number],
+  coords: [number, number][],
+  hint: number,
+  radius = 1200,
+): number {
+  const lo = Math.max(0, hint - radius), hi = Math.min(coords.length - 1, hint + radius);
+  let bestD = Infinity, bestIdx = hint;
+  for (let i = lo; i <= hi; i++) {
+    const d = (coords[i][0] - target[0]) ** 2 + (coords[i][1] - target[1]) ** 2;
+    if (d < bestD) { bestD = d; bestIdx = i; }
+  }
+  return bestIdx;
+}
+
+/** Replace the track section through each station with a perfectly straight segment.
+ *  Curves happen only BETWEEN stations — line enters/exits each platform at its ends. */
+function platformizeTrack(
+  coords: [number, number][],
+  stations: { pos: [number, number]; dir: [number, number]; segIdx: number }[],
+  halfM: number,
+): [number, number][] {
+  if (stations.length === 0) return coords;
+  const sorted = [...stations].sort((a, b) => a.segIdx - b.segIdx);
+  const result: [number, number][] = [];
+  let i = 0;
+
+  for (const s of sorted) {
+    const pa = offsetAlongDir(s.pos, s.dir, -halfM);
+    const pb = offsetAlongDir(s.pos, s.dir, halfM);
+    let ia = closestIdxNear(pa, coords, s.segIdx);
+    let ib = closestIdxNear(pb, coords, s.segIdx);
+    if (ia > ib) { [ia, ib] = [ib, ia]; } // ensure ascending order
+
+    if (ia <= i) { ia = i; } // don't back up
+    if (ia >= ib) continue;
+
+    // Copy track up to start of platform
+    for (let j = i; j < ia; j++) result.push(coords[j]);
+    // Insert perfectly straight platform segment
+    result.push(pa[0] < pb[0] || (pa[0] === pb[0] && pa[1] < pb[1]) ? pa : pb);
+    result.push(pa[0] < pb[0] || (pa[0] === pb[0] && pa[1] < pb[1]) ? pb : pa);
+    i = ib + 1;
+  }
+  for (let j = i; j < coords.length; j++) result.push(coords[j]);
+  return result;
 }
 
 /** Offset a map position by dist_m along a normalized direction vector. */
@@ -424,6 +474,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const metroDetailRef = useRef<L.LayerGroup | null>(null);
   // Chaikin-smoothed tracks — computed once, shared between render and snapToTrack
   const smoothedTracksRef = useRef<{ color: "red" | "green" | "blue"; coords: [number, number][] }[]>([]);
+  // Station snaps with neighbor-corrected directions — shared between main + detail layer
+  const stationSnapsRef = useRef<(SnapResult & { station: { lat: number; lng: number; name: string } })[]>([]);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
@@ -490,59 +542,75 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       green: "#00a14e",
       blue: "#0065bd",
     };
+    const HALF_M = 65; // 130m platform
 
-    // Beräkna Chaikin-utjämnade spår EN GÅNG — används för rendering OCH snapToTrack.
-    // Med ~8× fler punkter (3 iterationer) är varje segment ~1-2 m: enstaka segment-
-    // riktning = exakt lokal tangent → plattform alignar automatiskt med det renderade spåret.
+    // 1. Förutberäkna Chaikin-utjämnade spår (en gång, ~1-2m per segment)
     const smoothed = metroNetwork.METRO_TRACKS.map((t) => ({
       color: t.color,
       coords: chaikin(t.coords as [number, number][], 3),
     }));
     smoothedTracksRef.current = smoothed;
 
+    // 2. Snap alla stationer mot de utjämnade spåren (ger trackIdx + segIdx)
+    const rawSnaps = metroNetwork.METRO_STATIONS.map((s) => ({
+      station: s,
+      ...snapToTrack(s.lat, s.lng, smoothed),
+    }));
+
+    // 3. Gruppera per spår, sortera på segIdx, beräkna grann-baserad riktning
+    //    dir = normalize(nextStation.pos − prevStation.pos)
+    //    Oberoende av lokala GTFS-knickar — hela nod-till-nod-riktningen längs spåret.
+    const byTrack = new Map<number, typeof rawSnaps>();
+    for (const snap of rawSnaps) {
+      if (!byTrack.has(snap.trackIdx)) byTrack.set(snap.trackIdx, []);
+      byTrack.get(snap.trackIdx)!.push(snap);
+    }
+    for (const group of byTrack.values()) {
+      group.sort((a, b) => a.segIdx - b.segIdx);
+      for (let i = 0; i < group.length; i++) {
+        const prev = group[Math.max(0, i - 1)];
+        const next = group[Math.min(group.length - 1, i + 1)];
+        if (prev === next) continue;
+        const cosLat = Math.cos(group[i].pos[0] * Math.PI / 180);
+        const dLat = next.pos[0] - prev.pos[0], dLng = next.pos[1] - prev.pos[1];
+        const norm = Math.hypot(dLat, dLng * cosLat) || 1;
+        group[i].dir = [dLat / norm, dLng / norm];
+      }
+    }
+    const allSnaps = Array.from(byTrack.values()).flat();
+    stationSnapsRef.current = allSnaps;
+
+    // 4. Bygg "plattformiserade" spår: rak linje GENOM varje station, kurvor MELLAN
+    const platformized = smoothed.map((track, ti) => {
+      const stationsOnTrack = (byTrack.get(ti) ?? []).map((s) => ({
+        pos: s.pos, dir: s.dir, segIdx: s.segIdx,
+      }));
+      return { color: track.color, coords: platformizeTrack(track.coords, stationsOnTrack, HALF_M) };
+    });
+
     const layer = L.layerGroup();
 
-    // Render order: connectors → spår → cirklar ovanpå spår → entrance-prickar
-
-    // Snap stationer mot smoothed tracks (samma geometri som renderas)
-    const snapped = metroNetwork.METRO_STATIONS.map((s) =>
-      snapToTrack(s.lat, s.lng, smoothedTracksRef.current)
-    );
-
-    // Dotted connectors — renderas först (längst ner)
+    // Dotted entrance connectors — längst ner
     for (const ent of metroNetwork.METRO_ENTRANCES) {
       L.polyline(ent.link, {
-        color: "#64748b",
-        weight: 1.5,
-        opacity: 0.5,
-        dashArray: "1 6",
-        lineCap: "round",
-        interactive: false,
+        color: "#64748b", weight: 1.5, opacity: 0.5, dashArray: "1 6",
+        lineCap: "round", interactive: false,
       }).addTo(layer);
     }
 
-    // Spår — redan Chaikin-utjämnade, smoothFactor:0 för exakta punkter
-    for (const track of smoothed) {
+    // Spår — plattformiserade (raka vid stationer, kurvor mellan)
+    for (const track of platformized) {
       L.polyline(track.coords, {
-        color: lineColors[track.color],
-        weight: 4,
-        opacity: 0.85,
-        lineCap: "round",
-        lineJoin: "round",
-        smoothFactor: 0,
-        interactive: false,
+        color: lineColors[track.color], weight: 4, opacity: 0.85,
+        lineCap: "round", lineJoin: "round", smoothFactor: 0, interactive: false,
       }).addTo(layer);
     }
 
-    // Stationscirklar — vit fyllning, linjens färg som kant, ovanpå spåren.
-    for (const { pos, color } of snapped) {
+    // Stationscirklar ovanpå spåren
+    for (const { pos, color } of allSnaps) {
       L.circleMarker(pos, {
-        radius: 5,
-        color: lineColors[color],
-        weight: 2.5,
-        fillColor: "#ffffff",
-        fillOpacity: 1,
-        interactive: false,
+        radius: 5, color: lineColors[color], weight: 2.5,
+        fillColor: "#ffffff", fillOpacity: 1, interactive: false,
       }).addTo(layer);
     }
 
@@ -585,11 +653,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       entrancesByStation.get(key)!.push(ent);
     }
 
-    // Pre-compute snap+dir using the SAME smoothed tracks as rendering.
-    // Computed once here (not inside buildDetailLayer) so it doesn't re-run on every zoom.
-    const stationSnaps = metroNetwork.METRO_STATIONS.map((s) =>
-      ({ station: s, ...snapToTrack(s.lat, s.lng, smoothedTracksRef.current) })
-    );
+    // Use pre-computed snaps with neighbor-corrected directions from main layer
+    const stationSnaps = stationSnapsRef.current;
 
     function buildDetailLayer(zoom: number) {
       if (metroDetailRef.current) {
