@@ -64,9 +64,36 @@ function nearestOnSegment(
   return [lat1 + t * dx, lng1 + t * dy];
 }
 
-/** Snap (lat,lng) to nearest track point. Returns position, color, and a STABLE direction
- *  computed from ±150 m along the track — avoids single-segment noise that causes platforms
- *  to appear at wrong angles. */
+/** PCA on a window of nearby track points to find the best-fit line direction.
+ *  Same algorithm as the Python pipeline's long_axis_line(). Handles curves
+ *  at junctions correctly — gives the dominant direction, not a noisy single segment. */
+function pcaDirection(pts: [number, number][], cosLat: number): [number, number] {
+  const n = pts.length;
+  if (n < 2) return [1, 0];
+  // Work in screen-space: x = lng * cosLat (east), y = lat (north)
+  const mx = pts.reduce((s, p) => s + p[1] * cosLat, 0) / n;
+  const my = pts.reduce((s, p) => s + p[0], 0) / n;
+  let sxx = 0, syy = 0, sxy = 0;
+  for (const [plat, plng] of pts) {
+    const x = plng * cosLat - mx, y = plat - my;
+    sxx += x * x; syy += y * y; sxy += x * y;
+  }
+  sxx /= n; syy /= n; sxy /= n;
+  // Largest eigenvector (closed-form 2×2 covariance)
+  const tr = sxx + syy;
+  const disc = Math.max(0, (tr / 2) ** 2 - (sxx * syy - sxy * sxy));
+  const lam1 = tr / 2 + Math.sqrt(disc);
+  const ex = Math.abs(sxy) > 1e-14 ? lam1 - syy : (sxx >= syy ? 1 : 0);
+  const ey = Math.abs(sxy) > 1e-14 ? sxy               : (sxx >= syy ? 0 : 1);
+  // Convert screen eigenvector → geographic direction for offsetAlongDir
+  const geoLat = ey;
+  const geoLng = ex / cosLat;
+  const norm = Math.hypot(geoLat, geoLng * cosLat) || 1;
+  return [geoLat / norm, geoLng / norm];
+}
+
+/** Snap (lat,lng) to nearest track point. Returns position, color, and a PCA-derived direction
+ *  from ±50 nearby track indices — best-fit line regardless of local curvature. */
 function snapToTrack(
   lat: number,
   lng: number,
@@ -92,32 +119,13 @@ function snapToTrack(
     }
   }
 
-  // Walk ±150 m along the track from bestSegIdx for a stable overall direction
-  const WINDOW_M = 150;
+  // PCA on ±50 nearest indices — dominant direction of track near station
+  const WIN = 50;
   const c = bestCoords;
-  let backI = bestSegIdx;
-  let distBack = 0;
-  while (backI > 0 && distBack < WINDOW_M) {
-    distBack += Math.hypot(
-      (c[backI][0] - c[backI - 1][0]) * 111_000,
-      (c[backI][1] - c[backI - 1][1]) * 111_000 * cosLat,
-    );
-    backI--;
-  }
-  let fwdI = Math.min(bestSegIdx + 1, c.length - 1);
-  let distFwd = 0;
-  while (fwdI < c.length - 1 && distFwd < WINDOW_M) {
-    distFwd += Math.hypot(
-      (c[fwdI + 1][0] - c[fwdI][0]) * 111_000,
-      (c[fwdI + 1][1] - c[fwdI][1]) * 111_000 * cosLat,
-    );
-    fwdI++;
-  }
-  const dLat = c[fwdI][0] - c[backI][0];
-  const dLng = c[fwdI][1] - c[backI][1];
-  const norm = Math.hypot(dLat, dLng * cosLat) || 1;
+  const pts = c.slice(Math.max(0, bestSegIdx - WIN), Math.min(c.length, bestSegIdx + WIN + 1));
+  const dir = pcaDirection(pts, cosLat);
 
-  return { pos: bestPos, color: bestColor, dir: [dLat / norm, dLng / norm] };
+  return { pos: bestPos, color: bestColor, dir };
 }
 
 /** Offset a map position by dist_m along a normalized direction vector. */
