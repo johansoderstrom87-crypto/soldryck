@@ -4,16 +4,29 @@ import { useEffect, useRef, useState } from "react";
 import { getFavorites, saveFavorites } from "../lib/favorites";
 import { subscribeToPush, unsubscribeFromPush, getPushStatus } from "../lib/push";
 
+type HoursResult = { openNow: boolean | null; closesAt: string | null } | null;
+
 interface FavoritesPanelProps {
   venues: { id: string; name: string; type: string; address: string; lat: number; lng: number }[];
   onSelectVenue: (id: string) => void;
+  hour: number;
+  dateKey: string;
+  getStatus: (venue: any, dateKey: string, hour: number) => string | undefined;
 }
 
-export default function FavoritesPanel({ venues, onSelectVenue }: FavoritesPanelProps) {
+function sunStyle(raw: string | undefined) {
+  if (raw === "s" || raw === "sun")      return { dot: "#f59e0b", bg: "#fef3c7", text: "#92400e", label: "Sol" };
+  if (raw === "p" || raw === "partial")  return { dot: "#fb923c", bg: "#ffedd5", text: "#9a3412", label: "Delvis" };
+  if (raw === "d" || raw === "shade")    return { dot: "#94a3b8", bg: "#f1f5f9", text: "#475569", label: "Skugga" };
+  return { dot: "#cbd5e1", bg: "#f8fafc", text: "#94a3b8", label: "Natt" };
+}
+
+export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, getStatus }: FavoritesPanelProps) {
   const [open, setOpen] = useState(false);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [hoursMap, setHoursMap] = useState<Map<string, HoursResult | "loading">>(new Map());
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,6 +45,21 @@ export default function FavoritesPanel({ venues, onSelectVenue }: FavoritesPanel
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
+
+  // Fetch opening hours when panel opens
+  useEffect(() => {
+    if (!open) return;
+    const favoriteVenues = venues.filter((v) => favIds.has(v.id));
+    for (const v of favoriteVenues) {
+      if (hoursMap.has(v.id)) continue;
+      setHoursMap((prev) => new Map(prev).set(v.id, "loading"));
+      const params = new URLSearchParams({ id: v.id, name: v.name, lat: String(v.lat), lng: String(v.lng), type: v.type });
+      fetch(`/api/venue-hours?${params}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: HoursResult) => setHoursMap((prev) => new Map(prev).set(v.id, data)))
+        .catch(() => setHoursMap((prev) => new Map(prev).set(v.id, null)));
+    }
+  }, [open, favIds, venues]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const favoriteVenues = venues.filter((v) => favIds.has(v.id));
 
@@ -71,7 +99,7 @@ export default function FavoritesPanel({ venues, onSelectVenue }: FavoritesPanel
         }}
         title="Mina favoriter"
       >
-        <span className="text-red-500">{favIds.size > 0 ? "\u2764\uFE0F" : "\u2661"}</span>
+        <span className="text-red-500">{favIds.size > 0 ? "❤️" : "♡"}</span>
         {favIds.size > 0 && (
           <span className="bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold">
             {favIds.size}
@@ -80,7 +108,16 @@ export default function FavoritesPanel({ venues, onSelectVenue }: FavoritesPanel
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 rounded-xl p-2 min-w-[240px] max-w-[280px] z-[2000]" style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", border: "0.5px solid rgba(255,255,255,0.7)", boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}>
+        <div
+          className="absolute top-full left-0 mt-1 rounded-xl p-2 min-w-[260px] max-w-[300px] z-[2000]"
+          style={{
+            background: "rgba(255,255,255,0.72)",
+            backdropFilter: "blur(20px) saturate(1.4)",
+            WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+            border: "0.5px solid rgba(255,255,255,0.7)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+          }}
+        >
           <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide px-1 mb-1.5">
             Mina favoriter ({favIds.size})
           </div>
@@ -92,33 +129,59 @@ export default function FavoritesPanel({ venues, onSelectVenue }: FavoritesPanel
               Tryck på hjärtat i en popup för att spara.
             </div>
           ) : (
-            <div className="flex flex-col gap-0.5 max-h-[240px] overflow-y-auto">
-              {favoriteVenues.map((v) => (
-                <div
-                  key={v.id}
-                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 group"
-                >
-                  <button
-                    onClick={() => {
-                      onSelectVenue(v.id);
-                      setOpen(false);
-                    }}
-                    className="flex-1 text-left"
+            <div className="flex flex-col gap-0.5 max-h-[320px] overflow-y-auto">
+              {favoriteVenues.map((v) => {
+                const raw = getStatus(v as any, dateKey, hour);
+                const sun = sunStyle(raw);
+                const hours = hoursMap.get(v.id);
+                return (
+                  <div
+                    key={v.id}
+                    className="flex items-start gap-2 px-2 py-2 rounded-lg hover:bg-white/60 cursor-pointer group transition-colors"
+                    onClick={() => { onSelectVenue(v.id); setOpen(false); }}
                   >
-                    <div className="text-xs font-medium text-slate-700 truncate">{v.name}</div>
-                    {v.address && (
-                      <div className="text-[9px] text-slate-400 truncate">{v.address}</div>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => removeFavorite(v.id)}
-                    className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-sm"
-                    title="Ta bort"
-                  >
-                    &times;
-                  </button>
-                </div>
-              ))}
+                    {/* Sun dot */}
+                    <div className="flex-shrink-0 mt-1">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: sun.dot }} />
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <div className="text-xs font-semibold text-slate-700 truncate flex-1">{v.name}</div>
+                        <span
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: sun.bg, color: sun.text }}
+                        >
+                          {sun.label}
+                        </span>
+                      </div>
+                      {v.address && (
+                        <div className="text-[9px] text-slate-400 truncate mt-0.5">{v.address}</div>
+                      )}
+                      {hours === "loading" && (
+                        <div className="text-[9px] text-slate-300 mt-0.5">Hämtar öppettider…</div>
+                      )}
+                      {hours && hours !== "loading" && hours.openNow !== null && (
+                        <div className={`text-[9px] mt-0.5 font-medium ${hours.openNow ? "text-green-600" : "text-slate-400"}`}>
+                          {hours.openNow
+                            ? `Öppet${hours.closesAt ? ` · stänger ${hours.closesAt}` : ""}`
+                            : "Stängt just nu"}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Remove button */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeFavorite(v.id); }}
+                      className="flex-shrink-0 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-sm leading-none pt-0.5"
+                      title="Ta bort"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -134,7 +197,7 @@ export default function FavoritesPanel({ venues, onSelectVenue }: FavoritesPanel
                     : "text-slate-500 hover:bg-slate-50"
                 }`}
               >
-                <span>{pushEnabled ? "\u2600\uFE0F" : "\uD83D\uDD14"}</span>
+                <span>{pushEnabled ? "☀️" : "🔔"}</span>
                 <span className="flex-1">
                   {pushEnabled ? "Notiser på" : "Notifiera mig när favoriter har sol"}
                 </span>

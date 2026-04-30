@@ -132,6 +132,9 @@ export default function Home() {
         onMetroStationChange={setMetroStation}
         venues={allVenues}
         onSelectVenue={(id) => setFocusVenueId(id)}
+        hour={hour}
+        dateKey={dateKey}
+        getStatus={getStatus}
       />
 
       {/* Venue type quick-filter icons — left edge */}

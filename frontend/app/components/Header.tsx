@@ -43,6 +43,9 @@ interface HeaderProps {
   onMetroStationChange: (station: MetroStation | null) => void;
   venues: { id: string; name: string; type: string; address: string; lat: number; lng: number }[];
   onSelectVenue: (id: string) => void;
+  hour: number;
+  dateKey: string;
+  getStatus: (venue: any, dateKey: string, hour: number) => string | undefined;
 }
 
 const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: string; activeClass: string }[] = [
@@ -361,7 +364,7 @@ function SettingsButton({
 export default function Header({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
   showShadows, onToggleShadows, showMetro, onToggleMetro,
-  metroStation, onMetroStationChange, venues, onSelectVenue,
+  metroStation, onMetroStationChange, venues, onSelectVenue, hour, dateKey, getStatus,
 }: HeaderProps) {
   return (
     <div className="absolute top-0 left-0 right-0 z-[1100] pointer-events-none">
@@ -381,7 +384,7 @@ export default function Header({
             showMetro={showMetro}
             onToggleMetro={onToggleMetro}
           />
-          <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} />
+          <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} />
         </div>
       </div>
     </div>
