@@ -250,13 +250,13 @@ def compute_shadows():
                     venue_ground_z = row.get("MARK_Z", 0) or 0
                     break
 
-        # Förbered byggnadsdata — exkludera byggnader som venue-punkten
-        # ligger väldigt nära (< 0.5m), dvs den egna byggnaden
+        # Förbered byggnadsdata — exkludera bara byggnader som venue ligger
+        # HELT INUTI (mall food court etc.). En venue vid byggnadens vägg
+        # (0–0.5m bort) ska räkna byggnaden som skuggkastare för uteserveringen.
         nearby_list = []
         for idx in candidate_idxs:
             row = buildings_gdf.iloc[idx]
-            dist_m = row.geometry.distance(venue_point) * M_PER_DEG_LAT
-            if dist_m < 0.5:
+            if row.geometry.contains(venue_point):
                 continue
             bground = building_ground_z[idx]
             nearby_list.append((row.geometry, row[height_col], bground))
