@@ -119,12 +119,43 @@ function approxDistToTrack(
   return best;
 }
 
+/** Build cumulative distance array (meters) for every point along a track. */
+function buildCumDist(coords: [number, number][], cosLat: number): Float64Array {
+  const d = new Float64Array(coords.length);
+  for (let i = 1; i < coords.length; i++) {
+    const dlat = (coords[i][0] - coords[i - 1][0]) * 111_000;
+    const dlng = (coords[i][1] - coords[i - 1][1]) * 111_000 * cosLat;
+    d[i] = d[i - 1] + Math.hypot(dlat, dlng);
+  }
+  return d;
+}
+
+/** Linearly interpolate exact [lat, lng] at distance d along the track. */
+function interpAtDist(
+  coords: [number, number][],
+  cumDist: Float64Array,
+  d: number,
+): [number, number] {
+  if (d <= 0) return coords[0];
+  const last = cumDist.length - 1;
+  if (d >= cumDist[last]) return coords[last];
+  let lo = 0, hi = last;
+  while (lo < hi - 1) { const mid = (lo + hi) >> 1; if (cumDist[mid] <= d) lo = mid; else hi = mid; }
+  const t = (cumDist[lo + 1] - cumDist[lo]) > 0 ? (d - cumDist[lo]) / (cumDist[lo + 1] - cumDist[lo]) : 0;
+  return [
+    coords[lo][0] + t * (coords[lo + 1][0] - coords[lo][0]),
+    coords[lo][1] + t * (coords[lo + 1][1] - coords[lo][1]),
+  ];
+}
+
 /**
- * "The Clean Cut" — raderar ALLA spårpunkter inom DEAD_M meter av varje station
- * och injicerar exakt [P_start, P_end] i deras ställe.
+ * Distance-Based Reconstruction — bygger ett NYTT spår utan att modifiera det gamla.
  *
- * Inga gamla punkter lämnas kvar inuti perrongområdet → inga loopar eller trianglar.
- * Chaikin-kurvan appliceras bara MELLAN stationerna, aldrig PÅ perrong-segmentet.
+ * 1. Beräknar kumulativt avstånd (meter) för varje punkt.
+ * 2. Hittar stationens avstånd D längs spåret (aldrig index-baserat).
+ * 3. Definierar perrong-zonen [D-halfM, D+halfM].
+ * 4. Bygger ny array: punkter < D-halfM | exakt pa vid D-halfM | exakt pb vid D+halfM | punkter > D+halfM.
+ * Ingen punkt existerar inuti zonen → spåret kan aldrig backa eller loopa.
  */
 function platformizeTrack(
   rawCoords: [number, number][],
@@ -135,73 +166,62 @@ function platformizeTrack(
 
   const midLat = rawCoords[Math.floor(rawCoords.length / 2)][0];
   const cosLat = Math.cos((midLat * Math.PI) / 180);
+  const cumDist = buildCumDist(rawCoords, cosLat);
+  const totalLen = cumDist[cumDist.length - 1];
 
-  // Dead zone = 100m runt stationscentrum — alla punkter häri raderas
-  const DEAD_M = 100;
-  const deadThresh = (DEAD_M / 111_000) ** 2; // squared lat-degree equiv.
-
-  // keep[i] = 1 → behåll punkten; 0 → radera den
-  const keep = new Uint8Array(rawCoords.length).fill(1);
-
-  // För varje station: hitta centerIdx, markera dead zone, spara insert-info
-  type Ins = { insertAt: number; pa: [number, number]; pb: [number, number] };
-  const inserts: Ins[] = [];
+  type Interval = { dStart: number; dEnd: number; pa: [number, number]; pb: [number, number] };
+  const intervals: Interval[] = [];
 
   for (const s of stations) {
-    // Grov sökning → förfina
+    // Hitta närmaste punkt i dessa koordinater (grov → fin)
     const step = Math.max(1, Math.floor(rawCoords.length / 200));
-    let bestD = Infinity, centerIdx = 0;
+    let bestD2 = Infinity, bestIdx = 0;
     for (let i = 0; i < rawCoords.length; i += step) {
       const dlat = rawCoords[i][0] - s.pos[0], dlng = (rawCoords[i][1] - s.pos[1]) * cosLat;
-      const d = dlat * dlat + dlng * dlng;
-      if (d < bestD) { bestD = d; centerIdx = i; }
+      const d2 = dlat * dlat + dlng * dlng;
+      if (d2 < bestD2) { bestD2 = d2; bestIdx = i; }
     }
-    const rlo = Math.max(0, centerIdx - step), rhi = Math.min(rawCoords.length - 1, centerIdx + step);
+    const rlo = Math.max(0, bestIdx - step), rhi = Math.min(rawCoords.length - 1, bestIdx + step);
     for (let i = rlo; i <= rhi; i++) {
       const dlat = rawCoords[i][0] - s.pos[0], dlng = (rawCoords[i][1] - s.pos[1]) * cosLat;
-      const d = dlat * dlat + dlng * dlng;
-      if (d < bestD) { bestD = d; centerIdx = i; }
+      const d2 = dlat * dlat + dlng * dlng;
+      if (d2 < bestD2) { bestD2 = d2; bestIdx = i; }
     }
 
-    // Radera alla punkter inom DEAD_M; spara index för första raderade punkten
-    const searchR = Math.ceil(DEAD_M / 1.5) + 20; // räcker väl för 100m / ~1.5m per segment
-    let firstDelIdx = rawCoords.length;
-    const slo = Math.max(0, centerIdx - searchR), shi = Math.min(rawCoords.length - 1, centerIdx + searchR);
-    for (let i = slo; i <= shi; i++) {
-      const dlat = rawCoords[i][0] - s.pos[0], dlng = (rawCoords[i][1] - s.pos[1]) * cosLat;
-      if (dlat * dlat + dlng * dlng <= deadThresh) {
-        keep[i] = 0;
-        if (i < firstDelIdx) firstDelIdx = i;
-      }
-    }
+    const stDist = cumDist[bestIdx];
+    const dStart = Math.max(0, stDist - halfM);
+    const dEnd   = Math.min(totalLen, stDist + halfM);
 
-    if (firstDelIdx === rawCoords.length) continue; // inget att radera
-
-    const pa = offsetAlongDir(s.pos, s.dir, -halfM);
-    const pb = offsetAlongDir(s.pos, s.dir,  halfM);
-    inserts.push({ insertAt: firstDelIdx, pa, pb });
+    // Interpolera exakta positioner på spåret (inte offset från neighbor-riktning)
+    intervals.push({
+      dStart, dEnd,
+      pa: interpAtDist(rawCoords, cumDist, dStart),
+      pb: interpAtDist(rawCoords, cumDist, dEnd),
+    });
   }
 
-  inserts.sort((a, b) => a.insertAt - b.insertAt);
+  intervals.sort((a, b) => a.dStart - b.dStart);
 
-  // Bygg resultat-arrayen
+  // Enpasbygge — rör oss framåt längs spåret, hoppar aldrig bakåt
   const result: [number, number][] = [];
-  let insIdx = 0;
+  let m = 0, injected = false;
 
   for (let i = 0; i < rawCoords.length; i++) {
-    // Injicera [pa, pb] när vi når rätt position
-    while (insIdx < inserts.length && inserts[insIdx].insertAt === i) {
-      result.push(inserts[insIdx].pa);
-      result.push(inserts[insIdx].pb);
-      insIdx++;
+    const d = cumDist[i];
+
+    // Avancera förbi fullständigt passerade intervall
+    while (m < intervals.length && d > intervals[m].dEnd) { m++; injected = false; }
+
+    if (m >= intervals.length || d < intervals[m].dStart) {
+      result.push(rawCoords[i]); // utanför alla zoner — behåll
+    } else {
+      if (!injected) {
+        result.push(intervals[m].pa); // exakt D-halfM
+        result.push(intervals[m].pb); // exakt D+halfM
+        injected = true;
+      }
+      // Inuti dead zone — hoppa över originalkoordinaten
     }
-    if (keep[i]) result.push(rawCoords[i]);
-  }
-  // Flush eventuella kvarvarande inserts
-  while (insIdx < inserts.length) {
-    result.push(inserts[insIdx].pa);
-    result.push(inserts[insIdx].pb);
-    insIdx++;
   }
 
   return result;
