@@ -369,7 +369,8 @@ export default function Header({
 }: HeaderProps) {
   return (
     <div className="absolute top-0 left-0 right-0 z-[1100] pointer-events-none">
-      <div className="p-3">
+      <div className="p-3 relative">
+        {/* Left group: menu + favorites */}
         <div className="flex items-center gap-1.5 pointer-events-auto">
           <SettingsButton
             filter={filter}
@@ -385,10 +386,29 @@ export default function Header({
             showMetro={showMetro}
             onToggleMetro={onToggleMetro}
           />
-          <div className="flex-1 flex justify-center pointer-events-none select-none">
-            <Image src="/logo.png" alt="Soldryck" width={36} height={42} style={{ objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(245,158,11,0.3))" }} />
-          </div>
           <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} />
+        </div>
+
+        {/* Center: logo on glassmorphism card */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none select-none">
+          <div
+            className="rounded-2xl px-3 pt-2.5 pb-2 flex items-center justify-center"
+            style={{
+              background: "rgba(255,255,255,0.3)",
+              backdropFilter: "blur(14px) saturate(1.3)",
+              WebkitBackdropFilter: "blur(14px) saturate(1.3)",
+              border: "0.5px solid rgba(255,255,255,0.55)",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+            }}
+          >
+            <Image
+              src="/logo.png"
+              alt="Soldryck"
+              width={64}
+              height={76}
+              style={{ objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(245,158,11,0.3))" }}
+            />
+          </div>
         </div>
       </div>
     </div>
