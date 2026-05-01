@@ -389,10 +389,10 @@ export default function Header({
           <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} />
         </div>
 
-        {/* Center: logo on glassmorphism card */}
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none select-none">
+        {/* Center: logo on glassmorphism card, half-peeking out from top */}
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none select-none" style={{ top: -18 }}>
           <div
-            className="rounded-2xl px-3 pt-2.5 pb-2 flex items-center justify-center"
+            className="rounded-2xl px-2 pt-1 pb-1.5 flex items-center justify-center"
             style={{
               background: "rgba(255,255,255,0.3)",
               backdropFilter: "blur(14px) saturate(1.3)",
@@ -404,8 +404,8 @@ export default function Header({
             <Image
               src="/logo.png"
               alt="Soldryck"
-              width={64}
-              height={76}
+              width={48}
+              height={58}
               style={{ objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(245,158,11,0.3))" }}
             />
           </div>
