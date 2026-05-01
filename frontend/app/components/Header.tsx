@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import Image from "next/image";
 import { type VenueType, type SunRange } from "./SunMap";
 import { METRO_STATIONS, type MetroStation } from "../data/metro-stations";
 import FavoritesPanel from "./FavoritesPanel";
@@ -384,6 +385,9 @@ export default function Header({
             showMetro={showMetro}
             onToggleMetro={onToggleMetro}
           />
+          <div className="flex-1 flex justify-center pointer-events-none select-none">
+            <Image src="/logo.png" alt="Soldryck" width={36} height={42} style={{ objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(245,158,11,0.3))" }} />
+          </div>
           <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} />
         </div>
       </div>

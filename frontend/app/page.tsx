@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import TimeSlider from "./components/TimeSlider";
 import Header from "./components/Header";
 import FeedbackModal from "./components/FeedbackModal";
+import SplashScreen from "./components/SplashScreen";
 import { fetchWeather, toLocalDateStr, type WeatherData } from "./lib/weather";
 import type { FeedbackVenue } from "./components/SunMap";
 import type { VenueType, SunRange } from "./components/SunMap";
@@ -53,6 +54,7 @@ export default function Home() {
   const [sunRange, setSunRange] = useState<SunRange>(null);
   const [focusVenueId, setFocusVenueId] = useState<string | null>(initialVenue);
   const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
+  const [splashDone, setSplashDone] = useState(false);
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
   const dateStr = useMemo(() => toLocalDateStr(date), [date]);
@@ -117,6 +119,7 @@ export default function Home() {
 
   return (
     <div className="h-full relative">
+      {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
       <Header
         filter={filter}
         onFilterChange={setFilter}
