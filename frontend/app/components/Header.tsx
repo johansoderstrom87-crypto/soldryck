@@ -389,15 +389,17 @@ export default function Header({
           <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} />
         </div>
 
-        {/* Center: logo on glassmorphism card, half-peeking out from top */}
-        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none select-none" style={{ top: -18 }}>
+        {/* Center: logo card emerges from top edge — no top rounding/shadow */}
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none select-none" style={{ top: 0 }}>
           <div
-            className="rounded-2xl px-2 pt-1 pb-1.5 flex items-center justify-center"
+            className="px-3 pt-2.5 pb-2 flex items-center justify-center"
             style={{
+              borderRadius: "0 0 18px 18px",
               background: "rgba(255,255,255,0.3)",
               backdropFilter: "blur(14px) saturate(1.3)",
               WebkitBackdropFilter: "blur(14px) saturate(1.3)",
               border: "0.5px solid rgba(255,255,255,0.55)",
+              borderTop: "none",
               boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
             }}
           >
