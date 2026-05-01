@@ -70,6 +70,10 @@ type SnapResult = {
   dir: [number, number];
   trackIdx: number;
   segIdx: number;
+  // Filled in after neighbor-direction pass and interpAtDist:
+  pa?: [number, number];
+  pb?: [number, number];
+  platDir?: [number, number];
 };
 
 /** Snap (lat,lng) to nearest point on pre-smoothed tracks. Returns position, color,
@@ -102,6 +106,35 @@ function snapToTrack(
     }
   }
   return { pos: bestPos, color: bestColor, dir: bestDir, trackIdx: bestTrackIdx, segIdx: bestSegIdx };
+}
+
+/**
+ * Förskjut ett spår lateralt (normalt mot spårriktningen) med offsetM meter.
+ * Positiv = höger sett i spårets riktning. Används för att separera parallella linjer.
+ */
+/**
+ * Förskjut ett spår lateralt offsetM meter (positiv = höger sett i spårets riktning).
+ * Tangenten beräknas i skärmrymden (Mercator-korrigerat), normalen roteras 90° medurs,
+ * och konverteras tillbaka till lat/lng-grader.
+ */
+function applyLateralOffset(
+  coords: [number, number][],
+  offsetM: number,
+): [number, number][] {
+  if (Math.abs(offsetM) < 0.1 || coords.length < 2) return coords;
+  return coords.map((pt, i) => {
+    const prev = coords[Math.max(0, i - 1)];
+    const next = coords[Math.min(coords.length - 1, i + 1)];
+    const cosLat = Math.cos(pt[0] * Math.PI / 180);
+    const dlat = next[0] - prev[0];  // degrees lat
+    const dlng = next[1] - prev[1];  // degrees lng
+    const lenM = Math.hypot(dlat * 111_000, dlng * 111_000 * cosLat) || 1;
+    // 90° medurs normal: screen (east, north) → (north_m, -east_m) = (dlat*111k, -dlng*cosLat*111k) / lenM
+    // Konverterat till geografiska grader:
+    const dLatDeg = -dlng * cosLat * offsetM / lenM;          // grader latitud
+    const dLngDeg =  dlat * offsetM / (lenM * cosLat);        // grader longitud
+    return [pt[0] + dLatDeg, pt[1] + dLngDeg] as [number, number];
+  });
 }
 
 /** Approximate distance (m) from a point to any coord on the track (sampled). */
@@ -618,22 +651,30 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     };
     const HALF_M = 65; // 130m platform
 
-    // 1. Förutberäkna Chaikin-utjämnade spår (en gång, ~1-2m per segment)
+    // 1. Chaikin-utjämnade spår + lateral offset per linjefärg
+    //    Röd: +10m (höger), Grön: -10m (vänster), Blå: 0m
+    //    Separerar parallella linjer (Slussen, Gamla Stan, T-Centralen)
+    const LATERAL: Record<"red" | "green" | "blue", number> = { red: 10, green: -10, blue: 0 };
     const smoothed = metroNetwork.METRO_TRACKS.map((t) => ({
       color: t.color,
-      coords: chaikin(t.coords as [number, number][], 3),
+      coords: applyLateralOffset(chaikin(t.coords as [number, number][], 3), LATERAL[t.color]),
     }));
     smoothedTracksRef.current = smoothed;
 
-    // 2. Snap alla stationer mot de utjämnade spåren (ger trackIdx + segIdx)
+    // 2. Förutberäkna kumulativa avstånd per spår (används av interpAtDist)
+    const cumDists = smoothed.map((track) => {
+      const midLat = track.coords[Math.floor(track.coords.length / 2)][0];
+      const cosLat = Math.cos((midLat * Math.PI) / 180);
+      return buildCumDist(track.coords, cosLat);
+    });
+
+    // 3. Snap alla stationer mot de utjämnade (offset) spåren (ger trackIdx + segIdx)
     const rawSnaps = metroNetwork.METRO_STATIONS.map((s) => ({
       station: s,
       ...snapToTrack(s.lat, s.lng, smoothed),
     }));
 
-    // 3. Gruppera per spår, sortera på segIdx, beräkna grann-baserad riktning
-    //    dir = normalize(nextStation.pos − prevStation.pos)
-    //    Oberoende av lokala GTFS-knickar — hela nod-till-nod-riktningen längs spåret.
+    // 4. Grann-baserad riktning (dir = normalize(next - prev) längs spåret)
     const byTrack = new Map<number, typeof rawSnaps>();
     for (const snap of rawSnaps) {
       if (!byTrack.has(snap.trackIdx)) byTrack.set(snap.trackIdx, []);
@@ -651,6 +692,24 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         group[i].dir = [dLat / norm, dLng / norm];
       }
     }
+
+    // 5. Beräkna pa/pb via interpAtDist på det OFFSET-spåret → perfekt tangent-alignment.
+    //    platDir = normalize(pb - pa): exakt i linje med det renderade spåret, inga "knän".
+    for (const snap of rawSnaps) {
+      const cumDist = cumDists[snap.trackIdx];
+      const trackCoords = smoothed[snap.trackIdx].coords;
+      const totalLen = cumDist[cumDist.length - 1];
+      const stDist = cumDist[snap.segIdx];
+      const pa = interpAtDist(trackCoords, cumDist, Math.max(0, stDist - HALF_M));
+      const pb = interpAtDist(trackCoords, cumDist, Math.min(totalLen, stDist + HALF_M));
+      const cosLat = Math.cos(snap.pos[0] * Math.PI / 180);
+      const dLat = pb[0] - pa[0], dLng = pb[1] - pa[1];
+      const normLen = Math.hypot(dLat, dLng * cosLat) || 1;
+      snap.pa = pa;
+      snap.pb = pb;
+      snap.platDir = [dLat / normLen, dLng / normLen];
+    }
+
     const allSnaps = Array.from(byTrack.values()).flat();
     stationSnapsRef.current = allSnaps;
 
@@ -751,10 +810,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       const detail = L.layerGroup();
       const HALF_M = 65; // 130m platform total
 
-      for (const { station, pos, color, dir } of stationSnaps) {
+      for (const { station, pos, color, pa, pb, platDir } of stationSnaps) {
         const lc = LINE_COLORS[color];
-        const p1 = offsetAlongDir(pos, dir, -HALF_M);
-        const p2 = offsetAlongDir(pos, dir, HALF_M);
+        // Använd pa/pb från interpAtDist på det offset-spåret →
+        // perfekt tangent-alignment, inga "knän" vid perrongänden
+        const p1 = pa ?? offsetAlongDir(pos, platDir ?? [1,0], -HALF_M);
+        const p2 = pb ?? offsetAlongDir(pos, platDir ?? [1,0],  HALF_M);
 
         // Rakt spårsegment GENOM stationen (överskriver Chaikin-kurvan precis här)
         L.polyline([p1, p2], { color: lc, weight: 4, opacity: 0.85, lineCap: "butt", smoothFactor: 0, interactive: false }).addTo(detail);
@@ -765,7 +826,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         L.polyline([p1, p2], { color: lc,      weight: 13, lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
         L.polyline([p1, p2], { color: "#ffffff", weight: 9,  lineCap: "round", smoothFactor: 0, interactive: false }).addTo(detail);
 
-        // Stationsnamn centrerat på plattformen
+        // Centroid p1→p2 (mer exakt än `pos` som är GTFS stop-centroid)
+        const midPt: [number, number] = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+
+        // Stationsnamn centrerat på plattformens mitt
         if (showNames) {
           const nameIcon = L.divIcon({
             className: "metro-platform-label",
@@ -773,10 +837,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             iconSize: [200, 18],
             iconAnchor: [100, 9],
           });
-          L.marker(pos, { icon: nameIcon, interactive: false }).addTo(detail);
+          L.marker(midPt, { icon: nameIcon, interactive: false }).addTo(detail);
         }
 
-        // EN central T-ikon per station (inte en per uppgång)
+        // EN central T-ikon per station
         if (showNames) {
           const tIcon = L.divIcon({
             className: "metro-t-wrap",
@@ -784,7 +848,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             iconSize: [20, 20],
             iconAnchor: [10, 10],
           });
-          L.marker(pos, { icon: tIcon, interactive: false }).addTo(detail);
+          L.marker(midPt, { icon: tIcon, interactive: false }).addTo(detail);
         }
 
         // Uppgångar: diskreta prickar + tunn grå connector från plattformskant.
