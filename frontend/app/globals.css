@@ -264,7 +264,11 @@ body {
   color: var(--lc);
   white-space: nowrap;
   text-align: center;
-  text-shadow: 0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff;
+  /* Vit halo för läsbarhet mot bakgrundskartan */
+  text-shadow:
+    0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff,
+    1px 0 2px #fff, -1px 0 2px #fff,
+    0 1px 2px #fff, 0 -1px 2px #fff;
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
   letter-spacing: 0.04em;
   text-transform: uppercase;

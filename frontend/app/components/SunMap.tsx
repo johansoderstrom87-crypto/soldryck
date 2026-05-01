@@ -114,25 +114,28 @@ function snapToTrack(
  */
 /**
  * Förskjut ett spår lateralt offsetM meter (positiv = höger sett i spårets riktning).
- * Tangenten beräknas i skärmrymden (Mercator-korrigerat), normalen roteras 90° medurs,
- * och konverteras tillbaka till lat/lng-grader.
+ *
+ * Tangenten beräknas med ett glidande medelvärde (windowSize punkter) för att
+ * undvika "darriga" parallella linjer när GTFS-datan har mikro-hack.
+ * Normalen roteras 90° medurs i skärmrymden (Mercator-korrigerat).
  */
 function applyLateralOffset(
   coords: [number, number][],
   offsetM: number,
+  windowSize = 11,
 ): [number, number][] {
   if (Math.abs(offsetM) < 0.1 || coords.length < 2) return coords;
+  const half = Math.floor(windowSize / 2);
   return coords.map((pt, i) => {
-    const prev = coords[Math.max(0, i - 1)];
-    const next = coords[Math.min(coords.length - 1, i + 1)];
     const cosLat = Math.cos(pt[0] * Math.PI / 180);
-    const dlat = next[0] - prev[0];  // degrees lat
-    const dlng = next[1] - prev[1];  // degrees lng
+    // Glidande medelvärde: tangent från [lo, hi] istället för enstaka grannpar
+    const lo = Math.max(0, i - half);
+    const hi = Math.min(coords.length - 1, i + half);
+    const dlat = coords[hi][0] - coords[lo][0];
+    const dlng = coords[hi][1] - coords[lo][1];
     const lenM = Math.hypot(dlat * 111_000, dlng * 111_000 * cosLat) || 1;
-    // 90° medurs normal: screen (east, north) → (north_m, -east_m) = (dlat*111k, -dlng*cosLat*111k) / lenM
-    // Konverterat till geografiska grader:
-    const dLatDeg = -dlng * cosLat * offsetM / lenM;          // grader latitud
-    const dLngDeg =  dlat * offsetM / (lenM * cosLat);        // grader longitud
+    const dLatDeg = -dlng * cosLat * offsetM / lenM;
+    const dLngDeg =  dlat * offsetM / (lenM * cosLat);
     return [pt[0] + dLatDeg, pt[1] + dLngDeg] as [number, number];
   });
 }
@@ -808,7 +811,13 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
       const showNames = zoom >= 16;
       const detail = L.layerGroup();
-      const HALF_M = 65; // 130m platform total
+      const HALF_M = 65;
+
+      // Eget Leaflet-pane för stationsmarkörer — renderas ovanför spår och perronger
+      if (!mapRef.current.getPane("metroStationPane")) {
+        const pane = mapRef.current.createPane("metroStationPane");
+        pane.style.zIndex = "620"; // över overlayPane (400) och markerPane (600)
+      }
 
       for (const { station, pos, color, pa, pb, platDir } of stationSnaps) {
         const lc = LINE_COLORS[color];
@@ -829,26 +838,26 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         // Centroid p1→p2 (mer exakt än `pos` som är GTFS stop-centroid)
         const midPt: [number, number] = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
 
-        // Stationsnamn centrerat på plattformens mitt
         if (showNames) {
-          const nameIcon = L.divIcon({
-            className: "metro-platform-label",
-            html: `<div class="metro-platform-name" style="--lc:${lc}">${station.name}</div>`,
-            iconSize: [200, 18],
-            iconAnchor: [100, 9],
-          });
-          L.marker(midPt, { icon: nameIcon, interactive: false }).addTo(detail);
-        }
-
-        // EN central T-ikon per station
-        if (showNames) {
+          // T-ikon: centrerad på midPt, i det egna överpanelet
           const tIcon = L.divIcon({
             className: "metro-t-wrap",
             html: `<div class="metro-t-circle" style="background:${lc}">T</div>`,
             iconSize: [20, 20],
             iconAnchor: [10, 10],
           });
-          L.marker(midPt, { icon: tIcon, interactive: false }).addTo(detail);
+          L.marker(midPt, { icon: tIcon, interactive: false, pane: "metroStationPane" }).addTo(detail);
+
+          // Stationsnamn: T-cirkel är 20px hög (10px upp/ner från center).
+          // iconAnchor [100, -13] → toppen av name-boxen placeras 13px under midPt,
+          // dvs 3px gap under T-cirkelns botten (10px + 3px = 13px).
+          const nameIcon = L.divIcon({
+            className: "metro-platform-label",
+            html: `<div class="metro-platform-name" style="--lc:${lc}">${station.name}</div>`,
+            iconSize: [200, 16],
+            iconAnchor: [100, -13],
+          });
+          L.marker(midPt, { icon: nameIcon, interactive: false, pane: "metroStationPane" }).addTo(detail);
         }
 
         // Uppgångar: diskreta prickar + tunn grå connector från plattformskant.
