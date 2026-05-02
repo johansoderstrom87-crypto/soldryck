@@ -224,9 +224,12 @@ def compute_shadows():
     results = {}
     start_time = time.time()
 
-    for vi in range(total_venues):
+    TARGET_ID = "13711450153"
+for vi in range(total_venues):
         venue = venues_gdf.iloc[vi]
         venue_id = venue["id"]
+        if venue_id != TARGET_ID: continue
+        print(f"Processing {venue_id}: {venue.geometry}")
         venue_point = venue.geometry
         venue_lng, venue_lat = venue_point.x, venue_point.y
 
@@ -262,14 +265,7 @@ def compute_shadows():
             nearby_list.append((row.geometry, row[height_col], bground))
 
         # Venue elevation (rooftop terraces etc.)
-        # NaN-safe: venue.get() or 0 doesn't work when value is NaN (nan is truthy)
-        _elev = venue.get("venue_elevation_m")
-        try:
-            venue_elevation = float(_elev)
-            if venue_elevation != venue_elevation:  # nan != nan
-                venue_elevation = 0
-        except (TypeError, ValueError):
-            venue_elevation = 0
+        venue_elevation = venue.get("venue_elevation_m", 0) or 0
 
         results[venue_id] = {
             "name": venue.get("name", "Okänd"),
@@ -304,6 +300,8 @@ def compute_shadows():
                         bgeom, effective_height, 0, sun_az, sun_alt,
                     )
                     if shadow_poly and shadow_poly.contains(venue_point):
+                    import math as _m
+                    print(f"  SHADE from building h={bheight} eff={effective_height:.1f} shadow_poly_type={type(shadow_poly).__name__}")
                         in_shadow = True
                         break
 
