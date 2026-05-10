@@ -107,11 +107,20 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
 - **Resultat av senaste körning:** 3 115 obekräftade venues → 1 547 ja, 403 nej, 1 165 okänt
 - Sparar till `data/outdoor_verification.json`, stödjer återupptagning
 
+### Steg 7b: Dubbelkolla outdoor_seating=no via Google (`07b_verify_negative_seating.py`)
+- **Bakgrund:** Vissa OSM-bidragsgivare har bulk-taggat venues som `outdoor_seating=no` fast de faktiskt har uteservering. Steg 1 exkluderar dessa, och steg 7 missar dem (behandlar bara `<MISSING>`-venues).
+- **Hämtar:** Alla OSM-venues taggade `outdoor_seating=no/none/0` i bboxen via Overpass (~292 st), cachar i `data/raw/osm_outdoor_no.json`
+- **Verifierar:** Google `searchText` per venue, samma fält som steg 7
+- **Resultat av senaste körning:** 292 venues → **125 ja (override OSM)**, 71 nej, 96 okänt
+- Sparar till `data/outdoor_verification_negative.json`, stödjer återupptagning
+
 ### Steg 8: Slå ihop verifierade venues (`08_merge_verified_venues.py`)
 - Google-bekräftade (outdoorSeating=true) → läggs till `venues.geojson` med `source: "google_confirmed"`
+- **OSM=no men Google=yes** → läggs till med `source: "osm_no_google_yes"` (override)
 - Google-nekade (false) → `venues-unconfirmed.ts` med `source: "google_denied"`
 - Utan data → `venues-unconfirmed.ts` med `source: "unknown"`
 - OSM-bekräftade taggas `source: "osm_confirmed"`
+- **Läser både** `outdoor_verification.json` och `outdoor_verification_negative.json`
 
 ### Steg 9: Tunnelbanenät (`09_fetch_metro.py`)
 - **Källa:** OpenStreetMap via Overpass API
@@ -126,11 +135,12 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
 | Källa | Antal | Visning |
 |-------|-------|---------|
 | OSM `outdoor_seating`-tagg | ~969 | Färgade markörer med soldata |
-| Google Places bekräftad | ~1 531 | Färgade markörer med soldata |
-| **Totalt med soldata** | **2 514** | |
-| Google nekad (ingen uteservering) | 403 | Grå punkt zoom ≥ 17, popup "ingen uteservering" |
-| Okänt (varken OSM eller Google) | 1 165 | Grå punkt zoom ≥ 17 |
-| **Totalt i appen** | **~4 082** | |
+| Google Places bekräftad (utan OSM-tagg) | ~1 531 | Färgade markörer med soldata |
+| OSM=no men Google=yes (override) | 125 | Färgade markörer med soldata |
+| **Totalt med soldata** | **~2 843** | |
+| Google nekad (ingen uteservering) | 474 | Grå punkt zoom ≥ 17, popup "ingen uteservering" |
+| Okänt (varken OSM eller Google) | 1 259 | Grå punkt zoom ≥ 17 |
+| **Totalt i appen** | **~4 576** | |
 
 ## Takbar-filter
 
@@ -193,6 +203,7 @@ python 04_export_frontend.py                # ~2s, exporterar till frontend
 python 05_generate_shadow_geojson.py        # ~3-4h, shadow overlay
 python 06_compress_shadows.py               # ~20 min, komprimerar shadow-data
 python 07_verify_outdoor_seating.py         # ~5h (env: GOOGLE_PLACES_API_KEY)
+python 07b_verify_negative_seating.py       # ~30s, dubbelkollar OSM-no via Google
 python 08_merge_verified_venues.py          # ~5s, slår ihop verifierade
 python 09_fetch_metro.py                    # ~30s, tunnelbanespår + perronger
 
