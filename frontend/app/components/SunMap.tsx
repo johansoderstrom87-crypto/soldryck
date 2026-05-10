@@ -445,10 +445,13 @@ function resolveBadgeCollisions(map: L.Map, markers: L.Marker[]) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   }
 
-  // Get pixel positions for all markers
+  // Get pixel positions for all markers. Skip ones currently hidden by the
+  // sun/shade filter (display:none) so they don't reserve collision slots.
   const items: { px: L.Point; el: HTMLElement }[] = [];
   for (const m of markers) {
-    const el = (m as any)._icon?.querySelector(".marker-badge") as HTMLElement | null;
+    const iconEl = (m as any)._icon as HTMLElement | undefined;
+    if (!iconEl || iconEl.style.display === "none") continue;
+    const el = iconEl.querySelector(".marker-badge") as HTMLElement | null;
     if (!el) continue;
     const px = map.latLngToContainerPoint(m.getLatLng());
     items.push({ px, el });
@@ -578,6 +581,16 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
+  // Parallel array of (marker, venue) so the hour-update effect can recompute
+  // status without rebuilding markers. Kept in lockstep with markersRef.
+  const markerVenuesRef = useRef<{ marker: L.Marker; venue: any }[]>([]);
+  // Weather snapshot read by the hour-update effect (avoids making `weather`
+  // a dep of the cheap update path — only the build effect rebuilds on weather).
+  const weatherRef = useRef<WeatherData | null>(null);
+  weatherRef.current = weather;
+  // Latest hour for popup handlers (e.g. share-link) attached at build time.
+  const hourRef = useRef(0);
+  hourRef.current = hourProp;
   const unconfirmedMarkersRef = useRef<L.Marker[]>([]);
   const metroMarkersRef = useRef<L.Marker[]>([]);
   const metroNetworkRef = useRef<L.LayerGroup | null>(null);
@@ -940,13 +953,18 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     };
   }, []);
 
-  // Update markers
+  // Build venue markers — runs only when the *set* of venues or their styling
+  // baseline changes (date, type/sunRange filters, weather, metroStation).
+  // Hour scrubs and sun/shade filter changes go through the cheap update effect
+  // below, which retoggles `.marker-dot`'s class on the existing DOM rather
+  // than tearing down ~2 500 Leaflet markers.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
+    markerVenuesRef.current = [];
 
     const currentWeather = weather?.hourly[hour];
     const weatherSymbol = currentWeather?.symbolCode;
@@ -965,9 +983,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       // Filter by type
       if (!matchesTypeFilter(venue, typeFilter)) return;
 
-      // Filter by sun/shade
-      if (filter === "sun" && status !== "sun") return;
-      if (filter === "shade" && status !== "shade" && status !== "night") return;
+      // Sun/shade filter intentionally NOT applied here — the update effect
+      // below toggles visibility based on the live (hour, filter) pair so
+      // scrubbing the timeline doesn't rebuild markers.
 
       // Filter by sun range — venue must have sun for every hour in the range
       if (sunRange) {
@@ -979,28 +997,23 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         if (!hasSunAllHours) return;
       }
 
-      // Determine marker style based on combined shadow + weather
+      // Initial marker class for the current hour. The update effect mutates
+      // this class on hour change without recreating the icon. Visual size is
+      // CSS-driven off the status class (see globals.css), so iconSize stays
+      // uniform — no L.Icon recreation needed when status flips.
       const isRain = weatherSymbol && getSymbolInfo(weatherSymbol).category === "rain";
       const isActuallySunny = status === "sun" && weatherSymbol !== undefined && weatherSymbol <= 2;
 
       let markerClass: string;
-      let size: number;
-      if (isRain) {
-        markerClass = "marker-rain";
-        size = 12;
-      } else if (isActuallySunny) {
-        markerClass = "marker-sun";
-        size = 18;
-      } else if (status === "sun" && weatherSymbol && weatherSymbol <= 4) {
-        markerClass = "marker-partial";
-        size = 15;
-      } else if (status === "sun") {
-        markerClass = "marker-sun";
-        size = 18;
-      } else {
-        markerClass = "marker-shade";
-        size = 12;
-      }
+      if (isRain) markerClass = "marker-rain";
+      else if (isActuallySunny) markerClass = "marker-sun";
+      else if (status === "sun" && weatherSymbol && weatherSymbol <= 4) markerClass = "marker-partial";
+      else if (status === "sun") markerClass = "marker-sun";
+      else markerClass = "marker-shade";
+
+      const initiallyHidden =
+        (filter === "sun" && status !== "sun") ||
+        (filter === "shade" && status !== "shade" && status !== "night");
 
       const svgIcon = typeToSvgIcon(venue.type);
       const shortName = venue.name.length > 20 ? venue.name.slice(0, 18) + "…" : venue.name;
@@ -1014,16 +1027,17 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           </div>
           <div class="marker-badge-arrow"></div>
         </div>` : "";
+      // Uniform 18px wrapper — the dot's visual size is keyed off its status
+      // class in CSS, so flipping marker-shade <-> marker-sun on hour change
+      // doesn't require resizing the Leaflet icon container.
+      const ICON_SIZE = 18;
       const icon = L.divIcon({
         className: "marker-root",
         html: `<div class="marker-dot ${markerClass}"></div>${badgeHtml}`,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-        popupAnchor: [0, -size / 2 - 4],
+        iconSize: [ICON_SIZE, ICON_SIZE],
+        iconAnchor: [ICON_SIZE / 2, ICON_SIZE / 2],
+        popupAnchor: [0, -ICON_SIZE / 2 - 4],
       });
-
-      // Store pixel info for collision detection later
-      (icon as any)._venueLatLng = [venue.lat, venue.lng];
 
       // Hourly timeline — dual rows: shadow + weather
       const hours = Array.from({ length: 16 }, (_, i) => i + 7);
@@ -1217,7 +1231,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             const url = new URL(window.location.href);
             url.search = "";
             url.searchParams.set("venue", venue.id);
-            url.searchParams.set("hour", String(hour));
+            url.searchParams.set("hour", String(hourRef.current));
             const shareUrl = url.toString();
 
             if (navigator.share) {
@@ -1250,37 +1264,95 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         }
       });
 
+      if (initiallyHidden) {
+        const iconEl = (marker as any)._icon as HTMLElement | undefined;
+        if (iconEl) iconEl.style.display = "none";
+      }
+
       markersRef.current.push(marker);
+      markerVenuesRef.current.push({ marker, venue });
     });
 
     // Collision detection: reassign badge positions to avoid overlap
     resolveBadgeCollisions(map, markersRef.current);
-    map.off("zoomend moveend", handleCollisions);
     function handleCollisions() { if (mapRef.current) resolveBadgeCollisions(mapRef.current, markersRef.current); }
     map.on("zoomend moveend", handleCollisions);
 
-    // Pan to metro station when selected
-    if (metroStation && !focusVenueId) {
-      map.setView([metroStation.lat, metroStation.lng], 15, { animate: true });
+    return () => {
+      map.off("zoomend moveend", handleCollisions);
+    };
+  }, [dateKey, typeFilter, sunRange, weather, metroStation]);
+
+  // Hour & sun/shade-filter update — fast path. Just retoggles the .marker-dot
+  // class and visibility on existing markers. No L.Marker churn, no popup
+  // rebuild, no iconSize change. ~2 500 markers updated in a single tight
+  // loop instead of being torn down and re-added on every timeline tick.
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const w = weatherRef.current;
+    const wSymbol = w?.hourly[hour]?.symbolCode;
+    const isRain = wSymbol !== undefined && getSymbolInfo(wSymbol).category === "rain";
+
+    for (const { marker, venue } of markerVenuesRef.current) {
+      const status = normalize(getStatus(venue, dateKey, hour));
+
+      let markerClass: string;
+      if (isRain) markerClass = "marker-rain";
+      else if (status === "sun" && wSymbol !== undefined && wSymbol <= 2) markerClass = "marker-sun";
+      else if (status === "sun" && wSymbol !== undefined && wSymbol <= 4) markerClass = "marker-partial";
+      else if (status === "sun") markerClass = "marker-sun";
+      else markerClass = "marker-shade";
+
+      const visible =
+        filter === "all" ||
+        (filter === "sun" && status === "sun") ||
+        (filter === "shade" && (status === "shade" || status === "night"));
+
+      const iconEl = (marker as any)._icon as HTMLElement | undefined;
+      if (!iconEl) continue;
+      const dot = iconEl.firstElementChild as HTMLElement | null;
+      if (dot) dot.className = `marker-dot ${markerClass}`;
+      iconEl.style.display = visible ? "" : "none";
     }
 
-    // Focus on venue from URL params
-    if (focusVenueId) {
-      const targetVenue = allVenues.find((v: any) => v.id === focusVenueId);
-      if (targetVenue) {
-        map.setView([targetVenue.lat, targetVenue.lng], 16, { animate: true });
-        // Find and open the marker's popup
-        const targetMarker = markersRef.current.find((m) => {
-          const ll = m.getLatLng();
-          return Math.abs(ll.lat - targetVenue.lat) < 0.0001 && Math.abs(ll.lng - targetVenue.lng) < 0.0001;
-        });
-        if (targetMarker) {
-          setTimeout(() => targetMarker.openPopup(), 500);
-        }
-      }
-      onFocusHandled?.();
+    // When the sun/shade filter is active, visibility flips per hour. At
+    // badge-zoom that means we should re-pack the badges.
+    if (filter !== "all" && mapRef.current.getZoom() >= 17) {
+      resolveBadgeCollisions(mapRef.current, markersRef.current);
     }
-  }, [hour, dateKey, filter, typeFilter, sunRange, weather, metroStation]);
+  }, [hour, dateKey, filter]);
+
+  // Pan to selected metro station — own effect so a station change actually
+  // pans (the previous version was bundled into the rebuild-on-hour effect).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !metroStation) return;
+    if (focusVenueId) return; // venue focus takes priority — handled below
+    map.setView([metroStation.lat, metroStation.lng], 15, { animate: true });
+    // Read focusVenueId via closure on mount of this effect; we deliberately
+    // omit it from deps so a focus-clear doesn't re-pan to the station.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metroStation]);
+
+  // Focus on a specific venue (share URL or search). Pans + opens popup once
+  // per focusVenueId change, then signals the parent to clear the request.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !focusVenueId) return;
+    const targetVenue = allVenues.find((v: any) => v.id === focusVenueId);
+    if (targetVenue) {
+      map.setView([targetVenue.lat, targetVenue.lng], 16, { animate: true });
+      const targetMarker = markersRef.current.find((m) => {
+        const ll = m.getLatLng();
+        return Math.abs(ll.lat - targetVenue.lat) < 0.0001 && Math.abs(ll.lng - targetVenue.lng) < 0.0001;
+      });
+      if (targetMarker) {
+        setTimeout(() => targetMarker.openPopup(), 500);
+      }
+    }
+    onFocusHandled?.();
+  }, [focusVenueId]);
 
   // Unconfirmed venues — lazy loaded only at zoom >= 17 and in viewport
   useEffect(() => {
