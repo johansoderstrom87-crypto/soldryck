@@ -16,15 +16,19 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
       SunMap.tsx        Leaflet-karta med markörer och popups
       TimeSlider.tsx    Tidsreglage (timme + månadsväljare)
     /data
-      venues-computed.ts    Auto-genererad: 2 514 platser med soldata (~5.5 MB)
-      venues-unconfirmed.ts Auto-genererad: 1 568 platser utan bekräftad uteservering
+      venues-computed.ts    Auto-genererad: ~2 843 platser med soldata (~6.2 MB)
+      venues-unconfirmed.ts Auto-genererad: ~1 733 platser utan bekräftad uteservering
       metro-network.ts      Auto-genererad: tunnelbanespår + perronger (~144 KB)
       mock-venues.ts        Testdata (8 platser, används som fallback)
     /lib
       weather.ts       SMHI API-integration (prognos + symbolkoder 1-27)
+    /api
+      shadows/route.ts Servar shadow-data, läser från SHADOW_DATA_PATH (volym i prod)
     page.tsx           Huvudsida — sammankopplar alla komponenter
     layout.tsx         HTML-layout med Leaflet CSS
     globals.css        Tailwind + marker-styles (sol/skugga/regn/grå)
+  /scripts
+    seed-shadow-data.mjs  Hämtar shadow-data från GitHub vid container-start
   Dockerfile           Multi-stage Docker build (standalone Next.js)
 
 /pipeline             Python-scripts som genererar soldata
@@ -159,7 +163,7 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
 ## Frontend-arkitektur
 
 - **Kartan:** Leaflet med CARTO light basemap, dynamiskt laddad (ssr: false)
-- **Markörer (bekräftade):** DivIcon med CSS-klasser (marker-sun/shade/partial/rain), alltid renderade (~2 514 st)
+- **Markörer (bekräftade):** DivIcon med CSS-klasser (marker-sun/shade/partial/rain), alltid renderade (~2 843 st)
 - **Markörer (obekräftade):** Grå DivIcon, lazy-loadade — skapas bara vid zoom ≥ 17 och inom viewport
 - **Popups:** Sol/skugga-tidslinje + bästa soltimme
 - **Filter:** sol/skugga, venue-typ (restaurang/café/bar/takbar), soltidsintervall, t-banestation
@@ -170,8 +174,30 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
 
 - **Frontend:** Railway via Dockerfile (multi-stage Node.js 20 Alpine, standalone Next.js output)
 - **Domän:** `soldryck-web-production.up.railway.app`
-- **Deploy-kommando:** `railway up` från projektrot
+- **Deploy-kommando:** `railway up --service soldryck-web` från projektrot
 - **CI:** Manuell deploy (ingen auto-deploy från GitHub)
+- **Image-storlek:** ~50 MB (shadow-data exkluderat — se nedan)
+
+### Shadow-data via Railway Volume
+
+Shadow-data (~132 MB komprimerat, 187 filer) bundlas **inte** med image. Istället:
+
+- **Volym:** `soldryck-web-volume` mountad på `/app/shadow-data` (5 GB tilldelat)
+- **Env-variabel:** `SHADOW_DATA_PATH=/app/shadow-data` (sätts i Dockerfile)
+- **Bootstrap:** `frontend/scripts/seed-shadow-data.mjs` körs vid container-start. Om volymen är tom hämtar den alla 187 `.json.gz`-filer från GitHub raw URLs (~6 sek). Idempotent — gör inget om filerna redan finns.
+- **Re-seed efter pipeline-uppdatering:**
+  - `railway run --service soldryck-web -- node scripts/seed-shadow-data.mjs --force` (laddar ner allt på nytt)
+  - eller sätt env-variabel `RESEED_SHADOW_DATA=1` på en deploy → reset till noll efteråt
+- **Ignore:** `shadow-data/` finns i både `.dockerignore` och `.railwayignore`
+
+### Skapa volymen från grunden (om den måste återskapas)
+
+```bash
+MSYS_NO_PATHCONV=1 railway volume add -m /app/shadow-data
+# (välj soldryck-web service interaktivt om du har flera)
+```
+
+Vid nästa deploy seedas filerna automatiskt från GitHub.
 
 ## Datakällor (alla gratis utom Google Places)
 

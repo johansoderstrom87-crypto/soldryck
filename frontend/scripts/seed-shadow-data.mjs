@@ -3,7 +3,12 @@
  * Seed shadow-data from GitHub if the target directory is empty.
  * Runs at container startup. Idempotent — skips if files already present.
  *
- * Env: SHADOW_DATA_PATH (target dir, default /app/shadow-data)
+ * Env:
+ *   SHADOW_DATA_PATH     Target dir (default /app/shadow-data)
+ *   RESEED_SHADOW_DATA   Set to "1"/"true" to force re-download all files
+ *
+ * CLI:
+ *   --force              Same as RESEED_SHADOW_DATA=true
  */
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -14,6 +19,10 @@ const REPO = "johansoderstrom87-crypto/soldryck";
 const BRANCH = "master";
 const CONCURRENCY = 8;
 const EXPECTED_MIN_FILES = 180; // ~187 files, allow margin
+
+const FORCE =
+  process.argv.includes("--force") ||
+  /^(1|true|yes)$/i.test(process.env.RESEED_SHADOW_DATA || "");
 
 async function listFiles() {
   const url = `https://api.github.com/repos/${REPO}/contents/shadow-data?ref=${BRANCH}`;
@@ -27,7 +36,7 @@ async function listFiles() {
 
 async function downloadOne(file) {
   const localPath = join(TARGET_DIR, file.name);
-  if (existsSync(localPath)) return false;
+  if (!FORCE && existsSync(localPath)) return false;
   const res = await fetch(file.download_url);
   if (!res.ok) throw new Error(`Failed ${file.name}: ${res.status}`);
   await writeFile(localPath, Buffer.from(await res.arrayBuffer()));
@@ -38,12 +47,16 @@ async function main() {
   await mkdir(TARGET_DIR, { recursive: true });
 
   const existing = (await readdir(TARGET_DIR)).filter((f) => f.endsWith(".json.gz"));
-  if (existing.length >= EXPECTED_MIN_FILES) {
+  if (!FORCE && existing.length >= EXPECTED_MIN_FILES) {
     console.log(`[seed] ${existing.length} files already present in ${TARGET_DIR}, skipping`);
     return;
   }
 
-  console.log(`[seed] Volume has ${existing.length} files — fetching list from GitHub...`);
+  if (FORCE) {
+    console.log(`[seed] FORCE re-seed — will overwrite ${existing.length} existing files`);
+  } else {
+    console.log(`[seed] Volume has ${existing.length} files — fetching list from GitHub...`);
+  }
   const files = await listFiles();
   console.log(`[seed] ${files.length} files to consider, downloading with concurrency=${CONCURRENCY}`);
 
