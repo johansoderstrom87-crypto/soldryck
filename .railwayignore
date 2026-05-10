@@ -9,3 +9,4 @@ frontend/.next/
 .env*
 gtfs_sl.zip
 *.zip
+shadow-data/

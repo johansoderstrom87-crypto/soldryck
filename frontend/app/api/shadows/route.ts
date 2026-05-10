@@ -3,12 +3,13 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 
-// Try multiple locations: Docker production, then local dev paths
+// Try multiple locations: env-configured volume (prod), Docker default, local dev paths
 const SHADOW_DIRS = [
+  process.env.SHADOW_DATA_PATH,
   join(process.cwd(), "shadow-data"),
   join(process.cwd(), "public", "shadows"),
   join(process.cwd(), "..", "pipeline", "data", "shadows"),
-];
+].filter((p): p is string => Boolean(p));
 
 function findShadowFile(key: string): { path: string; gzipped: boolean } | null {
   for (const dir of SHADOW_DIRS) {
