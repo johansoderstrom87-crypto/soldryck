@@ -13,6 +13,7 @@ RUN npm run build
 
 FROM base AS runner
 WORKDIR /app
+RUN apk add --no-cache su-exec
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV SHADOW_DATA_PATH=/app/shadow-data
@@ -24,10 +25,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --chown=nextjs:nodejs frontend/scripts/seed-shadow-data.mjs ./scripts/seed-shadow-data.mjs
+COPY frontend/scripts/entrypoint.sh ./entrypoint.sh
+RUN chmod +x entrypoint.sh
 
-# Create mount point owned by nextjs so volume is writable
-RUN mkdir -p /app/shadow-data && chown nextjs:nodejs /app/shadow-data
-
-USER nextjs
+# Stay as root so entrypoint can chown the volume mount before dropping to nextjs
 EXPOSE 3000
-CMD ["sh", "-c", "node scripts/seed-shadow-data.mjs && node server.js"]
+CMD ["./entrypoint.sh"]
