@@ -575,6 +575,257 @@ function getAmbientColor(hour: number, date: Date, weatherSymbol?: number): stri
 // Cache for loaded shadow GeoJSON
 const shadowCache = new Map<string, any>();
 
+// Per-venue caches for the photo + hours endpoints. Lazy popup HTML rebuilds
+// the popup DOM on every open, which would otherwise re-fetch both endpoints
+// each time the user reopens a popup (the previous version relied on a
+// `dataset.loaded` flag on a persistent DOM node). Cached values survive
+// popup close/reopen cycles for the lifetime of the page.
+type VenueHoursPayload = {
+  openNow: boolean | null;
+  closesAt: string | null;
+  week: { open: string; close: string }[][] | null;
+} | null;
+const venuePhotoCache = new Map<string, string | null>();
+const venueHoursCache = new Map<string, VenueHoursPayload>();
+
+/**
+ * Single source of truth for "what should this marker look like for the
+ * current (hour, filter, weather)" — used both by the hour-update effect
+ * (mutating ~2 500 existing markers) and by viewport culling (applying
+ * state to a marker we just added back to the map after panning).
+ */
+function computeMarkerState(
+  venue: any,
+  dateKey: string,
+  hour: number,
+  filter: "all" | "sun" | "shade",
+  weather: WeatherData | null,
+): { className: string; visible: boolean } {
+  const status = normalize(getStatus(venue, dateKey, hour));
+  const wSymbol = weather?.hourly[hour]?.symbolCode;
+  const isRain = wSymbol !== undefined && getSymbolInfo(wSymbol).category === "rain";
+
+  let className: string;
+  if (isRain) className = "marker-rain";
+  else if (status === "sun" && wSymbol !== undefined && wSymbol <= 2) className = "marker-sun";
+  else if (status === "sun" && wSymbol !== undefined && wSymbol <= 4) className = "marker-partial";
+  else if (status === "sun") className = "marker-sun";
+  else className = "marker-shade";
+
+  const visible =
+    filter === "all" ||
+    (filter === "sun" && status === "sun") ||
+    (filter === "shade" && (status === "shade" || status === "night"));
+
+  return { className, visible };
+}
+
+/** Push the (className, visible) pair onto a marker's existing DOM. */
+function applyMarkerVisualState(marker: L.Marker, state: { className: string; visible: boolean }) {
+  const iconEl = (marker as any)._icon as HTMLElement | undefined;
+  if (!iconEl) return;
+  const dot = iconEl.firstElementChild as HTMLElement | null;
+  if (dot) dot.className = `marker-dot ${state.className}`;
+  iconEl.style.display = state.visible ? "" : "none";
+}
+
+/**
+ * Render a venue's photo into `container`. Checks the photo cache first;
+ * fetches `/api/venue-photo` only on the very first open per page session.
+ * Required because lazy popups regenerate DOM on each open, defeating the
+ * old `dataset.loaded` flag that the persistent-DOM version relied on.
+ */
+function renderVenuePhoto(container: HTMLElement, venue: any) {
+  const cached = venuePhotoCache.get(venue.id);
+  if (cached !== undefined) {
+    if (cached) {
+      container.innerHTML = `<img src="${cached}" alt="${venue.name}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;display:block" loading="lazy" />`;
+    }
+    return;
+  }
+  const params = new URLSearchParams({
+    id: venue.id, name: venue.name, lat: String(venue.lat), lng: String(venue.lng), type: venue.type,
+  });
+  fetch(`/api/venue-photo?${params}`)
+    .then((r) => r.ok ? r.json() : null)
+    .then((data) => {
+      const url = (data?.photoUrl ?? null) as string | null;
+      venuePhotoCache.set(venue.id, url);
+      if (url) {
+        container.innerHTML = `<img src="${url}" alt="${venue.name}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;display:block" loading="lazy" />`;
+      }
+    })
+    .catch(() => {});
+}
+
+/** Render an opening-hours block from `/api/venue-hours`, with cache. */
+function renderVenueHours(container: HTMLElement, venue: any) {
+  const inject = (data: VenueHoursPayload) => {
+    if (!data || (data.openNow === null && !data.week)) return;
+    const DAYS = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
+    const todayMon0 = (new Date().getDay() + 6) % 7;
+    const dotColor = data.openNow ? "#10b981" : data.openNow === false ? "#ef4444" : "#94a3b8";
+    const statusText = data.openNow
+      ? `Öppet${data.closesAt ? ` — stänger ${data.closesAt}` : ""}`
+      : data.openNow === false
+        ? "Stängt just nu"
+        : "Öppettider";
+
+    const weekRows = data.week?.map((segments, i) => {
+      const isToday = i === todayMon0;
+      const timeText = segments.length
+        ? segments.map((s) => `${s.open}–${s.close}`).join(", ")
+        : "Stängt";
+      const closed = segments.length === 0;
+      return `
+        <div class="venue-hours-row${isToday ? " venue-hours-row-today" : ""}">
+          <span class="venue-hours-day">${DAYS[i]}</span>
+          <span class="venue-hours-time${closed ? " venue-hours-closed" : ""}">${timeText}</span>
+        </div>
+      `;
+    }).join("") ?? "";
+
+    const weekHtml = data.week && data.week.length
+      ? `<div class="venue-hours-week" style="display:none">${weekRows}</div>`
+      : "";
+
+    container.innerHTML = `
+      <div class="venue-hours-status">
+        <span class="venue-hours-dot" style="background:${dotColor}"></span>
+        <span class="venue-hours-status-text">${statusText}</span>
+        ${weekHtml ? `<button class="hours-toggle" aria-expanded="false">
+          <span class="hours-toggle-label">Visa alla</span>
+          <svg class="hours-toggle-caret" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 3.5L5 6.5L8 3.5" /></svg>
+        </button>` : ""}
+      </div>
+      ${weekHtml}
+    `;
+
+    const toggle = container.querySelector<HTMLButtonElement>(".hours-toggle");
+    const week = container.querySelector<HTMLDivElement>(".venue-hours-week");
+    if (toggle && week) {
+      toggle.onclick = () => {
+        const visible = week.style.display !== "none";
+        week.style.display = visible ? "none" : "block";
+        toggle.setAttribute("aria-expanded", visible ? "false" : "true");
+        const label = toggle.querySelector(".hours-toggle-label");
+        if (label) label.textContent = visible ? "Visa alla" : "Dölj";
+      };
+    }
+  };
+
+  if (venueHoursCache.has(venue.id)) {
+    inject(venueHoursCache.get(venue.id) as VenueHoursPayload);
+    return;
+  }
+  const params = new URLSearchParams({
+    id: venue.id, name: venue.name, lat: String(venue.lat), lng: String(venue.lng), type: venue.type,
+  });
+  fetch(`/api/venue-hours?${params}`)
+    .then((r) => r.ok ? r.json() : null)
+    .then((data: VenueHoursPayload) => {
+      venueHoursCache.set(venue.id, data);
+      inject(data);
+    })
+    .catch(() => {});
+}
+
+/**
+ * Builds popup HTML for a confirmed venue. Called lazily by Leaflet on
+ * popupopen — paying the ~3–5 KB string + 16-hour `getBestHour` loop only
+ * for the venue the user actually opens. Keeps the build effect from
+ * pre-allocating ~25 MB of popup strings for 2 500 venues, and means the
+ * "current hour" highlight is always fresh (not frozen at build time).
+ */
+function buildVenuePopupHtml(
+  venue: any,
+  dateKey: string,
+  hour: number,
+  weather: WeatherData | null,
+): string {
+  const status = normalize(getStatus(venue, dateKey, hour));
+  const sunHours = getSunHrs(venue, dateKey);
+  const hours = Array.from({ length: 16 }, (_, i) => i + 7);
+
+  const hourLabels = hours
+    .map((h) => {
+      const bold = h === hour ? "font-weight:700;color:#0f172a" : "";
+      return `<div style="width:12px;text-align:center;font-size:7px;color:#94a3b8;flex-shrink:0;${bold}">${h}</div>`;
+    })
+    .join("");
+
+  const shadowTimeline = hours
+    .map((h) => {
+      const s = normalize(getStatus(venue, dateKey, h));
+      const bg =
+        s === "sun" ? "background:#f59e0b"
+        : s === "partial" ? "background:#fb923c"
+        : s === "night" ? "background:#1e293b"
+        : "background:#cbd5e1";
+      const border = h === hour ? "border:2px solid #0f172a" : "";
+      return `<div style="width:12px;height:12px;border-radius:2px;${bg};${border};flex-shrink:0" title="${h}:00 — ${statusToLabel(s)}"></div>`;
+    })
+    .join("");
+
+  const bestHour = getBestHour(venue, dateKey, weather);
+  const bestHourLine = bestHour
+    ? `<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:6px;padding:4px 8px;margin-top:4px;display:flex;align-items:center;gap:5px">
+        <span style="font-size:12px">&#11088;</span>
+        <span style="font-size:11px;color:#78350f;font-weight:500">B&auml;sta timmen: ${bestHour.label}</span>
+      </div>`
+    : "";
+
+  const address = venue.address || venue.addr_street
+    ? `<div style="color:#94a3b8;font-size:11px;margin-top:1px">${venue.address || ""}</div>`
+    : "";
+
+  return `
+    <div style="min-width:240px">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">
+        <div>
+          <strong style="font-size:14px;line-height:1.2">${venue.name}</strong>
+          <div style="color:#64748b;font-size:11px;margin-top:1px">${typeToLabel(venue.type)}${address ? ` · ${venue.address || ""}` : ""}</div>
+        </div>
+        <span style="font-size:20px;margin-left:6px">${statusToEmoji(status)}</span>
+      </div>
+      <div style="background:#f8fafc;border-radius:6px;padding:5px 6px;margin-top:2px">
+        <div style="display:flex;gap:1px;flex-wrap:nowrap;overflow-x:auto">${shadowTimeline}</div>
+        <div style="display:flex;gap:1px;flex-wrap:nowrap;margin-top:1px">${hourLabels}</div>
+      </div>
+      ${bestHourLine}
+      <div style="font-size:11px;color:#64748b;margin-top:4px">${sunHours} soltimmar (vid klart v&auml;der)</div>
+      <div id="venue-photo-${venue.id}" style="margin-top:6px"></div>
+      <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
+      <div style="display:flex;gap:4px;margin-top:6px">
+        <button
+          class="fav-btn"
+          data-venue-id="${venue.id}"
+          style="flex:0 0 32px;padding:3px;border:1px solid #fecaca;border-radius:6px;background:#fff;color:#ef4444;font-size:14px;cursor:pointer;text-align:center"
+          title="Spara som favorit"
+        >${getFavorites().has(venue.id) ? "&#10084;&#65039;" : "&#9825;"}</button>
+        <a
+          href="https://www.google.com/maps/place/${encodeURIComponent(venue.name)}/@${venue.lat},${venue.lng},17z"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Öppna i Google Maps"
+          style="flex:0 0 32px;padding:3px;border:1px solid #fca5a5;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none"
+        ><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></a>
+        <button
+          class="share-btn"
+          data-venue-id="${venue.id}"
+          data-venue-name="${venue.name}"
+          style="flex:1;padding:3px 8px;border:1px solid #fde68a;border-radius:6px;background:#fffbeb;color:#92400e;font-size:10px;cursor:pointer;text-align:center;font-weight:500"
+        >&#128279; Dela</button>
+        <button
+          class="feedback-btn"
+          data-venue-id="${venue.id}"
+          style="flex:1;padding:3px 8px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;color:#94a3b8;font-size:10px;cursor:pointer;text-align:center"
+        >St&auml;mmer inte?</button>
+      </div>
+    </div>
+  `;
+}
+
 export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, focusVenueId, onFocusHandled, metroStation }: SunMapProps) {
   // Defer expensive map rebuild while the user is actively scrubbing the timeline
   const hour = useDeferredValue(hourProp);
@@ -591,6 +842,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // Latest hour for popup handlers (e.g. share-link) attached at build time.
   const hourRef = useRef(0);
   hourRef.current = hourProp;
+  // Latest filter so cull-on-pan can apply correct visibility to markers
+  // that re-enter the viewport without going through the hour-update effect.
+  const filterRef = useRef<"all" | "sun" | "shade">("all");
+  filterRef.current = filter;
   const unconfirmedMarkersRef = useRef<L.Marker[]>([]);
   const metroMarkersRef = useRef<L.Marker[]>([]);
   const metroNetworkRef = useRef<L.LayerGroup | null>(null);
@@ -966,14 +1221,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     markersRef.current = [];
     markerVenuesRef.current = [];
 
-    const currentWeather = weather?.hourly[hour];
-    const weatherSymbol = currentWeather?.symbolCode;
-
     allVenues.forEach((venue: any) => {
-      const rawStatus = getStatus(venue, dateKey, hour);
-      const status = normalize(rawStatus);
-      const sunHours = getSunHrs(venue, dateKey);
-
       // Filter by metro station proximity
       if (metroStation) {
         const dist = distanceM(venue.lat, venue.lng, metroStation.lat, metroStation.lng);
@@ -997,23 +1245,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         if (!hasSunAllHours) return;
       }
 
-      // Initial marker class for the current hour. The update effect mutates
-      // this class on hour change without recreating the icon. Visual size is
-      // CSS-driven off the status class (see globals.css), so iconSize stays
-      // uniform — no L.Icon recreation needed when status flips.
-      const isRain = weatherSymbol && getSymbolInfo(weatherSymbol).category === "rain";
-      const isActuallySunny = status === "sun" && weatherSymbol !== undefined && weatherSymbol <= 2;
-
-      let markerClass: string;
-      if (isRain) markerClass = "marker-rain";
-      else if (isActuallySunny) markerClass = "marker-sun";
-      else if (status === "sun" && weatherSymbol && weatherSymbol <= 4) markerClass = "marker-partial";
-      else if (status === "sun") markerClass = "marker-sun";
-      else markerClass = "marker-shade";
-
-      const initiallyHidden =
-        (filter === "sun" && status !== "sun") ||
-        (filter === "shade" && status !== "shade" && status !== "night");
+      // Initial state seeded into the divIcon HTML — overwritten by
+      // applyMarkerVisualState the moment the cull function adds this marker
+      // to the map (or by the hour-update effect on subsequent ticks).
+      const initial = computeMarkerState(venue, dateKey, hour, filter, weather);
+      const markerClass = initial.className;
 
       const svgIcon = typeToSvgIcon(venue.type);
       const shortName = venue.name.length > 20 ? venue.name.slice(0, 18) + "…" : venue.name;
@@ -1039,91 +1275,15 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         popupAnchor: [0, -ICON_SIZE / 2 - 4],
       });
 
-      // Hourly timeline — dual rows: shadow + weather
-      const hours = Array.from({ length: 16 }, (_, i) => i + 7);
-
-      const hourLabels = hours
-        .map((h) => {
-          const bold = h === hour ? "font-weight:700;color:#0f172a" : "";
-          return `<div style="width:12px;text-align:center;font-size:7px;color:#94a3b8;flex-shrink:0;${bold}">${h}</div>`;
-        })
-        .join("");
-
-      const shadowTimeline = hours
-        .map((h) => {
-          const s = normalize(getStatus(venue, dateKey, h));
-          const bg =
-            s === "sun" ? "background:#f59e0b"
-            : s === "partial" ? "background:#fb923c"
-            : s === "night" ? "background:#1e293b"
-            : "background:#cbd5e1";
-          const border = h === hour ? "border:2px solid #0f172a" : "";
-          return `<div style="width:12px;height:12px;border-radius:2px;${bg};${border};flex-shrink:0" title="${h}:00 — ${statusToLabel(s)}"></div>`;
-        })
-        .join("");
-
-      // Best hour recommendation
-      const bestHour = getBestHour(venue, dateKey, weather);
-      const bestHourLine = bestHour
-        ? `<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:6px;padding:4px 8px;margin-top:4px;display:flex;align-items:center;gap:5px">
-            <span style="font-size:12px">&#11088;</span>
-            <span style="font-size:11px;color:#78350f;font-weight:500">B&auml;sta timmen: ${bestHour.label}</span>
-          </div>`
-        : "";
-
-      const address = venue.address || venue.addr_street
-        ? `<div style="color:#94a3b8;font-size:11px;margin-top:1px">${venue.address || ""}</div>`
-        : "";
-
-      const popup = L.popup({ maxWidth: 280 }).setContent(`
-        <div style="min-width:240px">
-          <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">
-            <div>
-              <strong style="font-size:14px;line-height:1.2">${venue.name}</strong>
-              <div style="color:#64748b;font-size:11px;margin-top:1px">${typeToLabel(venue.type)}${address ? ` · ${venue.address || ""}` : ""}</div>
-            </div>
-            <span style="font-size:20px;margin-left:6px">${statusToEmoji(status)}</span>
-          </div>
-          <div style="background:#f8fafc;border-radius:6px;padding:5px 6px;margin-top:2px">
-            <div style="display:flex;gap:1px;flex-wrap:nowrap;overflow-x:auto">${shadowTimeline}</div>
-            <div style="display:flex;gap:1px;flex-wrap:nowrap;margin-top:1px">${hourLabels}</div>
-          </div>
-          ${bestHourLine}
-          <div style="font-size:11px;color:#64748b;margin-top:4px">${sunHours} soltimmar (vid klart v&auml;der)</div>
-          <div id="venue-photo-${venue.id}" style="margin-top:6px"></div>
-          <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
-          <div style="display:flex;gap:4px;margin-top:6px">
-            <button
-              class="fav-btn"
-              data-venue-id="${venue.id}"
-              style="flex:0 0 32px;padding:3px;border:1px solid #fecaca;border-radius:6px;background:#fff;color:#ef4444;font-size:14px;cursor:pointer;text-align:center"
-              title="Spara som favorit"
-            >${getFavorites().has(venue.id) ? "&#10084;&#65039;" : "&#9825;"}</button>
-            <a
-              href="https://www.google.com/maps/place/${encodeURIComponent(venue.name)}/@${venue.lat},${venue.lng},17z"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Öppna i Google Maps"
-              style="flex:0 0 32px;padding:3px;border:1px solid #fca5a5;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none"
-            ><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></a>
-            <button
-              class="share-btn"
-              data-venue-id="${venue.id}"
-              data-venue-name="${venue.name}"
-              style="flex:1;padding:3px 8px;border:1px solid #fde68a;border-radius:6px;background:#fffbeb;color:#92400e;font-size:10px;cursor:pointer;text-align:center;font-weight:500"
-            >&#128279; Dela</button>
-            <button
-              class="feedback-btn"
-              data-venue-id="${venue.id}"
-              style="flex:1;padding:3px 8px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;color:#94a3b8;font-size:10px;cursor:pointer;text-align:center"
-            >St&auml;mmer inte?</button>
-          </div>
-        </div>
-      `);
-
-      const marker = L.marker([venue.lat, venue.lng], { icon })
-        .addTo(map)
-        .bindPopup(popup);
+      // Popup HTML is built lazily on open via the function form of bindPopup.
+      // The function reads hour/weather from refs so it always reflects the
+      // current slider state — no stale "current hour" highlight.
+      // Marker is NOT added to the map here; cullToViewport (below) only
+      // adds markers that are actually inside the buffered viewport.
+      const marker = L.marker([venue.lat, venue.lng], { icon }).bindPopup(
+        () => buildVenuePopupHtml(venue, dateKey, hourRef.current, weatherRef.current),
+        { maxWidth: 280 },
+      );
 
       marker.on("popupopen", () => {
         // Favorite button
@@ -1135,94 +1295,14 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           };
         }
 
-        // Fetch venue photo
+        // Photo + hours render through cached helpers — fetch happens at most
+        // once per venue per page session, regardless of how many times the
+        // user opens this popup.
         const photoContainer = document.getElementById(`venue-photo-${venue.id}`);
-        if (photoContainer && !photoContainer.dataset.loaded) {
-          photoContainer.dataset.loaded = "1";
-          const params = new URLSearchParams({
-            id: venue.id,
-            name: venue.name,
-            lat: String(venue.lat),
-            lng: String(venue.lng),
-            type: venue.type,
-          });
-          fetch(`/api/venue-photo?${params}`)
-            .then((r) => r.ok ? r.json() : null)
-            .then((data) => {
-              if (!data?.photoUrl) return;
-              photoContainer.innerHTML = `<img src="${data.photoUrl}" alt="${venue.name}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;display:block" loading="lazy" />`;
-            })
-            .catch(() => {});
-        }
+        if (photoContainer) renderVenuePhoto(photoContainer, venue);
 
-        // Fetch venue hours (Google Places)
         const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
-        if (hoursContainer && !hoursContainer.dataset.loaded) {
-          hoursContainer.dataset.loaded = "1";
-          const params = new URLSearchParams({
-            id: venue.id,
-            name: venue.name,
-            lat: String(venue.lat),
-            lng: String(venue.lng),
-            type: venue.type,
-          });
-          fetch(`/api/venue-hours?${params}`)
-            .then((r) => r.ok ? r.json() : null)
-            .then((data: { openNow: boolean | null; closesAt: string | null; week: { open: string; close: string }[][] | null } | null) => {
-              if (!data || (data.openNow === null && !data.week)) return;
-              const DAYS = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
-              const todayMon0 = (new Date().getDay() + 6) % 7;
-              const dotColor = data.openNow ? "#10b981" : data.openNow === false ? "#ef4444" : "#94a3b8";
-              const statusText = data.openNow
-                ? `Öppet${data.closesAt ? ` — stänger ${data.closesAt}` : ""}`
-                : data.openNow === false
-                  ? "Stängt just nu"
-                  : "Öppettider";
-
-              const weekRows = data.week?.map((segments, i) => {
-                const isToday = i === todayMon0;
-                const timeText = segments.length
-                  ? segments.map((s) => `${s.open}–${s.close}`).join(", ")
-                  : "Stängt";
-                const closed = segments.length === 0;
-                return `
-                  <div class="venue-hours-row${isToday ? " venue-hours-row-today" : ""}">
-                    <span class="venue-hours-day">${DAYS[i]}</span>
-                    <span class="venue-hours-time${closed ? " venue-hours-closed" : ""}">${timeText}</span>
-                  </div>
-                `;
-              }).join("") ?? "";
-
-              const weekHtml = data.week && data.week.length
-                ? `<div class="venue-hours-week" style="display:none">${weekRows}</div>`
-                : "";
-
-              hoursContainer.innerHTML = `
-                <div class="venue-hours-status">
-                  <span class="venue-hours-dot" style="background:${dotColor}"></span>
-                  <span class="venue-hours-status-text">${statusText}</span>
-                  ${weekHtml ? `<button class="hours-toggle" aria-expanded="false">
-                    <span class="hours-toggle-label">Visa alla</span>
-                    <svg class="hours-toggle-caret" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 3.5L5 6.5L8 3.5" /></svg>
-                  </button>` : ""}
-                </div>
-                ${weekHtml}
-              `;
-
-              const toggle = hoursContainer.querySelector<HTMLButtonElement>(".hours-toggle");
-              const week = hoursContainer.querySelector<HTMLDivElement>(".venue-hours-week");
-              if (toggle && week) {
-                toggle.onclick = () => {
-                  const visible = week.style.display !== "none";
-                  week.style.display = visible ? "none" : "block";
-                  toggle.setAttribute("aria-expanded", visible ? "false" : "true");
-                  const label = toggle.querySelector(".hours-toggle-label");
-                  if (label) label.textContent = visible ? "Visa alla" : "Dölj";
-                };
-              }
-            })
-            .catch(() => {});
-        }
+        if (hoursContainer) renderVenueHours(hoursContainer, venue);
 
         // Share button
         const shareBtn = document.querySelector(`.share-btn[data-venue-id="${venue.id}"]`);
@@ -1250,7 +1330,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         if (btn && onFeedback) {
           (btn as HTMLElement).onclick = () => {
             const currentSchedule: Record<number, "sun" | "shade" | "night"> = {};
-            for (const h of hours) {
+            for (let h = 7; h <= 22; h++) {
               currentSchedule[h] = normalize(getStatus(venue, dateKey, h)) as "sun" | "shade" | "night";
             }
             onFeedback({
@@ -1264,56 +1344,68 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         }
       });
 
-      if (initiallyHidden) {
-        const iconEl = (marker as any)._icon as HTMLElement | undefined;
-        if (iconEl) iconEl.style.display = "none";
-      }
-
       markersRef.current.push(marker);
       markerVenuesRef.current.push({ marker, venue });
     });
 
-    // Collision detection: reassign badge positions to avoid overlap
+    // Viewport culling — only ~200–500 markers (those visible + a 30 % buffer)
+    // are actually attached to the map. Off-screen markers stay as L.Marker
+    // objects in memory but contribute zero DOM nodes / zero zoom-recompute
+    // cost. The buffer is wide enough that fast pans don't reveal blank
+    // tiles before moveend fires.
+    function cullToViewport() {
+      const m = mapRef.current;
+      if (!m) return;
+      const bounds = m.getBounds();
+      const latBuf = (bounds.getNorth() - bounds.getSouth()) * 0.3;
+      const lngBuf = (bounds.getEast() - bounds.getWest()) * 0.3;
+      const south = bounds.getSouth() - latBuf;
+      const north = bounds.getNorth() + latBuf;
+      const west = bounds.getWest() - lngBuf;
+      const east = bounds.getEast() + lngBuf;
+
+      for (const { marker: mk, venue: v } of markerVenuesRef.current) {
+        const ll = mk.getLatLng();
+        const inside = ll.lat >= south && ll.lat <= north && ll.lng >= west && ll.lng <= east;
+        const onMap = !!((mk as any)._map);
+        if (inside && !onMap) {
+          mk.addTo(m);
+          // Newly-attached marker: paint its current (hour, filter, weather) state.
+          applyMarkerVisualState(
+            mk,
+            computeMarkerState(v, dateKey, hourRef.current, filterRef.current, weatherRef.current),
+          );
+        } else if (!inside && onMap) {
+          mk.remove();
+        }
+      }
+    }
+
+    cullToViewport();
     resolveBadgeCollisions(map, markersRef.current);
-    function handleCollisions() { if (mapRef.current) resolveBadgeCollisions(mapRef.current, markersRef.current); }
-    map.on("zoomend moveend", handleCollisions);
+
+    function handleViewportChange() {
+      cullToViewport();
+      if (mapRef.current) resolveBadgeCollisions(mapRef.current, markersRef.current);
+    }
+    map.on("zoomend moveend", handleViewportChange);
 
     return () => {
-      map.off("zoomend moveend", handleCollisions);
+      map.off("zoomend moveend", handleViewportChange);
     };
   }, [dateKey, typeFilter, sunRange, weather, metroStation]);
 
-  // Hour & sun/shade-filter update — fast path. Just retoggles the .marker-dot
-  // class and visibility on existing markers. No L.Marker churn, no popup
-  // rebuild, no iconSize change. ~2 500 markers updated in a single tight
-  // loop instead of being torn down and re-added on every timeline tick.
+  // Hour & sun/shade-filter update — fast path. Retoggles `.marker-dot`'s
+  // class and visibility on existing markers. Markers outside the viewport
+  // (no `_icon`) are skipped automatically by applyMarkerVisualState.
   useEffect(() => {
     if (!mapRef.current) return;
 
-    const w = weatherRef.current;
-    const wSymbol = w?.hourly[hour]?.symbolCode;
-    const isRain = wSymbol !== undefined && getSymbolInfo(wSymbol).category === "rain";
-
     for (const { marker, venue } of markerVenuesRef.current) {
-      const status = normalize(getStatus(venue, dateKey, hour));
-
-      let markerClass: string;
-      if (isRain) markerClass = "marker-rain";
-      else if (status === "sun" && wSymbol !== undefined && wSymbol <= 2) markerClass = "marker-sun";
-      else if (status === "sun" && wSymbol !== undefined && wSymbol <= 4) markerClass = "marker-partial";
-      else if (status === "sun") markerClass = "marker-sun";
-      else markerClass = "marker-shade";
-
-      const visible =
-        filter === "all" ||
-        (filter === "sun" && status === "sun") ||
-        (filter === "shade" && (status === "shade" || status === "night"));
-
-      const iconEl = (marker as any)._icon as HTMLElement | undefined;
-      if (!iconEl) continue;
-      const dot = iconEl.firstElementChild as HTMLElement | null;
-      if (dot) dot.className = `marker-dot ${markerClass}`;
-      iconEl.style.display = visible ? "" : "none";
+      applyMarkerVisualState(
+        marker,
+        computeMarkerState(venue, dateKey, hour, filter, weatherRef.current),
+      );
     }
 
     // When the sun/shade filter is active, visibility flips per hour. At
@@ -1343,12 +1435,21 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     const targetVenue = allVenues.find((v: any) => v.id === focusVenueId);
     if (targetVenue) {
       map.setView([targetVenue.lat, targetVenue.lng], 16, { animate: true });
-      const targetMarker = markersRef.current.find((m) => {
+      const found = markerVenuesRef.current.find(({ marker: m }) => {
         const ll = m.getLatLng();
         return Math.abs(ll.lat - targetVenue.lat) < 0.0001 && Math.abs(ll.lng - targetVenue.lng) < 0.0001;
       });
-      if (targetMarker) {
-        setTimeout(() => targetMarker.openPopup(), 500);
+      if (found) {
+        // Cull may not have added this marker yet (setView is mid-animation).
+        // Force-attach it so openPopup has DOM to render into.
+        if (!((found.marker as any)._map)) {
+          found.marker.addTo(map);
+          applyMarkerVisualState(
+            found.marker,
+            computeMarkerState(found.venue, dateKey, hourRef.current, filterRef.current, weatherRef.current),
+          );
+        }
+        setTimeout(() => found.marker.openPopup(), 500);
       }
     }
     onFocusHandled?.();
@@ -1437,67 +1538,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           .bindPopup(popup);
 
         marker.on("popupopen", () => {
-          // Fetch venue photo
           const photoContainer = document.getElementById(`venue-photo-${venue.id}`);
-          if (photoContainer && !photoContainer.dataset.loaded) {
-            photoContainer.dataset.loaded = "1";
-            const params = new URLSearchParams({
-              id: venue.id,
-              name: venue.name,
-              lat: String(venue.lat),
-              lng: String(venue.lng),
-              type: venue.type,
-            });
-            fetch(`/api/venue-photo?${params}`)
-              .then((r) => r.ok ? r.json() : null)
-              .then((data) => {
-                if (!data?.photoUrl) return;
-                photoContainer.innerHTML = `<img src="${data.photoUrl}" alt="${venue.name}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;display:block" loading="lazy" />`;
-              })
-              .catch(() => {});
-          }
+          if (photoContainer) renderVenuePhoto(photoContainer, venue);
 
-          // Fetch opening hours
           const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
-          if (hoursContainer && !hoursContainer.dataset.loaded) {
-            hoursContainer.dataset.loaded = "1";
-            const params = new URLSearchParams({ id: venue.id, name: venue.name, lat: String(venue.lat), lng: String(venue.lng), type: venue.type });
-            fetch(`/api/venue-hours?${params}`)
-              .then((r) => r.ok ? r.json() : null)
-              .then((data: { openNow: boolean | null; closesAt: string | null; week: { open: string; close: string }[][] | null } | null) => {
-                if (!data || (data.openNow === null && !data.week)) return;
-                const DAYS = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
-                const todayMon0 = (new Date().getDay() + 6) % 7;
-                const dotColor = data.openNow ? "#10b981" : data.openNow === false ? "#ef4444" : "#94a3b8";
-                const statusText = data.openNow
-                  ? `Öppet${data.closesAt ? ` — stänger ${data.closesAt}` : ""}`
-                  : data.openNow === false ? "Stängt just nu" : "Öppettider";
-                const weekRows = data.week?.map((segments, i) => {
-                  const isToday = i === todayMon0;
-                  const timeText = segments.length ? segments.map((s) => `${s.open}–${s.close}`).join(", ") : "Stängt";
-                  return `<div class="venue-hours-row${isToday ? " venue-hours-row-today" : ""}"><span class="venue-hours-day">${DAYS[i]}</span><span class="venue-hours-time${!segments.length ? " venue-hours-closed" : ""}">${timeText}</span></div>`;
-                }).join("") ?? "";
-                const weekHtml = data.week?.length ? `<div class="venue-hours-week" style="display:none">${weekRows}</div>` : "";
-                hoursContainer.innerHTML = `
-                  <div class="venue-hours-status">
-                    <span class="venue-hours-dot" style="background:${dotColor}"></span>
-                    <span class="venue-hours-status-text">${statusText}</span>
-                    ${weekHtml ? `<button class="hours-toggle" aria-expanded="false"><span class="hours-toggle-label">Visa alla</span><svg class="hours-toggle-caret" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 3.5L5 6.5L8 3.5" /></svg></button>` : ""}
-                  </div>${weekHtml}`;
-                const toggle = hoursContainer.querySelector<HTMLButtonElement>(".hours-toggle");
-                const week = hoursContainer.querySelector<HTMLDivElement>(".venue-hours-week");
-                if (toggle && week) {
-                  toggle.onclick = () => {
-                    const visible = week.style.display !== "none";
-                    week.style.display = visible ? "none" : "block";
-                    toggle.setAttribute("aria-expanded", visible ? "false" : "true");
-                    const label = toggle.querySelector(".hours-toggle-label");
-                    if (label) label.textContent = visible ? "Visa alla" : "Dölj";
-                  };
-                }
-              })
-              .catch(() => {});
-          }
+          if (hoursContainer) renderVenueHours(hoursContainer, venue);
 
           // "Vet du?" button → open feedback modal in seating mode
           const seatingBtn = document.querySelector(`.seating-btn[data-venue-id="${venue.id}"]`);

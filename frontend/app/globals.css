@@ -45,6 +45,10 @@ body {
 .marker-root {
   background: transparent !important;
   border: none !important;
+  /* Layout/style containment isolates each marker so a class change on one
+     dot can't trigger reflow of its siblings. With ~2 500 markers this
+     measurably reduces paint cost during hour scrubs and zoom. */
+  contain: layout style;
 }
 .marker-root:not(.marker-unconfirmed) {
   display: flex;
