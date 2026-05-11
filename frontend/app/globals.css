@@ -380,7 +380,8 @@ body {
   font-size: 8px;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.25);
+  /* Yttre vit halo + drop shadow för att poppa mot kartan */
+  box-shadow: 0 0 0 1.5px #fff, 0 1px 2px rgba(15, 23, 42, 0.3);
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
 }
 .metro-entrance-dot--lg {
@@ -388,7 +389,7 @@ body {
   height: 14px;
   border-width: 2.5px;
   font-size: 10px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.3);
+  box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(15, 23, 42, 0.35);
 }
 
 /* Venue opening hours — premium look inside popup */

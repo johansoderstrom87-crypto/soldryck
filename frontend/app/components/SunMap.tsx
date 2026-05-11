@@ -1010,24 +1010,37 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       corridorPane.style.pointerEvents = "none";
     }
 
-    // Station→färg lookup: link[0] är stationens [lat, lng]
-    const stationColor = new Map<string, string>();
+    // Station→snap lookup: pa/pb är perrongens ändpunkter, så vi kan rita
+    //    varje uppgång från NÄRMASTE punkt på perrongkanten (inte centerstrålning)
+    type SnapInfo = { pa: [number, number]; pb: [number, number]; color: string };
+    const stationSnapMap = new Map<string, SnapInfo>();
     for (const snap of allSnaps) {
-      stationColor.set(`${snap.station.lat},${snap.station.lng}`, lineColors[snap.color]);
+      if (snap.pa && snap.pb) {
+        stationSnapMap.set(`${snap.station.lat},${snap.station.lng}`, {
+          pa: snap.pa, pb: snap.pb, color: lineColors[snap.color],
+        });
+      }
     }
 
-    // Upplysta gångar: glow + corridor i linjefärgen
+    // Upplysta gångar: en separat linje per uppgång, från närmaste punkt på
+    //    perrongen → entrén. Vit glow under, färgad linje över.
     for (const ent of metroNetwork.METRO_ENTRANCES) {
-      const lc = stationColor.get(`${ent.link[0][0]},${ent.link[0][1]}`) ?? "#64748b";
-      // Yttre glow
-      L.polyline(ent.link, {
-        color: lc, weight: 6, opacity: 0.18,
+      const info = stationSnapMap.get(`${ent.link[0][0]},${ent.link[0][1]}`);
+      const lc = info?.color ?? "#64748b";
+      const startPt: [number, number] = info
+        ? nearestOnSegment(ent.lat, ent.lng, info.pa, info.pb)
+        : (ent.link[0] as [number, number]);
+      const corridor: [[number, number], [number, number]] = [startPt, [ent.lat, ent.lng]];
+
+      // Vit glow (under) — bredare så den sticker ut 2px på varje sida
+      L.polyline(corridor, {
+        color: "#ffffff", weight: 8, opacity: 0.55,
         lineCap: "round", interactive: false,
         pane: "metroCorridorPane",
       }).addTo(layer);
-      // Inre korridor
-      L.polyline(ent.link, {
-        color: lc, weight: 2.5, opacity: 0.7,
+      // Färgad korridor (över) — 4px, 40% opacity i linjefärgen
+      L.polyline(corridor, {
+        color: lc, weight: 4, opacity: 0.4,
         lineCap: "round", interactive: false,
         pane: "metroCorridorPane",
       }).addTo(layer);
@@ -1051,7 +1064,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     // Entré-ikoner: vit cirkel + färgad ring + ↑
     for (const ent of metroNetwork.METRO_ENTRANCES) {
-      const lc = stationColor.get(`${ent.link[0][0]},${ent.link[0][1]}`) ?? "#64748b";
+      const lc = stationSnapMap.get(`${ent.link[0][0]},${ent.link[0][1]}`)?.color ?? "#64748b";
       const titleAttr = ent.name ? ` title="${ent.name.replace(/"/g, "&quot;")}"` : "";
       const entranceIcon = L.divIcon({
         className: "metro-entrance",
@@ -1164,16 +1177,16 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         for (const ent of entrances) {
           const nearPt = nearestOnSegment(ent.lat, ent.lng, p1, p2);
 
-          // Yttre glow — ger gången en upplyst känsla
+          // Vit glow (under) — bredare för att simulera upplyst gång
           L.polyline([nearPt, [ent.lat, ent.lng]], {
-            color: lc, weight: 12, opacity: 0.22,
+            color: "#ffffff", weight: 8, opacity: 0.55,
             lineCap: "round", interactive: false,
             pane: "metroCorridorPane",
           }).addTo(detail);
 
-          // Inre korridor i linjens färg
+          // Färgad korridor (över) — 4px, 40% opacity
           L.polyline([nearPt, [ent.lat, ent.lng]], {
-            color: lc, weight: 5, opacity: 0.75,
+            color: lc, weight: 4, opacity: 0.4,
             lineCap: "round", interactive: false,
             pane: "metroCorridorPane",
           }).addTo(detail);
@@ -1194,7 +1207,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             const exitLabel = L.divIcon({
               className: "metro-exit-label",
               html: `<span class="metro-exit-name">${ent.name}</span>`,
-              iconAnchor: [-6, 10],
+              // Höger om ikonen (14px) + halo (2px) + 2px gap → x = -13.
+              //    Vertikalt centrerat på ikonen (label ~12px hög) → y = 6.
+              iconAnchor: [-13, 6],
             });
             L.marker([ent.lat, ent.lng], { icon: exitLabel, interactive: false }).addTo(detail);
           }
