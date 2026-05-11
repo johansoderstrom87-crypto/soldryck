@@ -154,11 +154,14 @@ export default function Home() {
                 width: 48,
                 height: 52,
                 background: "rgba(255,255,255,0.28)",
+                backgroundImage: active
+                  ? "linear-gradient(135deg, rgba(251,146,60,0.28) 0%, rgba(245,158,11,0.14) 100%)"
+                  : undefined,
                 backdropFilter: "blur(16px) saturate(1.5)",
                 WebkitBackdropFilter: "blur(16px) saturate(1.5)",
                 border: "0.5px solid rgba(255,255,255,0.55)",
                 boxShadow: active
-                  ? "0 0 24px rgba(251,146,60,0.65), 0 0 12px rgba(251,146,60,0.5), 0 4px 12px rgba(251,146,60,0.35)"
+                  ? "inset 0 0 0 1.5px rgba(251,146,60,0.7), inset 0 0 10px rgba(251,146,60,0.45), 0 2px 8px rgba(0,0,0,0.08)"
                   : "0 2px 8px rgba(0,0,0,0.08)",
                 color: active ? "#0f172a" : "#888",
                 opacity: active ? 1 : 0.72,
