@@ -130,8 +130,10 @@ function SettingsButton({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="rounded-xl px-2.5 py-1.5 flex items-center gap-1.5 transition-all text-slate-700"
+        className="rounded-xl flex items-center justify-center transition-all text-slate-700 relative"
         style={{
+          width: 40,
+          height: 40,
           background: "rgba(255,255,255,0.3)",
           backdropFilter: "blur(14px) saturate(1.3)",
           WebkitBackdropFilter: "blur(14px) saturate(1.3)",
@@ -143,38 +145,40 @@ function SettingsButton({
         title="Inställningar"
       >
         {/* Hamburger icon */}
-        <svg width="17" height="14" viewBox="0 0 17 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+        <svg width="18" height="15" viewBox="0 0 17 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <line x1="1" y1="2" x2="16" y2="2" />
           <line x1="1" y1="7" x2="16" y2="7" />
           <line x1="1" y1="12" x2="16" y2="12" />
         </svg>
         {activeCount > 0 && (
-          <span className="bg-amber-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold">
+          <span className="absolute -top-1 -right-1 bg-amber-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow">
             {activeCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 rounded-xl p-1 min-w-[200px] z-[2000]" style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", border: "0.5px solid rgba(255,255,255,0.7)", boxShadow: "0 8px 32px rgba(0,0,0,0.12)", transform: "translateZ(0)", isolation: "isolate" }}>
+        <div className="absolute top-full left-0 mt-1 rounded-xl p-1 min-w-[220px] z-[2000]" style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", border: "0.5px solid rgba(255,255,255,0.7)", boxShadow: "0 8px 32px rgba(0,0,0,0.12)", transform: "translateZ(0)", isolation: "isolate" }}>
 
-          {/* Install app — only shown when browser supports it */}
-          {installPrompt && (
-            <>
-              <button
-                onClick={handleInstall}
-                className="w-full px-2.5 py-2 rounded-lg text-xs font-semibold text-left flex items-center gap-2 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors border border-amber-200"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                Installera appen
-              </button>
-              <div className="border-t border-slate-200 my-1" />
-            </>
-          )}
+          {/* Logo header */}
+          <div className="flex items-center gap-2 px-2 pt-2 pb-2.5">
+            <Image
+              src="/logo.png"
+              alt="Soldryck"
+              width={32}
+              height={38}
+              style={{ objectFit: "contain", filter: "drop-shadow(0 2px 4px rgba(245,158,11,0.25))" }}
+            />
+            <div className="flex flex-col leading-tight">
+              <span className="text-[15px] font-bold text-slate-800 tracking-tight" style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}>
+                Soldryck
+              </span>
+              <span className="text-[9px] text-slate-500 font-medium uppercase tracking-wider">
+                Stockholm
+              </span>
+            </div>
+          </div>
+          <div className="border-t border-slate-200/70 mb-1" />
 
           {/* Sun/shade filter */}
           <div className="flex flex-col gap-0.5">
@@ -358,6 +362,24 @@ function SettingsButton({
               </div>
             )}
           </div>
+
+          {/* Install app — pinned to bottom, only shown when browser supports it */}
+          {installPrompt && (
+            <>
+              <div className="border-t border-slate-200 my-1" />
+              <button
+                onClick={handleInstall}
+                className="w-full px-2.5 py-2 rounded-lg text-xs font-semibold text-left flex items-center gap-2 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors border border-amber-200"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Installera appen
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
