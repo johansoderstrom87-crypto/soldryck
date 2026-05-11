@@ -153,25 +153,21 @@ export default function Home() {
               style={{
                 width: 48,
                 height: 52,
-                background: active
-                  ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
-                  : "rgba(255,255,255,0.28)",
-                backdropFilter: active ? undefined : "blur(16px) saturate(1.5)",
-                WebkitBackdropFilter: active ? undefined : "blur(16px) saturate(1.5)",
-                border: active
-                  ? "0.5px solid rgba(255,180,80,0.6)"
-                  : "0.5px solid rgba(255,255,255,0.55)",
+                background: "rgba(255,255,255,0.28)",
+                backdropFilter: "blur(16px) saturate(1.5)",
+                WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+                border: "0.5px solid rgba(255,255,255,0.55)",
                 boxShadow: active
-                  ? "0 0 24px rgba(251,146,60,0.55), 0 4px 12px rgba(251,146,60,0.4), inset 0 1px 1px rgba(255,255,255,0.3)"
+                  ? "0 0 24px rgba(251,146,60,0.65), 0 0 12px rgba(251,146,60,0.5), 0 4px 12px rgba(251,146,60,0.35)"
                   : "0 2px 8px rgba(0,0,0,0.08)",
-                color: active ? "#000" : "#888",
+                color: active ? "#0f172a" : "#888",
                 opacity: active ? 1 : 0.72,
                 transform: "translateZ(0)",
                 isolation: "isolate",
               }}
             >
               <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-              <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.55)" }}>
+              <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
                 {label === "Bar & Pub" ? "Bar" : label}
               </span>
             </button>
