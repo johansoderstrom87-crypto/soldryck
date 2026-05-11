@@ -137,6 +137,8 @@ function SettingsButton({
           WebkitBackdropFilter: "blur(14px) saturate(1.3)",
           border: "0.5px solid rgba(255,255,255,0.55)",
           boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+          transform: "translateZ(0)",
+          isolation: "isolate",
         }}
         title="Inställningar"
       >
@@ -154,7 +156,7 @@ function SettingsButton({
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 rounded-xl p-1 min-w-[200px] z-[2000]" style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", border: "0.5px solid rgba(255,255,255,0.7)", boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}>
+        <div className="absolute top-full left-0 mt-1 rounded-xl p-1 min-w-[200px] z-[2000]" style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", border: "0.5px solid rgba(255,255,255,0.7)", boxShadow: "0 8px 32px rgba(0,0,0,0.12)", transform: "translateZ(0)", isolation: "isolate" }}>
 
           {/* Install app — only shown when browser supports it */}
           {installPrompt && (
@@ -401,6 +403,8 @@ export default function Header({
               border: "0.5px solid rgba(255,255,255,0.55)",
               borderTop: "none",
               boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+              transform: "translateZ(0)",
+              isolation: "isolate",
             }}
           >
             <Image

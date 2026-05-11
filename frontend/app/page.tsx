@@ -166,6 +166,8 @@ export default function Home() {
                   : "0 2px 8px rgba(0,0,0,0.08)",
                 color: active ? "#000" : "#888",
                 opacity: active ? 1 : 0.72,
+                transform: "translateZ(0)",
+                isolation: "isolate",
               }}
             >
               <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />

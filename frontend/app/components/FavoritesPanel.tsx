@@ -96,6 +96,8 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
           WebkitBackdropFilter: "blur(14px) saturate(1.3)",
           border: "0.5px solid rgba(255,255,255,0.55)",
           boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+          transform: "translateZ(0)",
+          isolation: "isolate",
         }}
         title="Mina favoriter"
       >
@@ -116,6 +118,8 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
             WebkitBackdropFilter: "blur(20px) saturate(1.4)",
             border: "0.5px solid rgba(255,255,255,0.7)",
             boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+            transform: "translateZ(0)",
+            isolation: "isolate",
           }}
         >
           <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide px-1 mb-1.5">

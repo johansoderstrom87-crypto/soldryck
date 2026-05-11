@@ -60,6 +60,8 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
           WebkitBackdropFilter: "blur(14px) saturate(1.2)",
           boxShadow: "0 2px 10px rgba(0,0,0,0.04), inset 0 0 0 0.5px rgba(255,255,255,0.3)",
           overflow: "hidden",
+          transform: "translateZ(0)",
+          isolation: "isolate",
         }}
       >
         {/* Sun section */}
