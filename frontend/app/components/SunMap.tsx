@@ -1003,11 +1003,33 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     const layer = L.layerGroup();
 
-    // Dotted entrance connectors — längst ner
+    // Egen pane för korridorer — under spår (overlayPane 400) men över vägnätet (tilePane 200)
+    if (!map.getPane("metroCorridorPane")) {
+      const corridorPane = map.createPane("metroCorridorPane");
+      corridorPane.style.zIndex = "395";
+      corridorPane.style.pointerEvents = "none";
+    }
+
+    // Station→färg lookup: link[0] är stationens [lat, lng]
+    const stationColor = new Map<string, string>();
+    for (const snap of allSnaps) {
+      stationColor.set(`${snap.station.lat},${snap.station.lng}`, lineColors[snap.color]);
+    }
+
+    // Upplysta gångar: glow + corridor i linjefärgen
     for (const ent of metroNetwork.METRO_ENTRANCES) {
+      const lc = stationColor.get(`${ent.link[0][0]},${ent.link[0][1]}`) ?? "#64748b";
+      // Yttre glow
       L.polyline(ent.link, {
-        color: "#64748b", weight: 1.5, opacity: 0.5, dashArray: "1 6",
+        color: lc, weight: 6, opacity: 0.18,
         lineCap: "round", interactive: false,
+        pane: "metroCorridorPane",
+      }).addTo(layer);
+      // Inre korridor
+      L.polyline(ent.link, {
+        color: lc, weight: 2.5, opacity: 0.7,
+        lineCap: "round", interactive: false,
+        pane: "metroCorridorPane",
       }).addTo(layer);
     }
 
@@ -1027,14 +1049,15 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       }).addTo(layer);
     }
 
-    // Entrance-prickar
+    // Entré-ikoner: vit cirkel + färgad ring + ↑
     for (const ent of metroNetwork.METRO_ENTRANCES) {
+      const lc = stationColor.get(`${ent.link[0][0]},${ent.link[0][1]}`) ?? "#64748b";
       const titleAttr = ent.name ? ` title="${ent.name.replace(/"/g, "&quot;")}"` : "";
       const entranceIcon = L.divIcon({
         className: "metro-entrance",
-        html: `<div class="metro-entrance-dot"${titleAttr}></div>`,
-        iconSize: [10, 10],
-        iconAnchor: [5, 5],
+        html: `<div class="metro-entrance-dot" style="--lc:${lc}"${titleAttr}>↑</div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
       });
       L.marker([ent.lat, ent.lng], { icon: entranceIcon, interactive: !!ent.name, zIndexOffset: -50 })
         .addTo(layer);
@@ -1086,6 +1109,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         const pane = mapRef.current.createPane("metroStationPane");
         pane.style.zIndex = "620"; // över overlayPane (400) och markerPane (600)
       }
+      // Korridorpane — under spår (400) men över vägnätet (200)
+      if (!mapRef.current.getPane("metroCorridorPane")) {
+        const corridorPane = mapRef.current.createPane("metroCorridorPane");
+        corridorPane.style.zIndex = "395";
+        corridorPane.style.pointerEvents = "none";
+      }
 
       for (const { station, pos, color, pa, pb, platDir } of stationSnaps) {
         const lc = LINE_COLORS[color];
@@ -1128,24 +1157,35 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           L.marker(midPt, { icon: nameIcon, interactive: false, pane: "metroStationPane" }).addTo(detail);
         }
 
-        // Uppgångar: diskreta prickar + tunn grå connector från plattformskant.
+        // Uppgångar: upplysta gångar (glow + corridor) + T-ring entré.
         // Bara exit-namn om det skiljer sig från stationsnamnet (undviker upprepning).
         const key = `${station.lat},${station.lng}`;
         const entrances = entrancesByStation.get(key) ?? [];
         for (const ent of entrances) {
           const nearPt = nearestOnSegment(ent.lat, ent.lng, p1, p2);
 
-          // Tunn grå streckad connector
+          // Yttre glow — ger gången en upplyst känsla
           L.polyline([nearPt, [ent.lat, ent.lng]], {
-            color: "#94a3b8", weight: 1, opacity: 0.6,
-            dashArray: "3 5", lineCap: "round", interactive: false,
+            color: lc, weight: 12, opacity: 0.22,
+            lineCap: "round", interactive: false,
+            pane: "metroCorridorPane",
           }).addTo(detail);
 
-          // Liten uppgångsprick i linjens färg
-          L.circleMarker([ent.lat, ent.lng], {
-            radius: 3, color: lc, weight: 1.5,
-            fillColor: "#ffffff", fillOpacity: 1, interactive: false,
+          // Inre korridor i linjens färg
+          L.polyline([nearPt, [ent.lat, ent.lng]], {
+            color: lc, weight: 5, opacity: 0.75,
+            lineCap: "round", interactive: false,
+            pane: "metroCorridorPane",
           }).addTo(detail);
+
+          // Entré-ikon: vit cirkel med färgad ring + ↑
+          const entranceIcon = L.divIcon({
+            className: "metro-entrance",
+            html: `<div class="metro-entrance-dot metro-entrance-dot--lg" style="--lc:${lc}">↑</div>`,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+          });
+          L.marker([ent.lat, ent.lng], { icon: entranceIcon, interactive: false }).addTo(detail);
 
           // Namn-label bara om det är ett unikt gatunamn (inte stationsnamnet)
           const entNameClean = ent.name.toLowerCase().trim();
@@ -1154,7 +1194,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             const exitLabel = L.divIcon({
               className: "metro-exit-label",
               html: `<span class="metro-exit-name">${ent.name}</span>`,
-              iconAnchor: [-5, 9],
+              iconAnchor: [-6, 10],
             });
             L.marker([ent.lat, ent.lng], { icon: exitLabel, interactive: false }).addTo(detail);
           }
