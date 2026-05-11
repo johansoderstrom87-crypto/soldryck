@@ -27,6 +27,17 @@ body {
   z-index: 0;
 }
 
+/* Promote the marker pane to its own GPU layer so pan-translates ride the
+   compositor instead of triggering a CPU paint of every marker every frame.
+   Notably effective on older mobile Safari, where painting hundreds of
+   markers per frame is the dominant cost during pan. */
+.leaflet-marker-pane,
+.leaflet-shadow-pane,
+.leaflet-overlay-pane {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
 .leaflet-popup-content-wrapper {
   border-radius: 12px !important;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12) !important;
@@ -75,8 +86,16 @@ body {
   height: 12px;
 }
 
+/* Base shadows are kept cheap (single small drop shadow) for the zoomed-out
+   view where hundreds of markers paint at once. The fancy glow only applies
+   at badge-zoom (>= 17) where there are usually only ~20 visible markers,
+   so the more expensive effect is affordable. This dramatically reduces
+   paint cost on older iPhones during pan/zoom at low zoom levels. */
 .marker-dot.marker-sun {
   background: #f59e0b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+.show-badges .marker-dot.marker-sun {
   box-shadow: 0 0 12px rgba(245, 158, 11, 0.5), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 .marker-root:not(.marker-unconfirmed) .marker-dot.marker-sun {
@@ -86,11 +105,17 @@ body {
 
 .marker-dot.marker-shade {
   background: #94a3b8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+.show-badges .marker-dot.marker-shade {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .marker-dot.marker-partial {
   background: #fb923c;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+.show-badges .marker-dot.marker-partial {
   box-shadow: 0 0 8px rgba(251, 146, 60, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 .marker-root:not(.marker-unconfirmed) .marker-dot.marker-partial {
@@ -100,6 +125,9 @@ body {
 
 .marker-dot.marker-rain {
   background: #60a5fa;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+.show-badges .marker-dot.marker-rain {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 

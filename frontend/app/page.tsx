@@ -11,19 +11,11 @@ import type { FeedbackVenue } from "./components/SunMap";
 import type { VenueType, SunRange } from "./components/SunMap";
 import type { MetroStation } from "./data/metro-stations";
 
-// Try computed data first, fall back to mock
-let venueData: typeof import("./data/venues-computed") | null = null;
-try {
-  venueData = require("./data/venues-computed");
-} catch {
-  // venues-computed.ts doesn't exist yet
-}
-
+// Mock baseline data — tiny (8 venues), safe to keep in the main bundle as
+// a fallback so the UI renders something while venues-computed downloads
+// (or if the dynamic import fails altogether).
 const mockData = require("./data/mock-venues");
-
-const allVenues = venueData?.venues ?? mockData.mockVenues;
-const getDateKey = venueData?.getClosestDateKey ?? mockData.getClosestDateKey;
-const getStatus = venueData?.getVenueStatus ?? mockData.getVenueStatus;
+type VenueModule = typeof import("./data/venues-computed");
 
 const SunMap = dynamic(() => import("./components/SunMap"), {
   ssr: false,
@@ -56,7 +48,24 @@ export default function Home() {
   const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
   const [splashDone, setSplashDone] = useState(false);
 
-  const dateKey = useMemo(() => getDateKey(date), [date]);
+  // Lazy-load the ~5.5 MB venues-computed module. Keeping it out of the main
+  // bundle lets older phones become interactive in ~2 s instead of waiting
+  // 10–15 s for the full payload to download + JS-parse. The mock fallback
+  // (8 venues) provides a baseline while the real data is in flight.
+  const [venueData, setVenueData] = useState<VenueModule | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    import("./data/venues-computed")
+      .then((m) => { if (!cancelled) setVenueData(m as unknown as VenueModule); })
+      .catch(() => { /* keep mockData fallback */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const allVenues = venueData?.venues ?? mockData.mockVenues;
+  const getDateKey = venueData?.getClosestDateKey ?? mockData.getClosestDateKey;
+  const getStatus = venueData?.getVenueStatus ?? mockData.getVenueStatus;
+
+  const dateKey = useMemo(() => getDateKey(date), [date, getDateKey]);
   const dateStr = useMemo(() => toLocalDateStr(date), [date]);
 
   // Weather for the selected date
@@ -75,7 +84,7 @@ export default function Home() {
           return s === "sun" || s === "s";
         }
       ).length,
-    [dateKey, hour]
+    [dateKey, hour, allVenues, getStatus]
   );
 
   // Fetch weather on mount
