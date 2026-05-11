@@ -860,6 +860,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const geoWatchRef = useRef<number | null>(null);
   const hasCenteredRef = useRef(false);
   const [geoState, setGeoState] = useState<"idle" | "locating" | "located" | "error">("idle");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
 
@@ -1768,9 +1771,187 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
   };
 
+  // Search — outside click + Escape close
+  useEffect(() => {
+    if (!searchOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+        setSearchQuery("");
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); }
+    };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [searchOpen]);
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [] as any[];
+    const out: any[] = [];
+    for (const v of allVenues) {
+      if ((v.name || "").toLowerCase().includes(q)) {
+        out.push(v);
+        if (out.length >= 8) break;
+      }
+    }
+    return out;
+  }, [searchQuery]);
+
+  function flyToSearchResult(venue: any) {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setView([venue.lat, venue.lng], 17, { animate: true });
+    const found = markerVenuesRef.current.find(({ marker: m }) => {
+      const ll = m.getLatLng();
+      return Math.abs(ll.lat - venue.lat) < 0.0001 && Math.abs(ll.lng - venue.lng) < 0.0001;
+    });
+    if (found) {
+      if (!((found.marker as any)._map)) {
+        found.marker.addTo(map);
+        applyMarkerVisualState(
+          found.marker,
+          computeMarkerState(found.venue, dateKey, hourRef.current, filterRef.current, weatherRef.current),
+        );
+      }
+      setTimeout(() => found.marker.openPopup(), 500);
+    }
+    setSearchOpen(false);
+    setSearchQuery("");
+  }
+
   return (
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
+
+      {/* Search button — stacked above GPS, slides out an input + dropdown when open */}
+      <div
+        ref={searchRef}
+        style={{ position: "absolute", bottom: "281px", right: "12px", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}
+      >
+        {searchOpen && (
+          <div style={{ position: "relative" }}>
+            {searchResults.length > 0 && (
+              <div
+                style={{
+                  ...glassStyle,
+                  position: "absolute",
+                  right: 0,
+                  bottom: "calc(100% + 8px)",
+                  width: 280,
+                  maxHeight: 320,
+                  overflowY: "auto",
+                  borderRadius: 14,
+                  padding: 4,
+                  fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+                }}
+              >
+                {searchResults.map((v: any) => (
+                  <button
+                    key={v.id}
+                    onClick={() => flyToSearchResult(v)}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      padding: "8px 10px",
+                      background: "transparent",
+                      border: "none",
+                      borderRadius: 10,
+                      textAlign: "left",
+                      cursor: "pointer",
+                      color: "#0f172a",
+                      transition: "background 0.12s ease",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.5)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.25 }}>{v.name}</div>
+                    {v.address && (
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {v.address}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+            {searchQuery.trim() && searchResults.length === 0 && (
+              <div
+                style={{
+                  ...glassStyle,
+                  position: "absolute",
+                  right: 0,
+                  bottom: "calc(100% + 8px)",
+                  width: 280,
+                  borderRadius: 14,
+                  padding: "10px 12px",
+                  fontSize: 12,
+                  color: "#64748b",
+                  fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+                }}
+              >
+                Inga ställen matchar &ldquo;{searchQuery}&rdquo;
+              </div>
+            )}
+            <input
+              autoFocus
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Sök ställe..."
+              style={{
+                ...glassStyle,
+                height: 48,
+                width: 240,
+                padding: "0 16px",
+                borderRadius: 14,
+                fontSize: 14,
+                color: "#0f172a",
+                outline: "none",
+                fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+              }}
+            />
+          </div>
+        )}
+
+        <button
+          onClick={() => {
+            if (searchOpen) { setSearchOpen(false); setSearchQuery(""); }
+            else setSearchOpen(true);
+          }}
+          title={searchOpen ? "Stäng sök" : "Sök ställe"}
+          style={{
+            ...glassStyle,
+            width: 48,
+            height: 48,
+            borderRadius: 14,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#1e293b",
+            flexShrink: 0,
+          }}
+        >
+          {searchOpen ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          )}
+        </button>
+      </div>
 
       {/* GPS locate button — bottom-right above time slider */}
       <div style={{ position: "absolute", bottom: "225px", right: "12px", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}>
