@@ -12,6 +12,7 @@ interface FavoritesPanelProps {
   hour: number;
   dateKey: string;
   getStatus: (venue: any, dateKey: string, hour: number) => string | undefined;
+  embedded?: boolean;
 }
 
 function sunStyle(raw: string | undefined) {
@@ -21,7 +22,7 @@ function sunStyle(raw: string | undefined) {
   return { dot: "#cbd5e1", bg: "#f8fafc", text: "#94a3b8", label: "Natt" };
 }
 
-export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, getStatus }: FavoritesPanelProps) {
+export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, getStatus, embedded }: FavoritesPanelProps) {
   const [open, setOpen] = useState(false);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [pushEnabled, setPushEnabled] = useState(false);
@@ -89,8 +90,13 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="rounded-xl px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all text-slate-700"
-        style={{
+        className={embedded
+          ? "rounded-xl flex items-center justify-center transition-all hover:bg-white/40 relative"
+          : "rounded-xl px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all text-slate-700"}
+        style={embedded ? {
+          width: 36,
+          height: 36,
+        } : {
           background: "rgba(255,255,255,0.3)",
           backdropFilter: "blur(14px) saturate(1.3)",
           WebkitBackdropFilter: "blur(14px) saturate(1.3)",
@@ -101,9 +107,11 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
         }}
         title="Mina favoriter"
       >
-        <span className="text-red-500">{favIds.size > 0 ? "❤️" : "♡"}</span>
+        <span className={embedded ? "text-red-500 text-[18px] leading-none" : "text-red-500"}>{favIds.size > 0 ? "❤️" : "♡"}</span>
         {favIds.size > 0 && (
-          <span className="bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold">
+          <span className={embedded
+            ? "absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow"
+            : "bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold"}>
             {favIds.size}
           </span>
         )}
@@ -111,7 +119,7 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
 
       {open && (
         <div
-          className="absolute top-full left-0 mt-1 rounded-xl p-2 min-w-[260px] max-w-[300px] z-[2000]"
+          className={`absolute top-full mt-1 rounded-xl p-2 min-w-[260px] max-w-[300px] z-[2000] ${embedded ? "right-0" : "left-0"}`}
           style={{
             background: "rgba(255,255,255,0.72)",
             backdropFilter: "blur(20px) saturate(1.4)",

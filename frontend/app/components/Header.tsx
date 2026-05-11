@@ -29,6 +29,29 @@ const TYPE_OPTIONS: { value: VenueType; label: string; icon: string }[] = [
   { value: "rooftop", label: "Takbar", icon: "🏙️" },
 ];
 
+const TYPE_BUTTONS: { type: VenueType; label: string; svg: string }[] = [
+  {
+    type: "restaurant",
+    label: "Mat",
+    svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>`,
+  },
+  {
+    type: "cafe",
+    label: "Café",
+    svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>`,
+  },
+  {
+    type: "bar",
+    label: "Bar & Pub",
+    svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
+  },
+  {
+    type: "rooftop",
+    label: "Takbar",
+    svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><line x1="3" y1="7" x2="7" y2="7"/><line x1="17" y1="7" x2="21" y2="7"/></svg>`,
+  },
+];
+
 interface HeaderProps {
   filter: "all" | "sun" | "shade";
   onFilterChange: (filter: "all" | "sun" | "shade") => void;
@@ -58,6 +81,7 @@ const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: str
 function SettingsButton({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
   metroStation, onMetroStationChange, showShadows, onToggleShadows, showMetro, onToggleMetro,
+  embedded,
 }: {
   filter: "all" | "sun" | "shade";
   onFilterChange: (f: "all" | "sun" | "shade") => void;
@@ -71,6 +95,7 @@ function SettingsButton({
   onToggleShadows: () => void;
   showMetro: boolean;
   onToggleMetro: () => void;
+  embedded?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -130,8 +155,13 @@ function SettingsButton({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="rounded-xl flex items-center justify-center transition-all text-slate-700 relative"
-        style={{
+        className={embedded
+          ? "rounded-xl flex items-center justify-center transition-all text-slate-700 relative hover:bg-white/40"
+          : "rounded-xl flex items-center justify-center transition-all text-slate-700 relative"}
+        style={embedded ? {
+          width: 36,
+          height: 36,
+        } : {
           width: 40,
           height: 40,
           background: "rgba(255,255,255,0.3)",
@@ -391,11 +421,32 @@ export default function Header({
   showShadows, onToggleShadows, showMetro, onToggleMetro,
   metroStation, onMetroStationChange, venues, onSelectVenue, hour, dateKey, getStatus,
 }: HeaderProps) {
+  function toggleType(type: VenueType) {
+    const next = new Set(typeFilter);
+    if (next.has(type)) next.delete(type); else next.add(type);
+    onTypeFilterChange(next);
+  }
+
   return (
     <div className="absolute top-0 left-0 right-0 z-[1100] pointer-events-none">
-      <div className="p-3 relative">
-        {/* Left group: menu + favorites */}
-        <div className="flex items-center gap-1.5 pointer-events-auto">
+      {/* Centered top stack — wide card + filter row */}
+      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto select-none" style={{ top: 0 }}>
+
+        {/* Top card: settings + logo/name + favorites — emerges from top edge */}
+        <div
+          className="flex items-center gap-2 px-3 pt-2.5 pb-2"
+          style={{
+            borderRadius: "0 0 20px 20px",
+            background: "rgba(255,255,255,0.3)",
+            backdropFilter: "blur(14px) saturate(1.3)",
+            WebkitBackdropFilter: "blur(14px) saturate(1.3)",
+            border: "0.5px solid rgba(255,255,255,0.55)",
+            borderTop: "none",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+            transform: "translateZ(0)",
+            isolation: "isolate",
+          }}
+        >
           <SettingsButton
             filter={filter}
             onFilterChange={onFilterChange}
@@ -409,34 +460,73 @@ export default function Header({
             onToggleShadows={onToggleShadows}
             showMetro={showMetro}
             onToggleMetro={onToggleMetro}
+            embedded
           />
-          <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} />
-        </div>
 
-        {/* Center: logo card emerges from top edge — no top rounding/shadow */}
-        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none select-none" style={{ top: 0 }}>
-          <div
-            className="px-3 pt-2.5 pb-2 flex items-center justify-center"
-            style={{
-              borderRadius: "0 0 18px 18px",
-              background: "rgba(255,255,255,0.3)",
-              backdropFilter: "blur(14px) saturate(1.3)",
-              WebkitBackdropFilter: "blur(14px) saturate(1.3)",
-              border: "0.5px solid rgba(255,255,255,0.55)",
-              borderTop: "none",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-              transform: "translateZ(0)",
-              isolation: "isolate",
-            }}
-          >
+          {/* Logo + wordmark */}
+          <div className="flex items-center gap-1.5 px-2">
             <Image
               src="/logo.png"
               alt="Soldryck"
-              width={48}
-              height={58}
+              width={52}
+              height={62}
               style={{ objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(245,158,11,0.3))" }}
             />
+            <span
+              style={{
+                fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+                fontSize: 15,
+                fontWeight: 800,
+                color: "#d97706",
+                letterSpacing: "0.08em",
+                lineHeight: 1,
+              }}
+            >
+              SOLDRYCK
+            </span>
           </div>
+
+          <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} embedded />
+        </div>
+
+        {/* Filter row: four venue-type quick filters */}
+        <div className="flex gap-2" style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}>
+          {TYPE_BUTTONS.map(({ type, label, svg }) => {
+            const active = typeFilter.size === 0 || typeFilter.has(type);
+            return (
+              <button
+                key={type}
+                onClick={() => toggleType(type)}
+                title={label}
+                className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+                style={{
+                  width: 56,
+                  height: 56,
+                  background: "rgba(255,255,255,0.28)",
+                  backgroundImage: active
+                    ? "radial-gradient(circle at 50% 40%, rgba(251,146,60,0.18) 0%, rgba(245,158,11,0.04) 65%, transparent 100%)"
+                    : undefined,
+                  backdropFilter: "blur(16px) saturate(1.5)",
+                  WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+                  border: active
+                    ? "0.5px solid rgba(255,210,160,0.55)"
+                    : "0.5px solid rgba(255,255,255,0.55)",
+                  boxShadow: active
+                    ? "0 0 18px rgba(251,146,60,0.4), 0 0 6px rgba(251,146,60,0.45), inset 0 0 22px rgba(251,146,60,0.35), inset 0 0 10px rgba(251,146,60,0.5), inset 0 1px 1px rgba(255,255,255,0.35), 0 2px 8px rgba(0,0,0,0.08)"
+                    : "0 2px 8px rgba(0,0,0,0.08)",
+                  color: active ? "#0f172a" : "#888",
+                  opacity: active ? 1 : 0.72,
+                  transform: "translateZ(0)",
+                  isolation: "isolate",
+                }}
+              >
+                <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
+                  {label === "Bar & Pub" ? "Bar" : label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
