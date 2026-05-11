@@ -155,13 +155,15 @@ export default function Home() {
                 height: 52,
                 background: "rgba(255,255,255,0.28)",
                 backgroundImage: active
-                  ? "linear-gradient(135deg, rgba(251,146,60,0.10) 0%, rgba(245,158,11,0.05) 100%)"
+                  ? "radial-gradient(circle at 50% 40%, rgba(251,146,60,0.18) 0%, rgba(245,158,11,0.04) 65%, transparent 100%)"
                   : undefined,
                 backdropFilter: "blur(16px) saturate(1.5)",
                 WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                border: "0.5px solid rgba(255,255,255,0.55)",
+                border: active
+                  ? "0.5px solid rgba(255,210,160,0.55)"
+                  : "0.5px solid rgba(255,255,255,0.55)",
                 boxShadow: active
-                  ? "inset 0 0 0 1.5px rgba(251,146,60,0.85), inset 0 0 18px rgba(251,146,60,0.7), inset 0 0 6px rgba(251,146,60,0.55), 0 2px 8px rgba(0,0,0,0.08)"
+                  ? "0 0 18px rgba(251,146,60,0.4), 0 0 6px rgba(251,146,60,0.45), inset 0 0 22px rgba(251,146,60,0.35), inset 0 0 10px rgba(251,146,60,0.5), inset 0 1px 1px rgba(255,255,255,0.35), 0 2px 8px rgba(0,0,0,0.08)"
                   : "0 2px 8px rgba(0,0,0,0.08)",
                 color: active ? "#0f172a" : "#888",
                 opacity: active ? 1 : 0.72,
