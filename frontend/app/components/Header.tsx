@@ -432,10 +432,13 @@ export default function Header({
       {/* Centered top stack — wide card + filter row */}
       <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto select-none" style={{ top: 0 }}>
 
-        {/* Top card: settings + logo/name + favorites — emerges from top edge */}
+        {/* Top card: settings on left, logo centered, favorites on right */}
         <div
-          className="flex items-center gap-2 px-3 pt-2.5 pb-2"
+          className="flex items-center justify-between gap-4 px-3 pt-2.5 pb-2"
           style={{
+            position: "relative",
+            zIndex: 20,
+            width: 240,
             borderRadius: "0 0 20px 20px",
             background: "rgba(255,255,255,0.3)",
             backdropFilter: "blur(14px) saturate(1.3)",
@@ -463,34 +466,20 @@ export default function Header({
             embedded
           />
 
-          {/* Logo + wordmark */}
-          <div className="flex items-center gap-1.5 px-2">
-            <Image
-              src="/logo.png"
-              alt="Soldryck"
-              width={52}
-              height={62}
-              style={{ objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(245,158,11,0.3))" }}
-            />
-            <span
-              style={{
-                fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
-                fontSize: 15,
-                fontWeight: 800,
-                color: "#d97706",
-                letterSpacing: "0.08em",
-                lineHeight: 1,
-              }}
-            >
-              SOLDRYCK
-            </span>
-          </div>
+          {/* Centered logo */}
+          <Image
+            src="/logo.png"
+            alt="Soldryck"
+            width={52}
+            height={62}
+            style={{ objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(245,158,11,0.3))" }}
+          />
 
           <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} embedded />
         </div>
 
         {/* Filter row: four venue-type quick filters */}
-        <div className="flex gap-2" style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}>
+        <div className="flex gap-2" style={{ position: "relative", zIndex: 10, fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}>
           {TYPE_BUTTONS.map(({ type, label, svg }) => {
             const active = typeFilter.size === 0 || typeFilter.has(type);
             return (
@@ -500,8 +489,8 @@ export default function Header({
                 title={label}
                 className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
                 style={{
-                  width: 56,
-                  height: 56,
+                  width: 46,
+                  height: 46,
                   background: "rgba(255,255,255,0.28)",
                   backgroundImage: active
                     ? "radial-gradient(circle at 50% 40%, rgba(251,146,60,0.18) 0%, rgba(245,158,11,0.04) 65%, transparent 100%)"
