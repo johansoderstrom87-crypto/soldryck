@@ -882,6 +882,13 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
+        // Load tiles immediately during pan (not just after pan ends).
+        // Default on mobile is true which causes blank tiles during drag.
+        updateWhenIdle: false,
+        // Pre-fetch 4 extra tile columns/rows beyond the visible viewport so
+        // they're already loaded when the user pans into that area.
+        // Default is 2; 4–5 eliminates most blank-tile flashes on fast pans.
+        keepBuffer: 5,
       }
     ).addTo(map);
 
