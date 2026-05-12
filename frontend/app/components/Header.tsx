@@ -421,6 +421,8 @@ export default function Header({
   showShadows, onToggleShadows, showMetro, onToggleMetro,
   metroStation, onMetroStationChange, venues, onSelectVenue, hour, dateKey, getStatus,
 }: HeaderProps) {
+  const [filtersOpen, setFiltersOpen] = useState(true);
+
   function toggleType(type: VenueType) {
     const next = new Set(typeFilter);
     if (next.has(type)) next.delete(type); else next.add(type);
@@ -470,52 +472,108 @@ export default function Header({
           <Image
             src="/logo.png"
             alt="Soldryck"
-            width={36}
-            height={44}
-            style={{ objectFit: "contain", filter: "drop-shadow(0 2px 5px rgba(245,158,11,0.3))" }}
+            width={46}
+            height={56}
+            style={{ objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(245,158,11,0.3))" }}
           />
 
           <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} embedded />
         </div>
 
-        {/* Filter row: four venue-type quick filters */}
-        <div className="flex gap-1.5" style={{ position: "relative", zIndex: 10, fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}>
-          {TYPE_BUTTONS.map(({ type, label, svg }) => {
-            const active = typeFilter.size === 0 || typeFilter.has(type);
-            return (
-              <button
-                key={type}
-                onClick={() => toggleType(type)}
-                title={label}
-                className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
-                style={{
-                  width: 46,
-                  height: 46,
-                  background: "rgba(255,255,255,0.28)",
-                  backgroundImage: active
-                    ? "radial-gradient(circle at 50% 40%, rgba(251,146,60,0.18) 0%, rgba(245,158,11,0.04) 65%, transparent 100%)"
-                    : undefined,
-                  backdropFilter: "blur(16px) saturate(1.5)",
-                  WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                  border: active
-                    ? "0.5px solid rgba(255,210,160,0.55)"
-                    : "0.5px solid rgba(255,255,255,0.55)",
-                  boxShadow: active
-                    ? "0 0 18px rgba(251,146,60,0.4), 0 0 6px rgba(251,146,60,0.45), inset 0 0 22px rgba(251,146,60,0.35), inset 0 0 10px rgba(251,146,60,0.5), inset 0 1px 1px rgba(255,255,255,0.35), 0 2px 8px rgba(0,0,0,0.08)"
-                    : "0 2px 8px rgba(0,0,0,0.08)",
-                  color: active ? "#0f172a" : "#888",
-                  opacity: active ? 1 : 0.72,
-                  transform: "translateZ(0)",
-                  isolation: "isolate",
-                }}
-              >
-                <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
-                  {label === "Bar & Pub" ? "Bar" : label}
-                </span>
-              </button>
-            );
-          })}
+        {/* Filter row + collapse toggle */}
+        <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          {/* Animated filter buttons */}
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+              overflow: "hidden",
+              maxHeight: filtersOpen ? 60 : 0,
+              opacity: filtersOpen ? 1 : 0,
+              transform: filtersOpen ? "translateY(0)" : "translateY(-8px)",
+              transition: "max-height 0.28s ease, opacity 0.22s ease, transform 0.25s ease",
+              pointerEvents: filtersOpen ? "auto" : "none",
+            }}
+          >
+            {TYPE_BUTTONS.map(({ type, label, svg }) => {
+              const active = typeFilter.size === 0 || typeFilter.has(type);
+              return (
+                <button
+                  key={type}
+                  onClick={() => toggleType(type)}
+                  title={label}
+                  className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+                  style={{
+                    width: 46,
+                    height: 46,
+                    background: "rgba(255,255,255,0.28)",
+                    backgroundImage: active
+                      ? "radial-gradient(circle at 50% 40%, rgba(251,146,60,0.18) 0%, rgba(245,158,11,0.04) 65%, transparent 100%)"
+                      : undefined,
+                    backdropFilter: "blur(16px) saturate(1.5)",
+                    WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+                    border: active
+                      ? "0.5px solid rgba(255,210,160,0.55)"
+                      : "0.5px solid rgba(255,255,255,0.55)",
+                    boxShadow: active
+                      ? "0 0 18px rgba(251,146,60,0.4), 0 0 6px rgba(251,146,60,0.45), inset 0 0 22px rgba(251,146,60,0.35), inset 0 0 10px rgba(251,146,60,0.5), inset 0 1px 1px rgba(255,255,255,0.35), 0 2px 8px rgba(0,0,0,0.08)"
+                      : "0 2px 8px rgba(0,0,0,0.08)",
+                    color: active ? "#0f172a" : "#888",
+                    opacity: active ? 1 : 0.72,
+                    transform: "translateZ(0)",
+                    isolation: "isolate",
+                    flexShrink: 0,
+                  }}
+                >
+                  <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
+                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
+                    {label === "Bar & Pub" ? "Bar" : label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Collapse / expand toggle */}
+          <button
+            onClick={() => setFiltersOpen((v) => !v)}
+            title={filtersOpen ? "Dölj filter" : "Visa filter"}
+            style={{
+              background: "rgba(255,255,255,0.28)",
+              backdropFilter: "blur(14px) saturate(1.3)",
+              WebkitBackdropFilter: "blur(14px) saturate(1.3)",
+              border: "0.5px solid rgba(255,255,255,0.55)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+              borderRadius: 999,
+              width: 28,
+              height: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transform: "translateZ(0)",
+              isolation: "isolate",
+              transition: "opacity 0.2s",
+            }}
+          >
+            <svg
+              width="10"
+              height="6"
+              viewBox="0 0 10 6"
+              fill="none"
+              stroke="#64748b"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                transform: filtersOpen ? "rotate(0deg)" : "rotate(180deg)",
+                transition: "transform 0.25s ease",
+              }}
+            >
+              <path d="M1 1l4 4 4-4" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
