@@ -159,8 +159,8 @@ function SettingsButton({
           ? "rounded-xl flex items-center justify-center transition-all text-slate-700 relative hover:bg-white/40"
           : "rounded-xl flex items-center justify-center transition-all text-slate-700 relative"}
         style={embedded ? {
-          width: 36,
-          height: 36,
+          width: 32,
+          height: 32,
         } : {
           width: 40,
           height: 40,
@@ -430,16 +430,16 @@ export default function Header({
   return (
     <div className="absolute top-0 left-0 right-0 z-[1100] pointer-events-none">
       {/* Centered top stack — wide card + filter row */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto select-none" style={{ top: 0 }}>
+      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto select-none" style={{ top: 0 }}>
 
         {/* Top card: settings on left, logo centered, favorites on right */}
         <div
-          className="flex items-center justify-between gap-4 px-3 pt-2.5 pb-2"
+          className="flex items-center justify-between px-2.5 pt-1 pb-1"
           style={{
             position: "relative",
             zIndex: 20,
-            width: 240,
-            borderRadius: "0 0 20px 20px",
+            width: 196,
+            borderRadius: "0 0 18px 18px",
             background: "rgba(255,255,255,0.3)",
             backdropFilter: "blur(14px) saturate(1.3)",
             WebkitBackdropFilter: "blur(14px) saturate(1.3)",
@@ -470,16 +470,16 @@ export default function Header({
           <Image
             src="/logo.png"
             alt="Soldryck"
-            width={52}
-            height={62}
-            style={{ objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(245,158,11,0.3))" }}
+            width={36}
+            height={44}
+            style={{ objectFit: "contain", filter: "drop-shadow(0 2px 5px rgba(245,158,11,0.3))" }}
           />
 
           <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} embedded />
         </div>
 
         {/* Filter row: four venue-type quick filters */}
-        <div className="flex gap-2" style={{ position: "relative", zIndex: 10, fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}>
+        <div className="flex gap-1.5" style={{ position: "relative", zIndex: 10, fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}>
           {TYPE_BUTTONS.map(({ type, label, svg }) => {
             const active = typeFilter.size === 0 || typeFilter.has(type);
             return (

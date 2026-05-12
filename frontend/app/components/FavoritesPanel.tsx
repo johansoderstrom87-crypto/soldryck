@@ -94,8 +94,8 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
           ? "rounded-xl flex items-center justify-center transition-all hover:bg-white/40 relative"
           : "rounded-xl px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all text-slate-700"}
         style={embedded ? {
-          width: 36,
-          height: 36,
+          width: 32,
+          height: 32,
         } : {
           background: "rgba(255,255,255,0.3)",
           backdropFilter: "blur(14px) saturate(1.3)",

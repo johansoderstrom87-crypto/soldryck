@@ -48,7 +48,7 @@ export default function RootLayout({
           crossOrigin=""
         />
         <meta name="theme-color" content="#f59e0b" />
-        <link rel="apple-touch-icon" href="/icons/icon.svg" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className="h-full overflow-hidden">
         {children}
