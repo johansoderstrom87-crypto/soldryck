@@ -28,7 +28,9 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [hoursMap, setHoursMap] = useState<Map<string, HoursResult | "loading">>(new Map());
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setFavIds(getFavorites());
@@ -89,7 +91,17 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
   return (
     <div ref={ref} className="relative">
       <button
-        onClick={() => setOpen(!open)}
+        ref={btnRef}
+        onClick={() => {
+          if (embedded && btnRef.current) {
+            const r = btnRef.current.getBoundingClientRect();
+            const W = 268;
+            const margin = 8;
+            const left = Math.max(margin, Math.min(r.right - W, window.innerWidth - W - margin));
+            setDropdownPos({ top: r.bottom + 6, left });
+          }
+          setOpen(!open);
+        }}
         className={embedded
           ? "rounded-xl flex items-center justify-center transition-all hover:bg-white/40 relative"
           : "rounded-xl px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all text-slate-700"}
@@ -131,8 +143,14 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
 
       {open && (
         <div
-          className={`absolute top-full mt-1 rounded-xl p-2 min-w-[260px] max-w-[300px] z-[2000] ${embedded ? "right-0" : "left-0"}`}
+          className={`rounded-xl p-2 z-[2000] ${embedded ? "" : "absolute top-full mt-1 left-0 min-w-[260px] max-w-[300px]"}`}
           style={{
+            ...(embedded && dropdownPos ? {
+              position: "fixed",
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: 268,
+            } : {}),
             background: "rgba(255,255,255,0.72)",
             backdropFilter: "blur(20px) saturate(1.4)",
             WebkitBackdropFilter: "blur(20px) saturate(1.4)",
