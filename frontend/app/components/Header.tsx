@@ -164,7 +164,7 @@ function SettingsButton({
         } : {
           width: 40,
           height: 40,
-          background: "rgba(255,255,255,0.3)",
+          background: "rgba(255,255,255,0.92)",
           backdropFilter: "blur(14px) saturate(1.3)",
           WebkitBackdropFilter: "blur(14px) saturate(1.3)",
           border: "0.5px solid rgba(255,255,255,0.55)",
@@ -434,13 +434,13 @@ export default function Header({
 
         {/* Top card: settings on left, logo centered, favorites on right */}
         <div
-          className="flex items-center justify-between gap-4 px-3 pt-2.5 pb-2"
+          className="flex items-center justify-between gap-3 px-3 pt-1 pb-1"
           style={{
             position: "relative",
             zIndex: 20,
-            width: 240,
+            width: 200,
             borderRadius: "0 0 20px 20px",
-            background: "rgba(255,255,255,0.3)",
+            background: "rgba(255,255,255,0.92)",
             backdropFilter: "blur(14px) saturate(1.3)",
             WebkitBackdropFilter: "blur(14px) saturate(1.3)",
             border: "0.5px solid rgba(255,255,255,0.55)",
@@ -470,9 +470,9 @@ export default function Header({
           <Image
             src="/logo.png"
             alt="Soldryck"
-            width={52}
-            height={62}
-            style={{ objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(245,158,11,0.3))" }}
+            width={40}
+            height={48}
+            style={{ objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(245,158,11,0.3))" }}
           />
 
           <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} embedded />

@@ -97,7 +97,7 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
           width: 36,
           height: 36,
         } : {
-          background: "rgba(255,255,255,0.3)",
+          background: "rgba(255,255,255,0.92)",
           backdropFilter: "blur(14px) saturate(1.3)",
           WebkitBackdropFilter: "blur(14px) saturate(1.3)",
           border: "0.5px solid rgba(255,255,255,0.55)",
