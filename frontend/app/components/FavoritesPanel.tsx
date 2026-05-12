@@ -109,8 +109,8 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
       >
         {/* Heart icon — matches hamburger SVG style; filled when there are favorites */}
         <svg
-          width={embedded ? 18 : 16}
-          height={embedded ? 16 : 14}
+          width={embedded ? 22 : 16}
+          height={embedded ? 20 : 14}
           viewBox="0 0 24 24"
           fill={favIds.size > 0 ? "#ef4444" : "none"}
           stroke={favIds.size > 0 ? "#ef4444" : "#475569"}

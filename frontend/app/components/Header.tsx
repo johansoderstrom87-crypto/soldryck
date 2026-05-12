@@ -472,8 +472,8 @@ export default function Header({
           <Image
             src="/logo.png"
             alt="Soldryck"
-            width={46}
-            height={56}
+            width={54}
+            height={66}
             style={{ objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(245,158,11,0.3))" }}
           />
 
@@ -482,60 +482,68 @@ export default function Header({
 
         {/* Filter row + collapse toggle */}
         <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-          {/* Animated filter buttons */}
+          {/* CSS-grid collapse — smooth, no max-height jank, no backdrop-filter ghost */}
           <div
             style={{
-              display: "flex",
-              gap: 6,
-              fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
-              overflow: "hidden",
-              maxHeight: filtersOpen ? 60 : 0,
+              display: "grid",
+              gridTemplateRows: filtersOpen ? "1fr" : "0fr",
               opacity: filtersOpen ? 1 : 0,
-              transform: filtersOpen ? "translateY(0)" : "translateY(-8px)",
-              transition: "max-height 0.28s ease, opacity 0.22s ease, transform 0.25s ease",
-              pointerEvents: filtersOpen ? "auto" : "none",
+              visibility: filtersOpen ? "visible" : "hidden",
+              transform: filtersOpen ? "translateY(0)" : "translateY(-6px)",
+              transition: "grid-template-rows 0.26s ease, opacity 0.2s ease, transform 0.24s ease, visibility 0s linear " + (filtersOpen ? "0s" : "0.26s"),
             }}
           >
-            {TYPE_BUTTONS.map(({ type, label, svg }) => {
-              const active = typeFilter.size === 0 || typeFilter.has(type);
-              return (
-                <button
-                  key={type}
-                  onClick={() => toggleType(type)}
-                  title={label}
-                  className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
-                  style={{
-                    width: 46,
-                    height: 46,
-                    background: "rgba(255,255,255,0.28)",
-                    backgroundImage: active
-                      ? "radial-gradient(circle at 50% 40%, rgba(251,146,60,0.18) 0%, rgba(245,158,11,0.04) 65%, transparent 100%)"
-                      : undefined,
-                    backdropFilter: "blur(16px) saturate(1.5)",
-                    WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                    border: active
-                      ? "0.5px solid rgba(255,210,160,0.55)"
-                      : "0.5px solid rgba(255,255,255,0.55)",
-                    boxShadow: active
-                      ? "0 0 18px rgba(251,146,60,0.4), 0 0 6px rgba(251,146,60,0.45), inset 0 0 22px rgba(251,146,60,0.35), inset 0 0 10px rgba(251,146,60,0.5), inset 0 1px 1px rgba(255,255,255,0.35), 0 2px 8px rgba(0,0,0,0.08)"
-                      : "0 2px 8px rgba(0,0,0,0.08)",
-                    color: active ? "#0f172a" : "#888",
-                    opacity: active ? 1 : 0.72,
-                    transform: "translateZ(0)",
-                    isolation: "isolate",
-                    flexShrink: 0,
-                  }}
-                >
-                  <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
-                    {label === "Bar & Pub" ? "Bar" : label}
-                  </span>
-                </button>
-              );
-            })}
+            <div
+              style={{
+                minHeight: 0,
+                overflow: "hidden",
+                display: "flex",
+                gap: 6,
+                fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+                pointerEvents: filtersOpen ? "auto" : "none",
+              }}
+            >
+              {TYPE_BUTTONS.map(({ type, label, svg }) => {
+                const active = typeFilter.size === 0 || typeFilter.has(type);
+                return (
+                  <button
+                    key={type}
+                    onClick={() => toggleType(type)}
+                    title={label}
+                    className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+                    style={{
+                      width: 46,
+                      height: 46,
+                      background: "rgba(255,255,255,0.28)",
+                      backgroundImage: active
+                        ? "radial-gradient(circle at 50% 40%, rgba(251,146,60,0.18) 0%, rgba(245,158,11,0.04) 65%, transparent 100%)"
+                        : undefined,
+                      backdropFilter: "blur(16px) saturate(1.5)",
+                      WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+                      border: active
+                        ? "0.5px solid rgba(255,210,160,0.55)"
+                        : "0.5px solid rgba(255,255,255,0.55)",
+                      boxShadow: active
+                        ? "0 0 18px rgba(251,146,60,0.4), 0 0 6px rgba(251,146,60,0.45), inset 0 0 22px rgba(251,146,60,0.35), inset 0 0 10px rgba(251,146,60,0.5), inset 0 1px 1px rgba(255,255,255,0.35), 0 2px 8px rgba(0,0,0,0.08)"
+                        : "0 2px 8px rgba(0,0,0,0.08)",
+                      color: active ? "#0f172a" : "#888",
+                      opacity: active ? 1 : 0.72,
+                      transform: "translateZ(0)",
+                      isolation: "isolate",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
+                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
+                      {label === "Bar & Pub" ? "Bar" : label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Collapse / expand toggle */}
+          {/* Collapse / expand toggle — chevron ∧ when open (pointing up = hide), ∨ when closed (pointing down = show) */}
           <button
             onClick={() => setFiltersOpen((v) => !v)}
             title={filtersOpen ? "Dölj filter" : "Visa filter"}
@@ -554,7 +562,6 @@ export default function Header({
               cursor: "pointer",
               transform: "translateZ(0)",
               isolation: "isolate",
-              transition: "opacity 0.2s",
             }}
           >
             <svg
@@ -567,7 +574,7 @@ export default function Header({
               strokeLinecap="round"
               strokeLinejoin="round"
               style={{
-                transform: filtersOpen ? "rotate(0deg)" : "rotate(180deg)",
+                transform: filtersOpen ? "rotate(180deg)" : "rotate(0deg)",
                 transition: "transform 0.25s ease",
               }}
             >

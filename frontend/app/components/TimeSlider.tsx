@@ -397,16 +397,16 @@ export default function TimeSlider({
                     bottom: 0,
                     width: 20,
                     marginLeft: -10,
-                    fontSize: 14,
+                    fontSize: 16,
                     lineHeight: 1,
-                    transform: `scale(${isSelected ? 2.2 : 1})`,
+                    transform: `scale(${isSelected ? 2.0 : 1})`,
                     transformOrigin: "bottom center",
-                    opacity: isSelected ? 1 : past ? 0.35 : 0.85,
+                    opacity: past ? 0.45 : 1,
                     filter: past
-                      ? "grayscale(1)"
+                      ? "grayscale(0.8) drop-shadow(0 0 3px rgba(255,255,255,0.95))"
                       : isSelected
-                      ? "drop-shadow(0 2px 4px rgba(0,0,0,0.25))"
-                      : "none",
+                      ? "drop-shadow(0 0 4px rgba(255,255,255,1)) drop-shadow(0 2px 5px rgba(0,0,0,0.3))"
+                      : "drop-shadow(0 0 3px rgba(255,255,255,1)) drop-shadow(0 1px 3px rgba(0,0,0,0.18))",
                     willChange: "transform",
                     transition: "transform 0.22s ease-out, opacity 0.22s ease-out",
                   }}
