@@ -436,11 +436,10 @@ export default function Header({
 
         {/* Top card: settings on left, logo centered, favorites on right */}
         <div
-          className="flex items-center justify-between px-2.5 pt-1 pb-1"
+          className="flex items-center justify-center gap-2.5 px-3 pt-1 pb-1"
           style={{
             position: "relative",
             zIndex: 20,
-            width: 196,
             borderRadius: "0 0 18px 18px",
             background: "rgba(255,255,255,0.3)",
             backdropFilter: "blur(14px) saturate(1.3)",
@@ -482,28 +481,23 @@ export default function Header({
 
         {/* Filter row + collapse toggle */}
         <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-          {/* CSS-grid collapse — smooth, no max-height jank, no backdrop-filter ghost */}
+          {/* marginBottom collapse — no overflow:hidden so backdrop-filter has no ghost box and buttons aren't clipped */}
           <div
             style={{
-              display: "grid",
-              gridTemplateRows: filtersOpen ? "1fr" : "0fr",
+              display: "flex",
+              gap: 6,
+              fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
               opacity: filtersOpen ? 1 : 0,
               visibility: filtersOpen ? "visible" : "hidden",
-              transform: filtersOpen ? "translateY(0)" : "translateY(-6px)",
-              transition: "grid-template-rows 0.26s ease, opacity 0.2s ease, transform 0.24s ease, visibility 0s linear " + (filtersOpen ? "0s" : "0.26s"),
+              transform: filtersOpen ? "translateY(0)" : "translateY(-4px)",
+              marginBottom: filtersOpen ? 0 : -50,
+              pointerEvents: filtersOpen ? "auto" : "none",
+              transition:
+                "margin-bottom 0.26s ease, opacity 0.22s ease, transform 0.24s ease, " +
+                "visibility 0s linear " + (filtersOpen ? "0s" : "0.24s"),
             }}
           >
-            <div
-              style={{
-                minHeight: 0,
-                overflow: "hidden",
-                display: "flex",
-                gap: 6,
-                fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
-                pointerEvents: filtersOpen ? "auto" : "none",
-              }}
-            >
-              {TYPE_BUTTONS.map(({ type, label, svg }) => {
+            {TYPE_BUTTONS.map(({ type, label, svg }) => {
                 const active = typeFilter.size === 0 || typeFilter.has(type);
                 return (
                   <button
@@ -540,7 +534,6 @@ export default function Header({
                   </button>
                 );
               })}
-            </div>
           </div>
 
           {/* Collapse / expand toggle — chevron ∧ when open (pointing up = hide), ∨ when closed (pointing down = show) */}
