@@ -382,7 +382,7 @@ export default function TimeSlider({
 
         <div className="px-3 pt-1 pb-2.5" style={{ overflow: "visible" }}>
           {/* Weather icons row */}
-          <div className="relative mb-1" style={{ height: 30, overflow: "visible" }}>
+          <div className="relative mb-1" style={{ height: 34, overflow: "visible" }}>
             {HOURS.map((h) => {
               const hw = getHourWeather(h);
               const hwSymbol = hw ? getSymbolInfo(hw.symbolCode) : null;
@@ -397,16 +397,16 @@ export default function TimeSlider({
                     bottom: 0,
                     width: 20,
                     marginLeft: -10,
-                    fontSize: 16,
+                    fontSize: 18,
                     lineHeight: 1,
-                    transform: `scale(${isSelected ? 2.0 : 1})`,
+                    transform: `scale(${isSelected ? 1.8 : 1})`,
                     transformOrigin: "bottom center",
-                    opacity: past ? 0.45 : 1,
+                    opacity: past ? 0.38 : 1,
                     filter: past
-                      ? "grayscale(0.8) drop-shadow(0 0 3px rgba(255,255,255,0.95))"
+                      ? "grayscale(1) drop-shadow(0 1px 2px rgba(0,0,0,0.25))"
                       : isSelected
-                      ? "drop-shadow(0 0 4px rgba(255,255,255,1)) drop-shadow(0 2px 5px rgba(0,0,0,0.3))"
-                      : "drop-shadow(0 0 3px rgba(255,255,255,1)) drop-shadow(0 1px 3px rgba(0,0,0,0.18))",
+                      ? "drop-shadow(0 2px 6px rgba(0,0,0,0.35))"
+                      : "drop-shadow(0 1px 2px rgba(0,0,0,0.25))",
                     willChange: "transform",
                     transition: "transform 0.22s ease-out, opacity 0.22s ease-out",
                   }}
