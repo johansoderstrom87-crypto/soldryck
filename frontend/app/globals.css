@@ -27,15 +27,22 @@ body {
    cost dramatically while keeping the glassmorphism look on desktop where
    it's affordable. Boost background opacity to compensate for the lost
    blur (otherwise the map shows through too clearly). */
-@media (max-width: 768px) {
+@media (pointer: coarse) {
+  /* pointer:coarse targets touch screens (phones, tablets) regardless of
+     screen width or orientation — a 768px breakpoint misses wide phones
+     in landscape (e.g. S22 Ultra ≈ 882 CSS px wide in landscape).
+     backdrop-filter blur is the single most expensive CSS effect on mobile
+     Safari / Chrome: every map-pan recomputes the blur for every glass
+     surface. Removing it on touch devices has near-zero visual impact but
+     a dramatic effect on frame rate. */
   *,
   *::before,
   *::after {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
   }
-  /* Without blur, the semi-transparent glass surfaces (rgba ~0.65–0.72)
-     look washed-out over the map. Bump common UI surfaces toward opaque. */
+  /* Without blur, semi-transparent backgrounds let the map show through
+     too clearly. Bump common surfaces toward opaque. */
   .marker-badge {
     background: rgba(255, 255, 255, 0.94) !important;
   }
