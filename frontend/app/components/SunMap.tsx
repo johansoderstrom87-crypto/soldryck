@@ -1293,12 +1293,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       // below toggles visibility based on the live (hour, filter) pair so
       // scrubbing the timeline doesn't rebuild markers.
 
-      // Filter by sun range — venue must have sun (or partial sun) for every hour in the range
+      // Filter by sun range — venue must have sun for every hour in the range
       if (sunRange) {
         let hasSunAllHours = true;
-        for (let h = sunRange.from; h < sunRange.to; h++) {
+        for (let h = sunRange.from; h <= sunRange.to; h++) {
           const s = normalize(getStatus(venue, dateKey, h));
-          if (s !== "sun" && s !== "partial") { hasSunAllHours = false; break; }
+          if (s !== "sun") { hasSunAllHours = false; break; }
         }
         if (!hasSunAllHours) return;
       }
