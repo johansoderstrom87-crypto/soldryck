@@ -1,5 +1,5 @@
-const CACHE_NAME = "soldryck-v1";
-const PRECACHE = ["/", "/manifest.json", "/icons/icon.svg"];
+const CACHE_NAME = "soldryck-v2";
+const PRECACHE = ["/", "/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
@@ -25,8 +25,8 @@ self.addEventListener("push", (e) => {
   e.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon: "/icons/icon.svg",
-      badge: "/icons/icon.svg",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
       data: { url },
       tag: "soldryck-sun",
     })

@@ -46,7 +46,9 @@ export default function Home() {
   const [sunRange, setSunRange] = useState<SunRange>(null);
   const [focusVenueId, setFocusVenueId] = useState<string | null>(initialVenue);
   const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
-  const [splashDone, setSplashDone] = useState(false);
+  const [splashDone, setSplashDone] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches
+  );
 
   // Lazy-load the ~5.5 MB venues-computed module. Keeping it out of the main
   // bundle lets older phones become interactive in ~2 s instead of waiting
