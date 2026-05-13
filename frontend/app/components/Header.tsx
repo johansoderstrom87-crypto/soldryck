@@ -508,10 +508,9 @@ export default function Header({
                     style={{
                       width: 46,
                       height: 46,
-                      background: active ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.14)",
-                      backgroundImage: active
-                        ? "radial-gradient(circle at 50% 40%, rgba(251,146,60,0.14) 0%, transparent 70%)"
-                        : undefined,
+                      background: active
+                        ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
+                        : "rgba(255,255,255,0.14)",
                       backdropFilter: "blur(16px) saturate(1.5)",
                       WebkitBackdropFilter: "blur(16px) saturate(1.5)",
                       border: active
