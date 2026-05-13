@@ -13,6 +13,7 @@ import os
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 INPUT_FILE = os.path.join(DATA_DIR, "shadow_results.json")
 VENUES_FILE = os.path.join(DATA_DIR, "venues.geojson")
+RATINGS_FILE = os.path.join(DATA_DIR, "ratings.json")
 OUTPUT_FILE = os.path.join(
     os.path.dirname(__file__), "..", "frontend", "app", "data", "venues-computed.ts"
 )
@@ -94,6 +95,14 @@ def main():
             props = feat["properties"]
             level_lookup[str(props["id"])] = props.get("level", "")
 
+    # Load ratings if available
+    ratings_lookup: dict = {}
+    if os.path.exists(RATINGS_FILE):
+        with open(RATINGS_FILE, "r", encoding="utf-8") as f:
+            ratings_lookup = json.load(f)
+        rated = sum(1 for r in ratings_lookup.values() if r.get("rating") is not None)
+        print(f"  Laddade ratings för {rated}/{len(ratings_lookup)} venues")
+
     print(f"Läste {len(results)} platser")
 
     # Bygg venues-array
@@ -115,6 +124,11 @@ def main():
         }
         if rooftop:
             venue["rooftop"] = True
+        rating_entry = ratings_lookup.get(venue_id, {})
+        if rating_entry.get("rating") is not None:
+            venue["rating"] = rating_entry["rating"]
+        if rating_entry.get("rating_count") is not None:
+            venue["ratingCount"] = rating_entry["rating_count"]
         venues.append(venue)
 
     print(f"  {rooftop_count} takbarer/takrestauranger")
@@ -135,6 +149,8 @@ export interface ComputedVenue {{
   type: string;
   address: string;
   rooftop?: boolean;
+  rating?: number;
+  ratingCount?: number;
   /** schedule[MM-DD][hour] = SunStatus */
   schedule: Record<string, Record<string, SunStatus>>;
 }}

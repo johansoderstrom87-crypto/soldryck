@@ -793,7 +793,8 @@ function buildVenuePopupHtml(
         <div style="display:flex;gap:1px;flex-wrap:nowrap;margin-top:1px">${hourLabels}</div>
       </div>
       ${bestHourLine}
-      <div style="font-size:11px;color:#64748b;margin-top:4px">${sunHours} soltimmar (vid klart v&auml;der)</div>
+      ${venue.rating != null ? `<div style="font-size:11px;color:#64748b;margin-top:3px">&#11088; ${venue.rating.toFixed(1)}${venue.ratingCount != null ? `<span style="color:#94a3b8"> (${venue.ratingCount.toLocaleString("sv-SE")})</span>` : ""}</div>` : ""}
+      <div style="font-size:11px;color:#64748b;margin-top:3px">${sunHours} soltimmar (vid klart v&auml;der)</div>
       <div id="venue-photo-${venue.id}" style="margin-top:6px"></div>
       <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
       <div style="display:flex;gap:4px;margin-top:6px">
