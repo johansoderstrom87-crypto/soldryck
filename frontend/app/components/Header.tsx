@@ -508,20 +508,20 @@ export default function Header({
                     style={{
                       width: 46,
                       height: 46,
-                      background: "rgba(255,255,255,0.28)",
+                      background: active ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.14)",
                       backgroundImage: active
-                        ? "radial-gradient(circle at 50% 40%, rgba(251,146,60,0.18) 0%, rgba(245,158,11,0.04) 65%, transparent 100%)"
+                        ? "radial-gradient(circle at 50% 40%, rgba(251,146,60,0.14) 0%, transparent 70%)"
                         : undefined,
                       backdropFilter: "blur(16px) saturate(1.5)",
                       WebkitBackdropFilter: "blur(16px) saturate(1.5)",
                       border: active
-                        ? "0.5px solid rgba(255,210,160,0.55)"
-                        : "0.5px solid rgba(255,255,255,0.55)",
+                        ? "1px solid rgba(251,146,60,0.75)"
+                        : "0.5px solid rgba(255,255,255,0.45)",
                       boxShadow: active
-                        ? "0 0 18px rgba(251,146,60,0.4), 0 0 6px rgba(251,146,60,0.45), inset 0 0 22px rgba(251,146,60,0.35), inset 0 0 10px rgba(251,146,60,0.5), inset 0 1px 1px rgba(255,255,255,0.35), 0 2px 8px rgba(0,0,0,0.08)"
-                        : "0 2px 8px rgba(0,0,0,0.08)",
+                        ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
+                        : "0 2px 8px rgba(0,0,0,0.06)",
                       color: active ? "#0f172a" : "#888",
-                      opacity: active ? 1 : 0.72,
+                      opacity: active ? 1 : 0.65,
                       transform: "translateZ(0)",
                       isolation: "isolate",
                       flexShrink: 0,
