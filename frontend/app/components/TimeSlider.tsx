@@ -357,6 +357,42 @@ export default function TimeSlider({
         </div>
       </div>
 
+      {/* Weather icons — float above the glass panel */}
+      <div className="relative max-w-md mx-auto px-3" style={{ height: 34, overflow: "visible" }}>
+        {HOURS.map((h) => {
+          const hw = getHourWeather(h);
+          const hwSymbol = hw ? getSymbolInfo(hw.symbolCode) : null;
+          const isSelected = h === hour;
+          const past = isPastHour(h);
+          return (
+            <div
+              key={h}
+              className="absolute flex items-end justify-center"
+              style={{
+                left: `${((h - 7 + 0.5) / HOURS.length) * 100}%`,
+                bottom: 0,
+                width: 20,
+                marginLeft: -10,
+                fontSize: 18,
+                lineHeight: 1,
+                transform: `scale(${isSelected ? 1.8 : 1})`,
+                transformOrigin: "bottom center",
+                opacity: past ? 0.38 : 1,
+                filter: past
+                  ? "grayscale(0.9) drop-shadow(0 1px 3px rgba(0,0,0,0.35))"
+                  : isSelected
+                  ? "drop-shadow(0 2px 8px rgba(0,0,0,0.55)) drop-shadow(0 0 12px rgba(255,200,50,0.55))"
+                  : "drop-shadow(0 0 4px rgba(255,255,255,0.85)) drop-shadow(0 1px 3px rgba(0,0,0,0.45))",
+                willChange: "transform",
+                transition: "transform 0.22s ease-out, opacity 0.22s ease-out",
+              }}
+            >
+              {hwSymbol?.icon ?? "·"}
+            </div>
+          );
+        })}
+      </div>
+
       <div
         ref={panelRef}
         className="pointer-events-auto max-w-md mx-auto rounded-2xl"
@@ -380,43 +416,7 @@ export default function TimeSlider({
           />
         )}
 
-        <div className="px-3 pt-1 pb-2.5" style={{ overflow: "visible" }}>
-          {/* Weather icons row */}
-          <div className="relative mb-1" style={{ height: 34, overflow: "visible" }}>
-            {HOURS.map((h) => {
-              const hw = getHourWeather(h);
-              const hwSymbol = hw ? getSymbolInfo(hw.symbolCode) : null;
-              const isSelected = h === hour;
-              const past = isPastHour(h);
-              return (
-                <div
-                  key={h}
-                  className="absolute flex items-end justify-center"
-                  style={{
-                    left: `${((h - 7 + 0.5) / HOURS.length) * 100}%`,
-                    bottom: 0,
-                    width: 20,
-                    marginLeft: -10,
-                    fontSize: 18,
-                    lineHeight: 1,
-                    transform: `scale(${isSelected ? 1.8 : 1})`,
-                    transformOrigin: "bottom center",
-                    opacity: past ? 0.38 : 1,
-                    filter: past
-                      ? "grayscale(1) drop-shadow(0 1px 2px rgba(0,0,0,0.25))"
-                      : isSelected
-                      ? "drop-shadow(0 2px 6px rgba(0,0,0,0.35))"
-                      : "drop-shadow(0 1px 2px rgba(0,0,0,0.25))",
-                    willChange: "transform",
-                    transition: "transform 0.22s ease-out, opacity 0.22s ease-out",
-                  }}
-                >
-                  {hwSymbol?.icon ?? "·"}
-                </div>
-              );
-            })}
-          </div>
-
+        <div className="px-3 pt-2 pb-2.5" style={{ overflow: "visible" }}>
           {/* Draggable gradient slider */}
           <div
             ref={trackRef}
