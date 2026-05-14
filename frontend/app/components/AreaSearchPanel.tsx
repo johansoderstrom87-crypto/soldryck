@@ -5,7 +5,6 @@ import { useState, useEffect, useRef, useMemo } from "react";
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
 type SortMode = "sun-remaining" | "rating" | "sun-count";
 
-// Module-level caches — survive panel close/reopen
 const photoCache = new Map<string, string | null>();
 const hoursCache = new Map<string, any>();
 
@@ -37,22 +36,20 @@ function countSunHoursFrom(
   return count;
 }
 
-/** Sun diagram that exactly matches the place card popup style. */
+/** Sun diagram matching place card popup exactly — bars, hour labels, current-hour dot. */
 function SunDiagram({
-  venue, dateKey, hour, getStatus, getSunHours,
+  venue, dateKey, hour, getStatus,
 }: {
   venue: any;
   dateKey: string;
   hour: number;
   getStatus: (v: any, dk: string, h: number) => string | undefined;
-  getSunHours: (v: any, dk: string) => number;
 }) {
   const hours = Array.from({ length: 16 }, (_, i) => i + 7);
-  const sunHoursTotal = getSunHours(venue, dateKey);
 
   return (
     <div style={{ background: "#f8fafc", borderRadius: 8, padding: "5px 6px", marginTop: 7 }}>
-      {/* Bars */}
+      {/* Bars — same heights and gradients as place card popup */}
       <div style={{ display: "flex", gap: 2, alignItems: "flex-end" }}>
         {hours.map((h) => {
           const s = normalizeStatus(getStatus(venue, dateKey, h));
@@ -117,10 +114,6 @@ function SunDiagram({
           ),
         )}
       </div>
-      {/* Sun hours */}
-      <div style={{ fontSize: 10, color: "#94a3b8", textAlign: "right", marginTop: 2 }}>
-        {sunHoursTotal} soltimmar
-      </div>
     </div>
   );
 }
@@ -139,7 +132,6 @@ interface VenueCardProps {
 function VenueCard({
   venue, hour, dateKey, getStatus, getSunHours, isExpanded, onToggle, onSelect,
 }: VenueCardProps) {
-  // Always fetch on mount — photo shown even in collapsed state
   const [photo, setPhoto] = useState<string | null | undefined>(
     photoCache.has(venue.id) ? photoCache.get(venue.id) : undefined,
   );
@@ -165,137 +157,100 @@ function VenueCard({
       .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const status = normalizeStatus(getStatus(venue, dateKey, hour));
-  const statusColor = {
-    sun: "#f59e0b", partial: "#fb923c", shade: "#94a3b8", night: "#334155",
-  }[status];
-
-  // Opening hours line
   const isOpen = hoursData?.openNow;
   const openText = isOpen === true
     ? `Öppet${hoursData.closesAt ? ` — stänger ${hoursData.closesAt}` : ""}`
-    : isOpen === false
-    ? "Stängt"
-    : null;
+    : isOpen === false ? "Stängt" : null;
 
-  // Full week for expanded view
   const DAYS = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
   const todayMon0 = (new Date().getDay() + 6) % 7;
-
   const mapUrl = `https://www.google.com/maps/place/${encodeURIComponent(venue.name)}/@${venue.lat},${venue.lng},17z`;
 
   return (
-    <div
-      style={{
-        borderRadius: 12,
-        background: isExpanded ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.45)",
-        border: `0.5px solid ${isExpanded ? "rgba(251,146,60,0.4)" : "rgba(255,255,255,0.7)"}`,
-        marginBottom: 8,
+    <div style={{
+      borderRadius: 12,
+      background: isExpanded ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.45)",
+      border: `0.5px solid ${isExpanded ? "rgba(251,146,60,0.4)" : "rgba(255,255,255,0.7)"}`,
+      marginBottom: 8,
+      overflow: "hidden",
+      transition: "background 0.18s ease",
+    }}>
+
+      {/* Photo — full width at top. Shimmer while loading, hidden if no photo. */}
+      <div style={{
+        height: photo === null ? 0 : 80,
         overflow: "hidden",
-        transition: "background 0.18s ease",
-      }}
-    >
-      {/* Collapsed row: photo thumbnail left + content right */}
+        background: "linear-gradient(180deg,#f1f5f9,#e2e8f0)",
+        transition: "height 0.2s ease",
+        borderRadius: "11px 11px 0 0",
+      }}>
+        {typeof photo === "string" && (
+          <img
+            src={photo}
+            alt={venue.name}
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        )}
+      </div>
+
+      {/* Clickable collapsed content */}
       <div
-        style={{ display: "flex", alignItems: "stretch", cursor: "pointer" }}
+        style={{ padding: "8px 10px", cursor: "pointer" }}
         onClick={onToggle}
         role="button"
         aria-expanded={isExpanded}
       >
-        {/* Photo thumbnail — always shown */}
-        <div style={{
-          width: 68, flexShrink: 0,
-          background: "linear-gradient(180deg,#f1f5f9,#e2e8f0)",
-          position: "relative", overflow: "hidden",
-        }}>
-          {photo ? (
-            <img
-              src={photo}
-              alt={venue.name}
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-            />
-          ) : photo === undefined ? (
-            // loading shimmer
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Name — no status dot */}
             <div style={{
-              width: "100%", height: "100%", minHeight: 68,
-              background: "linear-gradient(135deg,#f1f5f9,#e2e8f0)",
-            }} />
-          ) : (
-            // null = no photo
-            <div style={{
-              width: "100%", height: "100%", minHeight: 68,
-              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 13, fontWeight: 700, color: "#0f172a",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
+              {venue.name}
             </div>
-          )}
-        </div>
-
-        {/* Content */}
-        <div style={{ flex: 1, minWidth: 0, padding: "8px 10px 8px 9px" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
-            {/* Status dot */}
-            <div style={{
-              width: 7, height: 7, borderRadius: "50%", background: statusColor,
-              marginTop: 4, flexShrink: 0,
-              boxShadow: status === "sun" ? "0 0 5px rgba(245,158,11,0.55)" : undefined,
-            }} />
-
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: 13, fontWeight: 700, color: "#0f172a",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}>
-                {venue.name}
-              </div>
-              <div style={{ fontSize: 10, color: "#64748b", marginTop: 1 }}>
-                {venue.rating != null && (
-                  <span>⭐ {venue.rating.toFixed(1)} · </span>
-                )}
-                {typeLabel(venue.type)}
-                {venue.rooftop && <span style={{ color: "#f59e0b" }}> · ↑ Takbar</span>}
-              </div>
-              {/* Hours status — visible when minimized */}
-              {openText && (
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                  <div style={{
-                    width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
-                    background: isOpen ? "#10b981" : "#ef4444",
-                  }} />
-                  <span style={{
-                    fontSize: 10, fontWeight: 500,
-                    color: isOpen ? "#059669" : "#dc2626",
-                  }}>
-                    {openText}
-                  </span>
-                </div>
-              )}
+            {/* Rating + type */}
+            <div style={{ fontSize: 10, color: "#64748b", marginTop: 1 }}>
+              {venue.rating != null && <span>⭐ {venue.rating.toFixed(1)} · </span>}
+              {typeLabel(venue.type)}
+              {venue.rooftop && <span style={{ color: "#f59e0b" }}> · ↑ Takbar</span>}
             </div>
-
-            {/* Expand chevron */}
-            <svg
-              width="11" height="11" viewBox="0 0 12 12" fill="none"
-              stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round"
-              style={{
-                marginTop: 3, flexShrink: 0,
-                transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.2s ease",
-              }}
-            >
-              <path d="M2 4l4 4 4-4" />
-            </svg>
+            {/* Hours — visible when minimized */}
+            {openText && (
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
+                <div style={{
+                  width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
+                  background: isOpen ? "#10b981" : "#ef4444",
+                }} />
+                <span style={{
+                  fontSize: 10, fontWeight: 500,
+                  color: isOpen ? "#059669" : "#dc2626",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {openText}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Sun diagram — always shown */}
-          <SunDiagram
-            venue={venue} dateKey={dateKey} hour={hour}
-            getStatus={getStatus} getSunHours={getSunHours}
-          />
+          {/* Expand chevron */}
+          <svg
+            width="11" height="11" viewBox="0 0 12 12" fill="none"
+            stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round"
+            style={{
+              marginTop: 2, flexShrink: 0,
+              transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.2s ease",
+            }}
+          >
+            <path d="M2 4l4 4 4-4" />
+          </svg>
         </div>
+
+        {/* Sun diagram — always visible */}
+        <SunDiagram
+          venue={venue} dateKey={dateKey} hour={hour} getStatus={getStatus}
+        />
       </div>
 
       {/* Expanded section */}
@@ -314,7 +269,8 @@ function VenueCard({
                   : "Stängt";
                 return (
                   <div key={i} style={{
-                    display: "flex", justifyContent: "space-between", gap: 8, padding: "2px 0",
+                    display: "flex", justifyContent: "space-between",
+                    gap: 8, padding: "2px 0",
                     fontWeight: isToday ? 700 : 400,
                     color: isToday ? "#0f172a" : "#64748b",
                   }}>
@@ -326,14 +282,13 @@ function VenueCard({
             </div>
           )}
 
-          {/* Action buttons */}
+          {/* Actions */}
           <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
             <button
               onClick={(e) => { e.stopPropagation(); onSelect(); }}
               style={{
                 flex: 1, height: 32,
-                border: "1px solid rgba(251,146,60,0.5)",
-                borderRadius: 8,
+                border: "1px solid rgba(251,146,60,0.5)", borderRadius: 8,
                 background: "linear-gradient(135deg,rgba(251,146,60,0.15),rgba(245,158,11,0.08))",
                 color: "#c2410c", fontSize: 11, fontWeight: 600, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
@@ -395,9 +350,7 @@ export default function AreaSearchPanel({
           countSunHoursFrom(a, dateKey, hour, getStatus)
         );
       }
-      if (sort === "rating") {
-        return (b.rating ?? -1) - (a.rating ?? -1);
-      }
+      if (sort === "rating") return (b.rating ?? -1) - (a.rating ?? -1);
       return getSunHours(b, dateKey) - getSunHours(a, dateKey);
     });
   }, [venues, sort, hour, dateKey]);
@@ -426,43 +379,33 @@ export default function AreaSearchPanel({
   );
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        bottom: 0,
-        // Narrower than before — wide enough for the sun diagram to be legible
-        width: "min(290px, 100%)",
-        // Above the header (z-1100) and filter buttons
-        zIndex: 1200,
-        display: "flex",
-        flexDirection: "column",
-        // Same glass as TimeSlider / header
-        background: "rgba(255,255,255,0.3)",
-        backdropFilter: "blur(14px) saturate(1.3)",
-        WebkitBackdropFilter: "blur(14px) saturate(1.3)",
-        border: "0.5px solid rgba(255,255,255,0.45)",
-        borderLeft: "none",
-        borderTop: "none",
-        borderBottom: "none",
-        boxShadow: "6px 0 24px rgba(0,0,0,0.12)",
-        fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
-        transform: "translateZ(0)",
-        isolation: "isolate",
-      }}
-    >
+    <div style={{
+      position: "absolute",
+      top: 0, left: 0, bottom: 0,
+      width: "min(220px, 100%)",
+      zIndex: 1200,
+      display: "flex",
+      flexDirection: "column",
+      // Same glass as TimeSlider / header
+      background: "rgba(255,255,255,0.3)",
+      backdropFilter: "blur(14px) saturate(1.3)",
+      WebkitBackdropFilter: "blur(14px) saturate(1.3)",
+      border: "none",
+      borderRight: "0.5px solid rgba(255,255,255,0.45)",
+      boxShadow: "6px 0 24px rgba(0,0,0,0.12)",
+      fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+      transform: "translateZ(0)",
+      isolation: "isolate",
+    }}>
       {/* Header */}
       <div style={{
-        padding: "14px 12px 10px",
+        padding: "14px 10px 10px",
         borderBottom: "0.5px solid rgba(255,255,255,0.45)",
         flexShrink: 0,
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
-              I detta område
-            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>I detta område</div>
             <div style={{ fontSize: 11, color: "#475569" }}>
               {venues.length} {venues.length === 1 ? "ställe" : "ställen"}
             </div>
@@ -470,25 +413,21 @@ export default function AreaSearchPanel({
           <button
             onClick={onClose}
             style={{
-              width: 28, height: 28, border: "0.5px solid rgba(255,255,255,0.55)",
-              borderRadius: 8,
-              background: "rgba(255,255,255,0.3)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              cursor: "pointer",
+              width: 26, height: 26,
+              border: "0.5px solid rgba(255,255,255,0.55)", borderRadius: 8,
+              background: "rgba(255,255,255,0.3)", backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#475569",
+              color: "#475569", flexShrink: 0,
             }}
             title="Stäng"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
-
-        {/* Sort buttons */}
-        <div style={{ display: "flex", gap: 5 }}>
+        <div style={{ display: "flex", gap: 4 }}>
           {sortBtn("sun-remaining", "Sol kvar")}
           {sortBtn("rating", "Betyg")}
           {sortBtn("sun-count", "Mest sol")}
@@ -498,7 +437,7 @@ export default function AreaSearchPanel({
       {/* Venue list */}
       <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
         {displayed.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px 16px", color: "#94a3b8", fontSize: 12 }}>
+          <div style={{ textAlign: "center", padding: "40px 12px", color: "#94a3b8", fontSize: 12 }}>
             Inga ställen i detta område
           </div>
         ) : (
@@ -520,12 +459,11 @@ export default function AreaSearchPanel({
               <button
                 onClick={() => setDisplayCount((c) => c + 40)}
                 style={{
-                  width: "100%", padding: "10px",
+                  width: "100%", padding: "9px",
                   border: "0.5px solid rgba(255,255,255,0.55)", borderRadius: 10,
                   background: "rgba(255,255,255,0.3)", cursor: "pointer",
                   fontSize: 11, color: "#475569", fontWeight: 500,
-                  backdropFilter: "blur(8px)",
-                  WebkitBackdropFilter: "blur(8px)",
+                  backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
                 }}
               >
                 Visa fler ({sorted.length - displayCount} kvar)
