@@ -780,10 +780,7 @@ function buildVenuePopupHtml(
            : s === "night" ? "background:#1e293b"
            : "background:#e2e8f0";
       }
-      const isCurrent = h === hour;
-      const barH = isCurrent ? "height:20px" : "height:16px";
-      const glow = isCurrent && (s === "sun" || s === "partial") ? ";box-shadow:0 0 8px rgba(245,158,11,0.65)" : "";
-      return `<div style="flex:1;border-radius:4px;${bg};${barH}${glow};min-width:0" title="${h}:00 — ${statusToLabel(s)}"></div>`;
+      return `<div style="flex:1;height:16px;border-radius:4px;${bg};min-width:0" title="${h}:00 — ${statusToLabel(s)}"></div>`;
     })
     .join("");
 
@@ -830,8 +827,8 @@ function buildVenuePopupHtml(
       </div>
       <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}</div>
       <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
-      <div style="background:#f8fafc;border-radius:8px;padding:5px 6px;margin-top:8px">
-        <div style="display:flex;gap:2px;align-items:flex-end">${shadowTimeline}</div>
+      <div style="background:rgba(255,255,255,0.55);border-radius:8px;padding:5px 6px;margin-top:8px;border:0.5px solid rgba(255,255,255,0.7)">
+        <div style="display:flex;gap:2px">${shadowTimeline}</div>
         <div style="display:flex;gap:2px;margin-top:2px">${hourLabels}</div>
         <div style="display:flex;gap:2px;margin-top:1px">${nowDots}</div>
         <div style="font-size:10px;color:#94a3b8;text-align:right;margin-top:2px">${sunHours} soltimmar</div>

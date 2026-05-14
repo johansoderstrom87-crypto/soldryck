@@ -58,14 +58,15 @@ body {
 }
 
 .leaflet-popup-content-wrapper {
-  background: rgba(255, 255, 255, 0.85) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0,0,0,0.07) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  border-radius: 20px !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
   overflow: hidden !important;
 }
 
 .leaflet-popup-tip {
-  background: rgba(255, 255, 255, 0.85) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
 }
 
 .leaflet-popup-content {
