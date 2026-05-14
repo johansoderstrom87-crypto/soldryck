@@ -357,22 +357,28 @@ export default function TimeSlider({
         </div>
       </div>
 
-      {/* Weather icons — float above the glass panel */}
-      <div className="relative max-w-md mx-auto px-3" style={{ height: 34, overflow: "visible" }}>
+      {/* Weather icons — pixel-aligned with slider via trackWidth to match each hour exactly */}
+      <div className="relative max-w-md mx-auto" style={{ height: 34, overflow: "visible" }}>
         {HOURS.map((h) => {
           const hw = getHourWeather(h);
           const hwSymbol = hw ? getSymbolInfo(hw.symbolCode) : null;
           const isSelected = h === hour;
           const past = isPastHour(h);
+          // Align with slider track: 12px = panel px-3 padding, -10 = center 20px icon
+          const leftPx = trackWidth > 0
+            ? 12 + ((h - 7 + 0.5) / HOURS.length) * trackWidth - 10
+            : null;
           return (
             <div
               key={h}
               className="absolute flex items-end justify-center"
               style={{
-                left: `${((h - 7 + 0.5) / HOURS.length) * 100}%`,
+                ...(leftPx !== null
+                  ? { left: `${leftPx}px` }
+                  : { left: `${((h - 7 + 0.5) / HOURS.length) * 100}%`, marginLeft: -10 }
+                ),
                 bottom: 0,
                 width: 20,
-                marginLeft: -10,
                 fontSize: 18,
                 lineHeight: 1,
                 transform: `scale(${isSelected ? 1.8 : 1})`,

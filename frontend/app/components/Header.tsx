@@ -506,8 +506,8 @@ export default function Header({
                     title={label}
                     className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
                     style={{
-                      width: 46,
-                      height: 46,
+                      width: 40,
+                      height: 40,
                       background: active
                         ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
                         : "rgba(255,255,255,0.14)",

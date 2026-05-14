@@ -2037,7 +2037,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       {/* Search button — round, top of right-side stack */}
       <div
         ref={searchRef}
-        style={{ position: "absolute", bottom: "337px", right: "12px", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}
+        style={{ position: "absolute", bottom: "329px", right: "12px", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}
       >
         {searchOpen && (
           <div style={{ position: "relative" }}>
@@ -2169,8 +2169,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             "Hitta närmaste uteservering med sol"
           }
           style={{
-            width: 52,
-            height: 52,
+            width: 44,
+            height: 44,
             borderRadius: "50%",
             border: "none",
             cursor: findSunState === "locating" ? "wait" : "pointer",
