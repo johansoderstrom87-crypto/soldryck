@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useMemo, useDeferredValue, useState } from "react";
+import AreaSearchPanel from "./AreaSearchPanel";
 import L from "leaflet";
 
 // Load computed data if available, otherwise mock
@@ -906,6 +907,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLDivElement>(null);
 
+  // Area search panel state
+  const [areaSearchOpen, setAreaSearchOpen] = useState(false);
+  const [areaSearchVenues, setAreaSearchVenues] = useState<any[]>([]);
+
   const dateKey = useMemo(() => getDateKey(date), [date]);
 
   // Initialize map
@@ -1770,6 +1775,57 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     };
   }, []);
 
+  // Area search — compute venues in map bounds that pass the active sun/shade filter.
+  // Re-runs when the panel opens, when the map moves, or when filter/dateKey change.
+  useEffect(() => {
+    if (!areaSearchOpen) return;
+    const map = mapRef.current;
+    if (!map) return;
+
+    function update() {
+      const m = mapRef.current;
+      if (!m) return;
+      const bounds = m.getBounds();
+      const inBounds = markerVenuesRef.current
+        .filter(({ venue }) => bounds.contains([venue.lat, venue.lng] as L.LatLngTuple))
+        .filter(({ venue }) => {
+          const f = filterRef.current;
+          if (f === "all") return true;
+          const s = normalize(getStatus(venue, dateKey, hourRef.current));
+          if (f === "sun") return s === "sun";
+          if (f === "shade") return s === "shade" || s === "night";
+          return true;
+        })
+        .map(({ venue }) => venue);
+      setAreaSearchVenues(inBounds);
+    }
+
+    update();
+    map.on("moveend zoomend", update);
+    return () => { map.off("moveend zoomend", update); };
+  }, [areaSearchOpen, filter, dateKey]);
+
+  // Pan to a venue from the area search panel and open its popup.
+  function flyToVenue(venue: any) {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setView([venue.lat, venue.lng], Math.max(map.getZoom(), 16), { animate: true });
+    const found = markerVenuesRef.current.find(({ marker: m }) => {
+      const ll = m.getLatLng();
+      return Math.abs(ll.lat - venue.lat) < 0.0001 && Math.abs(ll.lng - venue.lng) < 0.0001;
+    });
+    if (found) {
+      if (!((found.marker as any)._map)) {
+        found.marker.addTo(map);
+        applyMarkerVisualState(
+          found.marker,
+          computeMarkerState(found.venue, dateKey, hourRef.current, filterRef.current, weatherRef.current),
+        );
+      }
+      setTimeout(() => found.marker.openPopup(), 400);
+    }
+  }
+
   const currentWeatherSymbol = weather?.hourly[hour]?.symbolCode;
   const darkness = getAmbientDarkness(hour, date, currentWeatherSymbol);
   const ambientColor = getAmbientColor(hour, date, currentWeatherSymbol);
@@ -2051,6 +2107,50 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           )}
         </button>
       </div>
+
+      {/* "Sök i detta område" pill — centered above the time slider */}
+      {!areaSearchOpen && (
+        <div style={{
+          position: "absolute", bottom: "236px", left: "50%",
+          transform: "translateX(-50%)", zIndex: 1001, pointerEvents: "auto",
+        }}>
+          <button
+            onClick={() => setAreaSearchOpen(true)}
+            style={{
+              ...glassStyle,
+              padding: "9px 18px",
+              borderRadius: 999,
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#0f172a",
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              whiteSpace: "nowrap",
+              border: "0.5px solid rgba(255,255,255,0.55)",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            Sök i detta område
+          </button>
+        </div>
+      )}
+
+      {/* Area search panel */}
+      {areaSearchOpen && (
+        <AreaSearchPanel
+          venues={areaSearchVenues}
+          hour={hourProp}
+          dateKey={dateKey}
+          onClose={() => setAreaSearchOpen(false)}
+          onSelectVenue={flyToVenue}
+          getStatus={getStatus}
+          getSunHours={getSunHrs}
+        />
+      )}
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
