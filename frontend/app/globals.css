@@ -58,9 +58,14 @@ body {
 }
 
 .leaflet-popup-content-wrapper {
+  background: rgba(255, 255, 255, 0.85) !important;
   border-radius: 12px !important;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0,0,0,0.07) !important;
   overflow: hidden !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(255, 255, 255, 0.85) !important;
 }
 
 .leaflet-popup-content {
@@ -447,6 +452,8 @@ body {
   gap: 8px;
   font-size: 12px;
   color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .venue-hours-dot {
   width: 8px;
@@ -458,19 +465,23 @@ body {
 .venue-hours-status-text {
   font-weight: 600;
   letter-spacing: -0.01em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .hours-toggle {
-  margin-left: auto;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
   border: 1px solid #e2e8f0;
-  border-radius: 999px;
+  border-radius: 50%;
   background: #fff;
   color: #64748b;
-  font-size: 10px;
-  font-weight: 500;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }

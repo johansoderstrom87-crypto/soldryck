@@ -714,7 +714,6 @@ function renderVenueHours(container: HTMLElement, venue: any) {
         <span class="venue-hours-dot" style="background:${dotColor}"></span>
         <span class="venue-hours-status-text">${statusText}</span>
         ${weekHtml ? `<button class="hours-toggle" aria-expanded="false">
-          <span class="hours-toggle-label">Visa alla</span>
           <svg class="hours-toggle-caret" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 3.5L5 6.5L8 3.5" /></svg>
         </button>` : ""}
       </div>
@@ -728,8 +727,6 @@ function renderVenueHours(container: HTMLElement, venue: any) {
         const visible = week.style.display !== "none";
         week.style.display = visible ? "none" : "block";
         toggle.setAttribute("aria-expanded", visible ? "false" : "true");
-        const label = toggle.querySelector(".hours-toggle-label");
-        if (label) label.textContent = visible ? "Visa alla" : "Dölj";
       };
     }
   };
@@ -770,24 +767,38 @@ function buildVenuePopupHtml(
   const shadowTimeline = hours
     .map((h) => {
       const s = normalize(getStatus(venue, dateKey, h));
-      const bg =
-        s === "sun" ? "background:linear-gradient(135deg,#fde68a,#f59e0b)"
-        : s === "partial" ? "background:linear-gradient(135deg,#fed7aa,#fb923c)"
-        : s === "night" ? "background:#1e293b"
-        : "background:#e2e8f0";
-      const outline = h === hour ? "outline:2px solid #0f172a;outline-offset:1px;position:relative;z-index:1" : "";
-      return `<div style="flex:1;height:16px;border-radius:4px;${bg};${outline};min-width:0" title="${h}:00 — ${statusToLabel(s)}"></div>`;
+      let bg: string;
+      if (s === "sun") {
+        const dist = Math.abs(h - 13);
+        if (dist >= 6) bg = "background:linear-gradient(180deg,#fef9c3,#fde68a)";
+        else if (dist >= 4) bg = "background:linear-gradient(180deg,#fde68a,#fbbf24)";
+        else if (dist >= 2) bg = "background:linear-gradient(180deg,#fbbf24,#f59e0b)";
+        else bg = "background:linear-gradient(180deg,#f59e0b,#ea580c)";
+      } else {
+        bg = s === "partial" ? "background:linear-gradient(135deg,#fed7aa,#fb923c)"
+           : s === "night" ? "background:#1e293b"
+           : "background:#e2e8f0";
+      }
+      const isCurrent = h === hour;
+      const barH = isCurrent ? "height:20px" : "height:16px";
+      const glow = isCurrent && (s === "sun" || s === "partial") ? ";box-shadow:0 0 8px rgba(245,158,11,0.65)" : "";
+      return `<div style="flex:1;border-radius:4px;${bg};${barH}${glow};min-width:0" title="${h}:00 — ${statusToLabel(s)}"></div>`;
     })
     .join("");
 
   const hourLabels = hours
     .map((h) => {
-      const show = h % 3 === 0;
       const bold = h === hour ? "font-weight:700;color:#334155" : "";
-      return show
-        ? `<div style="flex:1;text-align:center;font-size:7px;color:#94a3b8;min-width:0;${bold}">${h}</div>`
-        : `<div style="flex:1;min-width:0"></div>`;
+      return `<div style="flex:1;text-align:center;font-size:6px;color:#94a3b8;min-width:0;${bold}">${h}</div>`;
     })
+    .join("");
+
+  const nowDots = hours
+    .map((h) =>
+      h === hour
+        ? `<div style="flex:1;min-width:0;display:flex;justify-content:center"><div style="width:5px;height:5px;border-radius:50%;background:#f59e0b;box-shadow:0 0 4px rgba(245,158,11,0.7)"></div></div>`
+        : `<div style="flex:1;min-width:0"></div>`
+    )
     .join("");
 
   const bestHour = getBestHour(venue, dateKey, weather);
@@ -813,14 +824,15 @@ function buildVenuePopupHtml(
     <div style="min-width:260px">
       ${photoContainerHtml}
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <strong style="font-size:15px;line-height:1.2;flex:1;margin-right:6px">${venue.name}</strong>
+        <strong style="font-size:17px;line-height:1.2;flex:1;margin-right:6px">${venue.name}</strong>
         <span style="font-size:20px;flex-shrink:0">${statusToEmoji(status)}</span>
       </div>
       <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}</div>
       <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
       <div style="background:#f8fafc;border-radius:8px;padding:5px 6px;margin-top:8px">
-        <div style="display:flex;gap:2px">${shadowTimeline}</div>
+        <div style="display:flex;gap:2px;align-items:flex-end">${shadowTimeline}</div>
         <div style="display:flex;gap:2px;margin-top:2px">${hourLabels}</div>
+        <div style="display:flex;gap:2px;margin-top:1px">${nowDots}</div>
         <div style="font-size:10px;color:#94a3b8;text-align:right;margin-top:2px">${sunHours} soltimmar</div>
       </div>
       ${bestHourLine}
