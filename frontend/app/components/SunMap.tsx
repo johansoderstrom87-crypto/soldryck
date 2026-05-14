@@ -900,6 +900,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const geoWatchRef = useRef<number | null>(null);
   const hasCenteredRef = useRef(false);
   const [geoState, setGeoState] = useState<"idle" | "locating" | "located" | "error">("idle");
+  const [findSunState, setFindSunState] = useState<"idle" | "locating" | "none" | "error">("idle");
+  const [findSunMsg, setFindSunMsg] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLDivElement>(null);
@@ -1802,6 +1804,56 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     return () => { map.off("moveend zoomend", update); };
   }, [areaSearchOpen, filter, dateKey]);
 
+  // Find the nearest venue currently in sun and fly to it.
+  function handleFindSun() {
+    if (findSunState === "locating") return;
+    setFindSunState("locating");
+    setFindSunMsg(null);
+
+    if (!navigator.geolocation) {
+      setFindSunState("error");
+      setFindSunMsg("GPS stöds inte");
+      setTimeout(() => setFindSunState("idle"), 3000);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const cosLat = Math.cos((latitude * Math.PI) / 180);
+
+        const sunnyVenues = allVenues.filter((v: any) => {
+          const s = getStatus(v, dateKey, hourRef.current);
+          return s === "sun" || s === "s";
+        });
+
+        if (sunnyVenues.length === 0) {
+          setFindSunState("none");
+          setTimeout(() => setFindSunState("idle"), 3000);
+          return;
+        }
+
+        let nearest = sunnyVenues[0];
+        let minDist = Infinity;
+        for (const v of sunnyVenues) {
+          const dlat = (v.lat - latitude) * 111_000;
+          const dlng = (v.lng - longitude) * 111_000 * cosLat;
+          const d = dlat * dlat + dlng * dlng;
+          if (d < minDist) { minDist = d; nearest = v; }
+        }
+
+        flyToVenue(nearest);
+        setFindSunState("idle");
+      },
+      (err) => {
+        setFindSunState("error");
+        setFindSunMsg(err.code === 1 ? "Tillåt platsåtkomst" : "Kunde inte hämta position");
+        setTimeout(() => setFindSunState("idle"), 4000);
+      },
+      { enableHighAccuracy: false, timeout: 8000 },
+    );
+  }
+
   // Pan to a venue from the area search panel and open its popup.
   function flyToVenue(venue: any) {
     const map = mapRef.current;
@@ -2055,6 +2107,61 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         </button>
       </div>
 
+      {/* "Hitta solen" pill — bottom-left, same level as GPS button */}
+      <div style={{ position: "absolute", bottom: "225px", left: "12px", zIndex: 1001 }}>
+        <button
+          onClick={handleFindSun}
+          disabled={findSunState === "locating"}
+          title="Hitta närmaste uteservering med sol just nu"
+          style={{
+            ...glassStyle,
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            padding: "0 18px",
+            height: 48,
+            borderRadius: 999,
+            cursor: findSunState === "locating" ? "wait" : "pointer",
+            fontSize: 13,
+            fontWeight: 600,
+            color: findSunState === "error" ? "#ef4444" : findSunState === "none" ? "#64748b" : "#92400e",
+            background: findSunState === "error"
+              ? "rgba(254,226,226,0.55)"
+              : findSunState === "none"
+              ? "rgba(241,245,249,0.55)"
+              : "rgba(253,224,71,0.45)",
+            transition: "background 0.3s, color 0.3s",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {findSunState === "locating" ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ animation: "spin 1s linear infinite", flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+          ) : findSunState === "none" ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+            </svg>
+          ) : findSunState === "error" ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, animation: "find-sun-idle 3s ease-in-out infinite" }}>
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+            </svg>
+          )}
+          <span>{
+            findSunState === "locating" ? "Letar..." :
+            findSunState === "none" ? "Ingen sol nära dig" :
+            findSunState === "error" ? (findSunMsg ?? "GPS-fel") :
+            "Hitta solen"
+          }</span>
+        </button>
+      </div>
+
       {/* GPS locate button — bottom-right above time slider */}
       <div style={{ position: "absolute", bottom: "225px", right: "12px", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}>
         {/* Tooltip — fades in then out, only when idle */}
@@ -2151,6 +2258,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes find-sun-idle {
+          0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+          50% { transform: scale(1.15) rotate(15deg); opacity: 0.8; }
+        }
         @keyframes gps-tip {
           0%   { opacity: 0; transform: translateX(6px); }
           12%  { opacity: 1; transform: translateX(0); }
