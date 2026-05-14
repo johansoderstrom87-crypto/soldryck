@@ -638,9 +638,7 @@ function applyMarkerVisualState(marker: L.Marker, state: { className: string; vi
 function renderVenuePhoto(container: HTMLElement, venue: any) {
   const cached = venuePhotoCache.get(venue.id);
   if (cached !== undefined) {
-    if (cached) {
-      container.innerHTML = `<img src="${cached}" alt="${venue.name}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;display:block" loading="lazy" />`;
-    }
+    // Already handled in buildVenuePopupHtml — image embedded in HTML or no container rendered.
     return;
   }
   const params = new URLSearchParams({
@@ -652,7 +650,9 @@ function renderVenuePhoto(container: HTMLElement, venue: any) {
       const url = (data?.photoUrl ?? null) as string | null;
       venuePhotoCache.set(venue.id, url);
       if (url) {
-        container.innerHTML = `<img src="${url}" alt="${venue.name}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;display:block" loading="lazy" />`;
+        container.innerHTML = `<img src="${url}" alt="${venue.name}" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" />`;
+      } else {
+        container.style.cssText += ";height:0;margin-top:0;margin-bottom:0;display:none";
       }
     })
     .catch(() => {});
@@ -665,10 +665,30 @@ function renderVenueHours(container: HTMLElement, venue: any) {
     const DAYS = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
     const todayMon0 = (new Date().getDay() + 6) % 7;
     const dotColor = data.openNow ? "#10b981" : data.openNow === false ? "#ef4444" : "#94a3b8";
+
+    // Compute next opening time when closed
+    let opensAt: string | null = null;
+    if (data.openNow === false && data.week) {
+      const now = new Date();
+      const todayMon0 = (now.getDay() + 6) % 7;
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const currentTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      const DAYS_SHORT = ["mån", "tis", "ons", "tor", "fre", "lör", "sön"];
+      outer: for (let d = 0; d <= 7; d++) {
+        const dayIdx = (todayMon0 + d) % 7;
+        const segs = data.week[dayIdx] || [];
+        for (const seg of segs) {
+          if (d === 0 && seg.open <= currentTime) continue;
+          opensAt = d === 0 ? `kl. ${seg.open}` : d === 1 ? `imorgon kl. ${seg.open}` : `${DAYS_SHORT[dayIdx]} kl. ${seg.open}`;
+          break outer;
+        }
+      }
+    }
+
     const statusText = data.openNow
       ? `Öppet${data.closesAt ? ` — stänger ${data.closesAt}` : ""}`
       : data.openNow === false
-        ? "Stängt just nu"
+        ? `Stängt${opensAt ? ` — öppnar ${opensAt}` : " just nu"}`
         : "Öppettider";
 
     const weekRows = data.week?.map((segments, i) => {
@@ -747,80 +767,89 @@ function buildVenuePopupHtml(
   const sunHours = getSunHrs(venue, dateKey);
   const hours = Array.from({ length: 16 }, (_, i) => i + 7);
 
-  const hourLabels = hours
-    .map((h) => {
-      const bold = h === hour ? "font-weight:700;color:#0f172a" : "";
-      return `<div style="width:12px;text-align:center;font-size:7px;color:#94a3b8;flex-shrink:0;${bold}">${h}</div>`;
-    })
-    .join("");
-
   const shadowTimeline = hours
     .map((h) => {
       const s = normalize(getStatus(venue, dateKey, h));
       const bg =
-        s === "sun" ? "background:#f59e0b"
-        : s === "partial" ? "background:#fb923c"
+        s === "sun" ? "background:linear-gradient(135deg,#fde68a,#f59e0b)"
+        : s === "partial" ? "background:linear-gradient(135deg,#fed7aa,#fb923c)"
         : s === "night" ? "background:#1e293b"
-        : "background:#cbd5e1";
-      const border = h === hour ? "border:2px solid #0f172a" : "";
-      return `<div style="width:12px;height:12px;border-radius:2px;${bg};${border};flex-shrink:0" title="${h}:00 — ${statusToLabel(s)}"></div>`;
+        : "background:#e2e8f0";
+      const outline = h === hour ? "outline:2px solid #0f172a;outline-offset:1px;position:relative;z-index:1" : "";
+      return `<div style="flex:1;height:16px;border-radius:4px;${bg};${outline};min-width:0" title="${h}:00 — ${statusToLabel(s)}"></div>`;
+    })
+    .join("");
+
+  const hourLabels = hours
+    .map((h) => {
+      const show = h % 3 === 0;
+      const bold = h === hour ? "font-weight:700;color:#334155" : "";
+      return show
+        ? `<div style="flex:1;text-align:center;font-size:7px;color:#94a3b8;min-width:0;${bold}">${h}</div>`
+        : `<div style="flex:1;min-width:0"></div>`;
     })
     .join("");
 
   const bestHour = getBestHour(venue, dateKey, weather);
   const bestHourLine = bestHour
-    ? `<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:6px;padding:4px 8px;margin-top:4px;display:flex;align-items:center;gap:5px">
-        <span style="font-size:12px">&#11088;</span>
+    ? `<div style="border-left:3px solid #f59e0b;padding:3px 8px;margin-top:6px;background:#fffbeb;border-radius:0 6px 6px 0;display:flex;align-items:center;gap:5px">
+        <span style="font-size:11px">&#11088;</span>
         <span style="font-size:11px;color:#78350f;font-weight:500">B&auml;sta timmen: ${bestHour.label}</span>
       </div>`
     : "";
 
-  const address = venue.address || venue.addr_street
-    ? `<div style="color:#94a3b8;font-size:11px;margin-top:1px">${venue.address || ""}</div>`
+  const ratingHtml = venue.rating != null
+    ? `&#11088; ${venue.rating.toFixed(1)}${venue.ratingCount != null ? `<span style="color:#b0bec5"> (${venue.ratingCount.toLocaleString("sv-SE")})</span>` : ""} &middot; `
     : "";
 
+  const cachedPhoto = venuePhotoCache.get(venue.id);
+  const photoContainerHtml = cachedPhoto === null
+    ? ""
+    : `<div id="venue-photo-${venue.id}" style="margin:-12px -16px 10px -16px;height:140px;background:linear-gradient(180deg,#f1f5f9,#e2e8f0);border-radius:12px 12px 0 0;overflow:hidden">${cachedPhoto ? `<img src="${cachedPhoto}" alt="${venue.name}" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" />` : ""}</div>`;
+
+  const mapUrl = `https://www.google.com/maps/place/${encodeURIComponent(venue.name)}/@${venue.lat},${venue.lng},17z`;
+
   return `
-    <div style="min-width:240px">
-      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">
-        <div>
-          <strong style="font-size:14px;line-height:1.2">${venue.name}</strong>
-          <div style="color:#64748b;font-size:11px;margin-top:1px">${typeToLabel(venue.type)}${address ? ` · ${venue.address || ""}` : ""}</div>
-        </div>
-        <span style="font-size:20px;margin-left:6px">${statusToEmoji(status)}</span>
+    <div style="min-width:260px">
+      ${photoContainerHtml}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <strong style="font-size:15px;line-height:1.2;flex:1;margin-right:6px">${venue.name}</strong>
+        <span style="font-size:20px;flex-shrink:0">${statusToEmoji(status)}</span>
       </div>
-      <div style="background:#f8fafc;border-radius:6px;padding:5px 6px;margin-top:2px">
-        <div style="display:flex;gap:1px;flex-wrap:nowrap;overflow-x:auto">${shadowTimeline}</div>
-        <div style="display:flex;gap:1px;flex-wrap:nowrap;margin-top:1px">${hourLabels}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}</div>
+      <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
+      <div style="background:#f8fafc;border-radius:8px;padding:5px 6px;margin-top:8px">
+        <div style="display:flex;gap:2px">${shadowTimeline}</div>
+        <div style="display:flex;gap:2px;margin-top:2px">${hourLabels}</div>
+        <div style="font-size:10px;color:#94a3b8;text-align:right;margin-top:2px">${sunHours} soltimmar</div>
       </div>
       ${bestHourLine}
-      ${venue.rating != null ? `<div style="font-size:11px;color:#64748b;margin-top:3px">&#11088; ${venue.rating.toFixed(1)}${venue.ratingCount != null ? `<span style="color:#94a3b8"> (${venue.ratingCount.toLocaleString("sv-SE")})</span>` : ""}</div>` : ""}
-      <div style="font-size:11px;color:#64748b;margin-top:3px">${sunHours} soltimmar (vid klart v&auml;der)</div>
-      <div id="venue-photo-${venue.id}" style="margin-top:6px"></div>
-      <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
-      <div style="display:flex;gap:4px;margin-top:6px">
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
         <button
           class="fav-btn"
           data-venue-id="${venue.id}"
-          style="flex:0 0 32px;padding:3px;border:1px solid #fecaca;border-radius:6px;background:#fff;color:#ef4444;font-size:14px;cursor:pointer;text-align:center"
+          style="flex:0 0 32px;height:32px;border:1px solid #fecaca;border-radius:8px;background:#fff;color:#ef4444;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center"
           title="Spara som favorit"
         >${getFavorites().has(venue.id) ? "&#10084;&#65039;" : "&#9825;"}</button>
         <a
-          href="https://www.google.com/maps/place/${encodeURIComponent(venue.name)}/@${venue.lat},${venue.lng},17z"
+          href="${mapUrl}"
           target="_blank"
           rel="noopener noreferrer"
           title="Öppna i Google Maps"
-          style="flex:0 0 32px;padding:3px;border:1px solid #fca5a5;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none"
-        ><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></a>
+          style="flex:0 0 32px;height:32px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none"
+        ><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></a>
         <button
           class="share-btn"
           data-venue-id="${venue.id}"
           data-venue-name="${venue.name}"
-          style="flex:1;padding:3px 8px;border:1px solid #fde68a;border-radius:6px;background:#fffbeb;color:#92400e;font-size:10px;cursor:pointer;text-align:center;font-weight:500"
+          style="flex:1;height:32px;border:none;border-radius:8px;background:#f59e0b;color:#fff;font-size:11px;font-weight:600;cursor:pointer"
         >&#128279; Dela</button>
+      </div>
+      <div style="text-align:right;margin-top:4px">
         <button
           class="feedback-btn"
           data-venue-id="${venue.id}"
-          style="flex:1;padding:3px 8px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;color:#94a3b8;font-size:10px;cursor:pointer;text-align:center"
+          style="border:none;background:none;color:#cbd5e1;font-size:10px;cursor:pointer;text-decoration:underline;text-underline-offset:2px;padding:0"
         >St&auml;mmer inte?</button>
       </div>
     </div>
@@ -1348,7 +1377,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       // adds markers that are actually inside the buffered viewport.
       const marker = L.marker([venue.lat, venue.lng], { icon }).bindPopup(
         () => buildVenuePopupHtml(venue, dateKey, hourRef.current, weatherRef.current),
-        { maxWidth: 280 },
+        { maxWidth: 300 },
       );
 
       marker.on("popupopen", () => {
