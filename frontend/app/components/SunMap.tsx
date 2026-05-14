@@ -19,6 +19,23 @@ try {
   // venues-unconfirmed.ts doesn't exist yet
 }
 
+interface ClaimedVenueData {
+  verifiedAt: string;
+  happyHour?: {
+    daysLabel: string;
+    start: number;
+    end: number;
+    description: string;
+  };
+}
+let claimedVenues: Record<string, ClaimedVenueData> = {};
+try {
+  const claimedData = require("../data/claimed-venues.json");
+  claimedVenues = claimedData.venues ?? {};
+} catch {
+  // claimed-venues.json saknas — ingen happy hour-data
+}
+
 import { type WeatherData, getSymbolInfo } from "../lib/weather";
 import { METRO_STATIONS, type MetroStation, STATION_RADIUS_M, distanceM } from "../data/metro-stations";
 import { getFavorites, toggleFavorite } from "../lib/favorites";
@@ -807,6 +824,28 @@ function buildVenuePopupHtml(
       </div>`
     : "";
 
+  const claimed = claimedVenues[String(venue.id)];
+  const happyHourHtml = claimed?.happyHour
+    ? (() => {
+        const hh = claimed.happyHour!;
+        const active = hour >= hh.start && hour < hh.end;
+        const bg = active ? "#dcfce7" : "#f0fdf4";
+        const border = active ? "#22c55e" : "#86efac";
+        const textColor = active ? "#14532d" : "#166534";
+        const activeBadge = active
+          ? `<span style="margin-left:6px;background:#22c55e;color:#fff;font-size:9px;font-weight:700;border-radius:4px;padding:1px 5px">NU AKTIV</span>`
+          : "";
+        return `<div style="background:${bg};border-left:3px solid ${border};border-radius:0 8px 8px 0;padding:6px 10px;margin-top:8px;display:flex;flex-direction:column;gap:2px">
+          <div style="display:flex;align-items:center">
+            <span style="font-size:10px;font-weight:700;color:${textColor};text-transform:uppercase;letter-spacing:0.5px">Happy Hour</span>
+            ${activeBadge}
+          </div>
+          <div style="font-size:11px;color:${textColor}">${hh.start}–${hh.end}, ${hh.daysLabel}</div>
+          <div style="font-size:11px;color:${textColor}">${hh.description}</div>
+        </div>`;
+      })()
+    : "";
+
   const ratingHtml = venue.rating != null
     ? `&#11088; ${venue.rating.toFixed(1)}${venue.ratingCount != null ? `<span style="color:#b0bec5"> (${venue.ratingCount.toLocaleString("sv-SE")})</span>` : ""} &middot; `
     : "";
@@ -834,6 +873,7 @@ function buildVenuePopupHtml(
         <div style="font-size:10px;color:#94a3b8;text-align:right;margin-top:2px">${sunHours} soltimmar</div>
       </div>
       ${bestHourLine}
+      ${happyHourHtml}
       <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
         <button
           class="fav-btn"
@@ -855,12 +895,16 @@ function buildVenuePopupHtml(
           style="flex:1;height:32px;border:none;border-radius:8px;background:#f59e0b;color:#fff;font-size:11px;font-weight:600;cursor:pointer"
         >&#128279; Dela</button>
       </div>
-      <div style="text-align:right;margin-top:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
         <button
           class="feedback-btn"
           data-venue-id="${venue.id}"
           style="border:none;background:none;color:#cbd5e1;font-size:10px;cursor:pointer;text-decoration:underline;text-underline-offset:2px;padding:0"
         >St&auml;mmer inte?</button>
+        ${claimed
+          ? `<span style="font-size:9px;color:#86efac">&#10003; Verifierat st&auml;lle</span>`
+          : `<a href="mailto:johan.soderstrom.87@gmail.com?subject=${encodeURIComponent(`Soldryck – Claima: ${venue.name} (ID: ${venue.id})`)}&body=${encodeURIComponent(`Hej!\n\nJag är ägare till ${venue.name} och vill verifiera mitt ställe på Soldryck.\n\nNamn:\nTelefon:\nE-post till verksamheten:\nHemsida:\n\nVad jag vill lägga till:\n`)}" style="font-size:9px;color:#cbd5e1;text-decoration:none" title="Äger du detta ställe?">Äger du det h&auml;r?</a>`
+        }
       </div>
     </div>
   `;
@@ -902,6 +946,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const [geoState, setGeoState] = useState<"idle" | "locating" | "located" | "error">("idle");
   const [findSunState, setFindSunState] = useState<"idle" | "locating" | "none" | "error">("idle");
   const [findSunMsg, setFindSunMsg] = useState<string | null>(null);
+  const [showSearchInArea, setShowSearchInArea] = useState(false);
+  const hasPannedRef = useRef(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLDivElement>(null);
@@ -948,6 +994,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     map.on("moveend", () => {
       map.fire("update-unconfirmed");
+      if (!hasPannedRef.current) {
+        hasPannedRef.current = true;
+        setShowSearchInArea(true);
+      }
     });
 
     mapRef.current = map;
@@ -1984,10 +2034,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* Search button — stacked above GPS, slides out an input + dropdown when open */}
+      {/* Search button — round, top of right-side stack */}
       <div
         ref={searchRef}
-        style={{ position: "absolute", bottom: "281px", right: "12px", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}
+        style={{ position: "absolute", bottom: "337px", right: "12px", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}
       >
         {searchOpen && (
           <div style={{ position: "relative" }}>
@@ -2082,9 +2132,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           title={searchOpen ? "Stäng sök" : "Sök ställe"}
           style={{
             ...glassStyle,
-            width: 48,
-            height: 48,
-            borderRadius: 14,
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
@@ -2107,58 +2157,59 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         </button>
       </div>
 
-      {/* "Hitta solen" pill — bottom-left, same level as GPS button */}
-      <div style={{ position: "absolute", bottom: "225px", left: "12px", zIndex: 1001 }}>
+      {/* Hitta solen FAB — orange round button, middle of right-side stack */}
+      <div style={{ position: "absolute", bottom: "277px", right: "12px", zIndex: 1001 }}>
         <button
           onClick={handleFindSun}
           disabled={findSunState === "locating"}
-          title="Hitta närmaste uteservering med sol just nu"
+          title={
+            findSunState === "locating" ? "Letar efter sol..." :
+            findSunState === "none" ? "Ingen sol nära dig just nu" :
+            findSunState === "error" ? (findSunMsg ?? "Kunde inte hämta position") :
+            "Hitta närmaste uteservering med sol"
+          }
           style={{
-            ...glassStyle,
+            width: 52,
+            height: 52,
+            borderRadius: "50%",
+            border: "none",
+            cursor: findSunState === "locating" ? "wait" : "pointer",
             display: "flex",
             alignItems: "center",
-            gap: 7,
-            padding: "0 18px",
-            height: 48,
-            borderRadius: 999,
-            cursor: findSunState === "locating" ? "wait" : "pointer",
-            fontSize: 13,
-            fontWeight: 600,
-            color: findSunState === "error" ? "#ef4444" : findSunState === "none" ? "#64748b" : "#92400e",
+            justifyContent: "center",
             background: findSunState === "error"
-              ? "rgba(254,226,226,0.55)"
+              ? "rgba(239,68,68,0.88)"
               : findSunState === "none"
-              ? "rgba(241,245,249,0.55)"
-              : "rgba(253,224,71,0.45)",
-            transition: "background 0.3s, color 0.3s",
-            whiteSpace: "nowrap",
+              ? "rgba(100,116,139,0.45)"
+              : "linear-gradient(145deg, #fb923c 0%, #f59e0b 100%)",
+            backdropFilter: findSunState === "none" ? "blur(14px) saturate(1.3)" : undefined,
+            WebkitBackdropFilter: findSunState === "none" ? "blur(14px) saturate(1.3)" : undefined,
+            boxShadow: findSunState === "idle"
+              ? "0 4px 20px rgba(245,158,11,0.5), 0 2px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25)"
+              : "0 2px 8px rgba(0,0,0,0.12)",
+            color: "#fff",
+            transition: "background 0.3s ease, box-shadow 0.3s ease",
           }}
         >
           {findSunState === "locating" ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ animation: "spin 1s linear infinite", flexShrink: 0 }}>
-              <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ animation: "spin 1s linear infinite" }}>
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.35" />
               <path d="M12 2a10 10 0 0 1 10 10" />
             </svg>
           ) : findSunState === "none" ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
             </svg>
           ) : findSunState === "error" ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
             </svg>
           ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, animation: "find-sun-idle 3s ease-in-out infinite" }}>
-              <circle cx="12" cy="12" r="4" />
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "find-sun-idle 3s ease-in-out infinite" }}>
+              <circle cx="12" cy="12" r="4" fill="currentColor" />
               <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
             </svg>
           )}
-          <span>{
-            findSunState === "locating" ? "Letar..." :
-            findSunState === "none" ? "Ingen sol nära dig" :
-            findSunState === "error" ? (findSunMsg ?? "GPS-fel") :
-            "Hitta solen"
-          }</span>
         </button>
       </div>
 
@@ -2186,9 +2237,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           title={geoState === "located" ? "Dölj min position" : "Visa min position"}
           style={{
             ...glassStyle,
-            width: 48,
-            height: 48,
-            borderRadius: 14,
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
@@ -2212,30 +2263,29 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         </button>
       </div>
 
-      {/* "Sök i detta område" pill — centered above the time slider */}
-      {!areaSearchOpen && (
+      {/* "Sök i detta område" — appears below category filters after first pan (Google Maps pattern) */}
+      {showSearchInArea && !areaSearchOpen && (
         <div style={{
-          position: "absolute", bottom: "236px", left: "50%",
-          transform: "translateX(-50%)", zIndex: 1001, pointerEvents: "auto",
+          position: "absolute", top: "148px", left: "50%",
+          transform: "translateX(-50%)", zIndex: 1090, pointerEvents: "auto",
         }}>
           <button
             onClick={() => setAreaSearchOpen(true)}
             style={{
               ...glassStyle,
-              padding: "9px 18px",
+              padding: "7px 14px",
               borderRadius: 999,
               cursor: "pointer",
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 600,
               color: "#0f172a",
               display: "flex",
               alignItems: "center",
-              gap: 7,
+              gap: 6,
               whiteSpace: "nowrap",
-              border: "0.5px solid rgba(255,255,255,0.55)",
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             Sök i detta område
