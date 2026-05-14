@@ -1,0 +1,4 @@
+{
+  "_readme": "Lägg till ägares happy hour-data här. Nyckel = venue.id (OSM-nod-ID som sträng). start/end = heltalsklockslag (16 = 16:00). daysLabel = visningstext.",
+  "venues": {}
+}
