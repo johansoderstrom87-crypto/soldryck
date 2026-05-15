@@ -43,9 +43,12 @@ body {
 .leaflet-container {
   width: 100%;
   height: 100%;
-  /* No z-index here — keeping it z:auto means the container doesn't create
-     an isolating stacking context, so .leaflet-popup-pane can escape to a
-     higher z-index than the Header (z=1100) and buttons (z=1001). */
+  /* No z-index: keeping z:auto means no isolating stacking context, so
+     .leaflet-popup-pane (z=1150) can sit above the Header (z=1100).
+     overflow:visible lets the popup escape the container clip boundary
+     when it extends above/below the container edge before autoPan fires.
+     The map is full-screen so tiles never bleed beyond the viewport. */
+  overflow: visible !important;
 }
 
 /* Popup pane is hoisted to the SunMap root div via JS (see SunMap.tsx map

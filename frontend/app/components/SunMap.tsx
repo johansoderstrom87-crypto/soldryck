@@ -1019,16 +1019,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     mapRef.current = map;
 
-    // Hoist the popup pane to the SunMap root div so it escapes the
-    // leaflet-container's z-index stacking context and can appear above
-    // the Header (z=1100). The SunMap root div has the same top-left
-    // origin, so Leaflet's transform-based popup positioning still works.
-    const popupPane = map.getPanes().popupPane as HTMLElement;
-    const sunMapRoot = containerRef.current?.parentElement;
-    if (sunMapRoot) sunMapRoot.appendChild(popupPane);
-
     return () => {
-      popupPane.remove();
       map.remove();
       mapRef.current = null;
     };
