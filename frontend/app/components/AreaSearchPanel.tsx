@@ -48,7 +48,7 @@ function SunDiagram({
   const hours = Array.from({ length: 16 }, (_, i) => i + 7);
 
   return (
-    <div style={{ background: "#f8fafc", borderRadius: 8, padding: "5px 6px", marginTop: 7 }}>
+    <div style={{ background: "#f8fafc", borderRadius: 7, padding: "4px 5px", marginTop: 5 }}>
       {/* Bars — same heights and gradients as place card popup */}
       <div style={{ display: "flex", gap: 2, alignItems: "flex-end" }}>
         {hours.map((h) => {
@@ -74,7 +74,7 @@ function SunDiagram({
               title={`${h}:00`}
               style={{
                 flex: 1, borderRadius: 4, background: bg,
-                height: isCurrent ? 20 : 16, minWidth: 0,
+                height: isCurrent ? 17 : 13, minWidth: 0,
                 boxShadow:
                   isCurrent && (s === "sun" || s === "partial")
                     ? "0 0 8px rgba(245,158,11,0.65)"
@@ -168,17 +168,17 @@ function VenueCard({
 
   return (
     <div style={{
-      borderRadius: 12,
+      borderRadius: 10,
       background: isExpanded ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.45)",
       border: `0.5px solid ${isExpanded ? "rgba(251,146,60,0.4)" : "rgba(255,255,255,0.7)"}`,
-      marginBottom: 8,
+      marginBottom: 6,
       overflow: "hidden",
       transition: "background 0.18s ease",
     }}>
 
       {/* Photo — full width at top. Shimmer while loading, hidden if no photo. */}
       <div style={{
-        height: photo === null ? 0 : 80,
+        height: photo === null ? 0 : 60,
         overflow: "hidden",
         background: "linear-gradient(180deg,#f1f5f9,#e2e8f0)",
         transition: "height 0.2s ease",
@@ -195,7 +195,7 @@ function VenueCard({
 
       {/* Clickable collapsed content */}
       <div
-        style={{ padding: "8px 10px", cursor: "pointer" }}
+        style={{ padding: "6px 8px", cursor: "pointer" }}
         onClick={onToggle}
         role="button"
         aria-expanded={isExpanded}
@@ -204,7 +204,7 @@ function VenueCard({
           <div style={{ flex: 1, minWidth: 0 }}>
             {/* Name — no status dot */}
             <div style={{
-              fontSize: 13, fontWeight: 700, color: "#0f172a",
+              fontSize: 12, fontWeight: 700, color: "#0f172a",
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>
               {venue.name}
@@ -255,7 +255,7 @@ function VenueCard({
 
       {/* Expanded section */}
       {isExpanded && (
-        <div style={{ padding: "0 10px 10px", borderTop: "1px solid rgba(0,0,0,0.06)" }}>
+        <div style={{ padding: "0 8px 8px", borderTop: "1px solid rgba(0,0,0,0.06)" }}>
           {/* Full week hours */}
           {hoursData?.week && hoursData.week.length > 0 && (
             <div style={{

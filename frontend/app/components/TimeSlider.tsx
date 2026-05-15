@@ -314,7 +314,7 @@ export default function TimeSlider({
 
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 z-[1050] p-3 pointer-events-none"
+      className="absolute bottom-0 left-0 right-0 z-[1250] p-3 pointer-events-none"
       style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}
     >
       {/* Sun / temp / wind bar + range toggle button */}

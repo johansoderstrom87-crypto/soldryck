@@ -606,6 +606,23 @@ type VenueHoursPayload = {
 const venuePhotoCache = new Map<string, string | null>();
 const venueHoursCache = new Map<string, VenueHoursPayload>();
 
+async function fetchOpenNow(venue: any): Promise<boolean | null> {
+  if (venueHoursCache.has(venue.id)) {
+    return venueHoursCache.get(venue.id)?.openNow ?? null;
+  }
+  const params = new URLSearchParams({
+    id: venue.id, name: venue.name, lat: String(venue.lat), lng: String(venue.lng), type: venue.type,
+  });
+  try {
+    const r = await fetch(`/api/venue-hours?${params}`);
+    const data: VenueHoursPayload = r.ok ? await r.json() : null;
+    venueHoursCache.set(venue.id, data);
+    return data?.openNow ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Single source of truth for "what should this marker look like for the
  * current (hour, filter, weather)" — used both by the hour-update effect
@@ -1890,7 +1907,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     }
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const { latitude, longitude } = pos.coords;
         const cosLat = Math.cos((latitude * Math.PI) / 180);
 
@@ -1905,16 +1922,30 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           return;
         }
 
-        let nearest = sunnyVenues[0];
-        let minDist = Infinity;
-        for (const v of sunnyVenues) {
-          const dlat = (v.lat - latitude) * 111_000;
-          const dlng = (v.lng - longitude) * 111_000 * cosLat;
-          const d = dlat * dlat + dlng * dlng;
-          if (d < minDist) { minDist = d; nearest = v; }
+        // Sort by distance, take nearest 10, then prefer open venues
+        const nearest10 = sunnyVenues
+          .map((v: any) => {
+            const dlat = (v.lat - latitude) * 111_000;
+            const dlng = (v.lng - longitude) * 111_000 * cosLat;
+            return { v, d: dlat * dlat + dlng * dlng };
+          })
+          .sort((a: any, b: any) => a.d - b.d)
+          .slice(0, 10)
+          .map((x: any) => x.v);
+
+        const openNowResults = await Promise.all(nearest10.map(fetchOpenNow));
+        const openVenues = nearest10.filter((_: any, i: number) => openNowResults[i] === true);
+        const unknownVenues = nearest10.filter((_: any, i: number) => openNowResults[i] === null);
+
+        const target = openVenues[0] ?? unknownVenues[0];
+        if (!target) {
+          setFindSunState("none");
+          setFindSunMsg("Inga öppna ställen med sol nära dig");
+          setTimeout(() => { setFindSunState("idle"); setFindSunMsg(null); }, 4000);
+          return;
         }
 
-        flyToVenue(nearest);
+        flyToVenue(target);
         setFindSunState("idle");
       },
       (err) => {
@@ -2188,7 +2219,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           disabled={findSunState === "locating"}
           title={
             findSunState === "locating" ? "Letar efter sol..." :
-            findSunState === "none" ? "Ingen sol nära dig just nu" :
+            findSunState === "none" ? (findSunMsg ?? "Ingen sol nära dig just nu") :
             findSunState === "error" ? (findSunMsg ?? "Kunde inte hämta position") :
             "Hitta närmaste uteservering med sol"
           }
