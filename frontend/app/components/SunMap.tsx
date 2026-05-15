@@ -1019,7 +1019,16 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     mapRef.current = map;
 
+    // Hoist the popup pane to the SunMap root div so it escapes the
+    // leaflet-container's z-index stacking context and can appear above
+    // the Header (z=1100). The SunMap root div has the same top-left
+    // origin, so Leaflet's transform-based popup positioning still works.
+    const popupPane = map.getPanes().popupPane as HTMLElement;
+    const sunMapRoot = containerRef.current?.parentElement;
+    if (sunMapRoot) sunMapRoot.appendChild(popupPane);
+
     return () => {
+      popupPane.remove();
       map.remove();
       mapRef.current = null;
     };
@@ -1460,7 +1469,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       // adds markers that are actually inside the buffered viewport.
       const marker = L.marker([venue.lat, venue.lng], { icon }).bindPopup(
         () => buildVenuePopupHtml(venue, dateKey, hourRef.current, weatherRef.current),
-        { maxWidth: 300 },
+        {
+          maxWidth: 300,
+          autoPan: true,
+          autoPanPaddingTopLeft: L.point(20, 180),
+          autoPanPaddingBottomRight: L.point(20, 240),
+        },
       );
 
       marker.on("popupopen", () => {
@@ -1686,7 +1700,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(venue.name)}/@${venue.lat},${venue.lng},17z`;
         const mapsPinSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg>`;
 
-        const popup = L.popup({ maxWidth: 280 }).setContent(`
+        const popup = L.popup({
+          maxWidth: 280,
+          autoPan: true,
+          autoPanPaddingTopLeft: L.point(20, 180),
+          autoPanPaddingBottomRight: L.point(20, 240),
+        }).setContent(`
           <div style="min-width:220px">
             <div style="margin-bottom:4px">
               <strong style="font-size:14px;line-height:1.2">${venue.name}</strong>
