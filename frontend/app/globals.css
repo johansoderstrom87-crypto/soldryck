@@ -549,3 +549,13 @@ body {
   font-style: italic;
   font-weight: 400;
 }
+
+@keyframes onb-pulse {
+  0%, 100% { box-shadow: 0 0 0 100vmax rgba(0,0,0,0.52); }
+  50%       { box-shadow: 0 0 0 100vmax rgba(0,0,0,0.52), 0 0 0 7px rgba(251,146,60,0.32); }
+}
+
+@keyframes onb-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

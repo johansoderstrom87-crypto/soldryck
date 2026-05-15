@@ -6,6 +6,7 @@ import TimeSlider from "./components/TimeSlider";
 import Header from "./components/Header";
 import FeedbackModal from "./components/FeedbackModal";
 import SplashScreen from "./components/SplashScreen";
+import Onboarding from "./components/Onboarding";
 import { fetchWeather, toLocalDateStr, type WeatherData } from "./lib/weather";
 import type { FeedbackVenue } from "./components/SunMap";
 import type { VenueType, SunRange } from "./components/SunMap";
@@ -99,6 +100,7 @@ export default function Home() {
   return (
     <div className="h-full relative">
       {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
+      <Onboarding ready={splashDone} />
       <Header
         filter={filter}
         onFilterChange={setFilter}
