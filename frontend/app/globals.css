@@ -43,7 +43,16 @@ body {
 .leaflet-container {
   width: 100%;
   height: 100%;
-  z-index: 0;
+  /* No z-index here — keeping it z:auto means the container doesn't create
+     an isolating stacking context, so .leaflet-popup-pane can escape to a
+     higher z-index than the Header (z=1100) and buttons (z=1001). */
+}
+
+/* Raise popup pane above Header (z=1100) and buttons (z=1001) but below
+   TimeSlider (z=1250). Needs z-index on the container to be removed (above)
+   so it is no longer trapped in a z=0 stacking context. */
+.leaflet-popup-pane {
+  z-index: 1150 !important;
 }
 
 /* Promote the marker pane to its own GPU layer so pan-translates ride the
