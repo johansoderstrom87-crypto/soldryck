@@ -314,11 +314,11 @@ export default function TimeSlider({
 
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 z-[1000] p-3 pointer-events-none"
+      className="absolute bottom-0 left-0 right-0 z-[1050] p-3 pointer-events-none"
       style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}
     >
       {/* Sun / temp / wind bar + range toggle button */}
-      <div className="max-w-md mx-auto mb-1 flex items-center gap-2">
+      <div className="max-w-md mx-auto mt-2 mb-1 flex items-center gap-2">
         <button
           onClick={() => {
             if (rangeMode) {
@@ -342,7 +342,7 @@ export default function TimeSlider({
             border: rangeMode ? "0.5px solid rgba(255,180,80,0.6)" : "0.5px solid rgba(255,255,255,0.55)",
             boxShadow: rangeMode
               ? "0 0 18px rgba(251,146,60,0.55), 0 3px 8px rgba(251,146,60,0.4), inset 0 1px 1px rgba(255,255,255,0.3)"
-              : "0 2px 8px rgba(0,0,0,0.08)",
+              : "0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)",
             color: rangeMode ? "#000" : "#64748b",
           }}
         >

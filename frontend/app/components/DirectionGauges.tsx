@@ -58,7 +58,7 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
           background: "linear-gradient(90deg, rgba(251,191,36,0.12) 0%, rgba(255,255,255,0.2) 35%, rgba(255,255,255,0.2) 65%, rgba(96,165,250,0.1) 100%)",
           backdropFilter: "blur(14px) saturate(1.2)",
           WebkitBackdropFilter: "blur(14px) saturate(1.2)",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.04), inset 0 0 0 0.5px rgba(255,255,255,0.3)",
+          boxShadow: "0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1), inset 0 0 0 0.5px rgba(255,255,255,0.3)",
           overflow: "hidden",
           transform: "translateZ(0)",
           isolation: "isolate",

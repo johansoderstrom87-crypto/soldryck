@@ -1988,7 +1988,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     backdropFilter: "blur(14px) saturate(1.3)",
     WebkitBackdropFilter: "blur(14px) saturate(1.3)",
     border: "0.5px solid rgba(255, 255, 255, 0.55)",
-    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+    boxShadow: "0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)",
   };
 
   // Search — outside click + Escape close
