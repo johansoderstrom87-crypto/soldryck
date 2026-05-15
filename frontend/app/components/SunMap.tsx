@@ -939,6 +939,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // Station snaps with neighbor-corrected directions — shared between main + detail layer
   const stationSnapsRef = useRef<(SnapResult & { station: { lat: number; lng: number; name: string } })[]>([]);
   const shadowLayerRef = useRef<L.GeoJSON | null>(null);
+  const searchAreaRectRef = useRef<L.Rectangle | null>(null);
+  const searchBoundsRef = useRef<L.LatLngBounds | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const geoWatchRef = useRef<number | null>(null);
@@ -1824,34 +1826,48 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     };
   }, []);
 
-  // Area search — compute venues in map bounds that pass the active sun/shade filter.
-  // Re-runs when the panel opens, when the map moves, or when filter/dateKey change.
+  // Area search — on open, capture bounds once, draw a dashed rectangle to mark the
+  // searched area, and compute the venue list. Re-runs on filter/dateKey changes to
+  // recompute venues without moving the rectangle. Cleans up when panel closes.
   useEffect(() => {
-    if (!areaSearchOpen) return;
     const map = mapRef.current;
     if (!map) return;
 
-    function update() {
-      const m = mapRef.current;
-      if (!m) return;
-      const bounds = m.getBounds();
-      const inBounds = markerVenuesRef.current
-        .filter(({ venue }) => bounds.contains([venue.lat, venue.lng] as L.LatLngTuple))
-        .filter(({ venue }) => {
-          const f = filterRef.current;
-          if (f === "all") return true;
-          const s = normalize(getStatus(venue, dateKey, hourRef.current));
-          if (f === "sun") return s === "sun";
-          if (f === "shade") return s === "shade" || s === "night";
-          return true;
-        })
-        .map(({ venue }) => venue);
-      setAreaSearchVenues(inBounds);
+    if (!areaSearchOpen) {
+      searchAreaRectRef.current?.remove();
+      searchAreaRectRef.current = null;
+      searchBoundsRef.current = null;
+      return;
     }
 
-    update();
-    map.on("moveend zoomend", update);
-    return () => { map.off("moveend zoomend", update); };
+    // Capture bounds and draw rectangle only on first open (not on filter/dateKey re-runs)
+    if (!searchBoundsRef.current) {
+      searchBoundsRef.current = map.getBounds();
+      searchAreaRectRef.current = L.rectangle(searchBoundsRef.current, {
+        color: "#f59e0b",
+        weight: 2,
+        dashArray: "9, 6",
+        opacity: 0.7,
+        fillColor: "#fbbf24",
+        fillOpacity: 0.06,
+        interactive: false,
+      }).addTo(map);
+    }
+
+    // Compute venues within the initially captured bounds
+    const bounds = searchBoundsRef.current;
+    const inBounds = markerVenuesRef.current
+      .filter(({ venue }) => bounds.contains([venue.lat, venue.lng] as L.LatLngTuple))
+      .filter(({ venue }) => {
+        const f = filterRef.current;
+        if (f === "all") return true;
+        const s = normalize(getStatus(venue, dateKey, hourRef.current));
+        if (f === "sun") return s === "sun";
+        if (f === "shade") return s === "shade" || s === "night";
+        return true;
+      })
+      .map(({ venue }) => venue);
+    setAreaSearchVenues(inBounds);
   }, [areaSearchOpen, filter, dateKey]);
 
   // Find the nearest venue currently in sun and fly to it.
@@ -1904,11 +1920,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     );
   }
 
-  // Pan to a venue from the area search panel and open its popup.
+  // Fly to a venue from the area search panel with a smooth animation, then open popup.
   function flyToVenue(venue: any) {
     const map = mapRef.current;
     if (!map) return;
-    map.setView([venue.lat, venue.lng], Math.max(map.getZoom(), 16), { animate: true });
+    const targetZoom = Math.max(map.getZoom(), 16);
+    map.flyTo([venue.lat, venue.lng], targetZoom, { duration: 1.0, easeLinearity: 0.4 });
     const found = markerVenuesRef.current.find(({ marker: m }) => {
       const ll = m.getLatLng();
       return Math.abs(ll.lat - venue.lat) < 0.0001 && Math.abs(ll.lng - venue.lng) < 0.0001;
@@ -1921,7 +1938,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           computeMarkerState(found.venue, dateKey, hourRef.current, filterRef.current, weatherRef.current),
         );
       }
-      setTimeout(() => found.marker.openPopup(), 400);
+      // Delay popup until flyTo animation completes (~1s)
+      setTimeout(() => found.marker.openPopup(), 1100);
     }
   }
 
