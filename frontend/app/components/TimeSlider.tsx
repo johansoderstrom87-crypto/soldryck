@@ -388,7 +388,7 @@ export default function TimeSlider({
                   ? "grayscale(0.9) drop-shadow(0 1px 3px rgba(0,0,0,0.35))"
                   : isSelected
                   ? "drop-shadow(0 2px 8px rgba(0,0,0,0.55)) drop-shadow(0 0 12px rgba(255,200,50,0.55))"
-                  : "drop-shadow(0 0 4px rgba(255,255,255,0.85)) drop-shadow(0 1px 3px rgba(0,0,0,0.45))",
+                  : "drop-shadow(0 0 4px rgba(255,255,255,0.9)) drop-shadow(0 2px 6px rgba(0,0,0,0.6))",
                 willChange: "transform",
                 transition: "transform 0.22s ease-out, opacity 0.22s ease-out",
               }}
@@ -407,6 +407,7 @@ export default function TimeSlider({
           backdropFilter: "blur(14px) saturate(1.3)",
           WebkitBackdropFilter: "blur(14px) saturate(1.3)",
           border: "0.5px solid rgba(255, 255, 255, 0.45)",
+          boxShadow: "0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)",
           overflow: "visible",
           transform: "translateZ(0)",
           isolation: "isolate",

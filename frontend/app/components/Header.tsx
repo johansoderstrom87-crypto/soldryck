@@ -446,7 +446,7 @@ export default function Header({
             WebkitBackdropFilter: "blur(14px) saturate(1.3)",
             border: "0.5px solid rgba(255,255,255,0.55)",
             borderTop: "none",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+            boxShadow: "0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)",
             transform: "translateZ(0)",
             isolation: "isolate",
           }}
