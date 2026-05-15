@@ -108,8 +108,8 @@ body {
 }
 
 .marker-root:not(.marker-unconfirmed) .marker-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 
 /* Base shadows are kept cheap (single small drop shadow) for the zoomed-out
@@ -125,8 +125,8 @@ body {
   box-shadow: 0 0 12px rgba(245, 158, 11, 0.5), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 .marker-root:not(.marker-unconfirmed) .marker-dot.marker-sun {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
 }
 
 .marker-dot.marker-shade {
@@ -145,8 +145,8 @@ body {
   box-shadow: 0 0 8px rgba(251, 146, 60, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 .marker-root:not(.marker-unconfirmed) .marker-dot.marker-partial {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
 }
 
 .marker-dot.marker-rain {
