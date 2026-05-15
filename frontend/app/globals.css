@@ -145,8 +145,8 @@ body {
   box-shadow: 0 0 8px rgba(251, 146, 60, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 .marker-root:not(.marker-unconfirmed) .marker-dot.marker-partial {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
 }
 
 .marker-dot.marker-rain {

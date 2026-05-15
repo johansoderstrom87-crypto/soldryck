@@ -625,8 +625,6 @@ function computeMarkerState(
 
   let className: string;
   if (isRain) className = "marker-rain";
-  else if (status === "sun" && wSymbol !== undefined && wSymbol <= 2) className = "marker-sun";
-  else if (status === "sun" && wSymbol !== undefined && wSymbol <= 4) className = "marker-partial";
   else if (status === "sun") className = "marker-sun";
   else className = "marker-shade";
 
