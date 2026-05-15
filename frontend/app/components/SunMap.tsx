@@ -1874,6 +1874,14 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     setFindSunState("locating");
     setFindSunMsg(null);
 
+    // Activate GPS blue dot if not already on. Set hasCenteredRef first so
+    // handleLocate's watchPosition callback won't auto-pan to the user —
+    // we'll pan to the sunny venue ourselves below.
+    if (geoState === "idle" || geoState === "error") {
+      hasCenteredRef.current = true;
+      handleLocate();
+    }
+
     if (!navigator.geolocation) {
       setFindSunState("error");
       setFindSunMsg("GPS stöds inte");
