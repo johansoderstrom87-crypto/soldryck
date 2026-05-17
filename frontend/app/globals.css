@@ -43,25 +43,25 @@ body {
 .leaflet-container {
   width: 100%;
   height: 100%;
-  /* No z-index: keeping z:auto means no isolating stacking context, so
-     .leaflet-popup-pane (z=1150) can sit above the Header (z=1100).
-     overflow:visible lets the popup escape the container clip boundary
-     when it extends above/below the container edge before autoPan fires.
-     The map is full-screen so tiles never bleed beyond the viewport. */
   overflow: visible !important;
 }
 
-/* Popup pane is hoisted to the SunMap root div via JS (see SunMap.tsx map
-   init) so it escapes leaflet-container's stacking context. z=1150 places
-   it above Header (z=1100) and buttons (z=1001) but below TimeSlider (z=1250).
-   pointer-events:none on the pane itself prevents the invisible pane overlay
-   from blocking map interactions; the popup content overrides to auto. */
-.leaflet-popup-pane {
-  z-index: 1150 !important;
-  pointer-events: none;
-}
+/* Make the popup itself position:fixed so it physically escapes the
+   leaflet-container's stacking context and overflow:hidden — no CSS
+   stacking-context analysis required.  Since the map is full-screen
+   (origin at 0,0), Leaflet's translate() coordinates equal viewport
+   coordinates, so positioning is unaffected.  z=1150 places it above
+   the Header (z=1100) and buttons (z=1001), below TimeSlider (z=1250). */
 .leaflet-popup {
-  pointer-events: auto;
+  position: fixed !important;
+  z-index: 1150 !important;
+}
+.leaflet-popup-pane {
+  pointer-events: none; /* empty pane doesn't block map clicks */
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip-container {
+  pointer-events: auto; /* re-enable clicks inside the popup */
 }
 
 /* Promote the marker pane to its own GPU layer so pan-translates ride the
