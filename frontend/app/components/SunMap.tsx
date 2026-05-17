@@ -1019,20 +1019,22 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     mapRef.current = map;
 
-    // Move popup to document.body on every open so it escapes every
-    // stacking context and overflow clip. The map is full-screen (origin
-    // 0,0 = viewport 0,0) so Leaflet's translate() coords stay correct
-    // for position:fixed. Leaflet's own popup.remove() detaches from body
-    // when it closes, so no cleanup needed here.
-    map.on("popupopen", (e: any) => {
-      const el: HTMLElement | null = e.popup?.getElement?.() ?? e.popup?._container ?? null;
-      if (!el) return;
-      document.body.appendChild(el);
-      el.style.setProperty("position", "fixed", "important");
-      el.style.setProperty("z-index", "9999", "important");
-    });
+    // Move the popup pane to the SunMap root div so it escapes
+    // leaflet-container's stacking context. The pane's z=1150 (CSS) then
+    // sits directly in the root stacking context, beating the Header (z=1100).
+    // pointer-events:none on the pane lets map drag/click pass through;
+    // .leaflet-popup (CSS) restores pointer-events:auto for the popup itself.
+    // The pane's coordinate origin stays the same (SunMap root = full-screen),
+    // so Leaflet's transform-based positioning remains correct.
+    const popupPane = map.getPanes().popupPane as HTMLElement;
+    const sunMapRoot = containerRef.current?.parentElement;
+    if (sunMapRoot) {
+      sunMapRoot.appendChild(popupPane);
+      popupPane.style.pointerEvents = "none";
+    }
 
     return () => {
+      popupPane.remove();
       map.remove();
       mapRef.current = null;
     };
