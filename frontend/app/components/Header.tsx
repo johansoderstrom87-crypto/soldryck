@@ -65,6 +65,8 @@ interface HeaderProps {
   onToggleMetro: () => void;
   metroStation: MetroStation | null;
   onMetroStationChange: (station: MetroStation | null) => void;
+  servingFilter: boolean;
+  onServingFilterChange: (v: boolean) => void;
   venues: { id: string; name: string; type: string; address: string; lat: number; lng: number }[];
   onSelectVenue: (id: string) => void;
   hour: number;
@@ -81,7 +83,7 @@ const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: str
 function SettingsButton({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
   metroStation, onMetroStationChange, showShadows, onToggleShadows, showMetro, onToggleMetro,
-  embedded,
+  servingFilter, onServingFilterChange, embedded,
 }: {
   filter: "all" | "sun" | "shade";
   onFilterChange: (f: "all" | "sun" | "shade") => void;
@@ -95,6 +97,8 @@ function SettingsButton({
   onToggleShadows: () => void;
   showMetro: boolean;
   onToggleMetro: () => void;
+  servingFilter: boolean;
+  onServingFilterChange: (v: boolean) => void;
   embedded?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -149,7 +153,8 @@ function SettingsButton({
     typeFilter.size +
     (metroStation ? 1 : 0) +
     (showShadows ? 1 : 0) +
-    (showMetro ? 1 : 0);
+    (showMetro ? 1 : 0) +
+    (servingFilter ? 1 : 0);
 
   return (
     <div ref={ref} className="relative">
@@ -265,6 +270,26 @@ function SettingsButton({
             </span>
             <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${showMetro ? "bg-white/30" : "bg-slate-200"}`}>
               <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${showMetro ? "translate-x-3" : "translate-x-0"}`} />
+            </span>
+          </button>
+
+          {/* Tillstånd toggle */}
+          <button
+            onClick={() => onServingFilterChange(!servingFilter)}
+            className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
+              servingFilter ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 11h1a4 4 0 0 1 0 8h-1"/>
+                <path d="M3 11h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9z"/>
+                <path d="M3 8a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3H3V8z"/>
+              </svg>
+              Tillstånd
+            </span>
+            <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${servingFilter ? "bg-white/30" : "bg-slate-200"}`}>
+              <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${servingFilter ? "translate-x-3" : "translate-x-0"}`} />
             </span>
           </button>
 
@@ -419,7 +444,8 @@ function SettingsButton({
 export default function Header({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
   showShadows, onToggleShadows, showMetro, onToggleMetro,
-  metroStation, onMetroStationChange, venues, onSelectVenue, hour, dateKey, getStatus,
+  metroStation, onMetroStationChange, servingFilter, onServingFilterChange,
+  venues, onSelectVenue, hour, dateKey, getStatus,
 }: HeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(true);
 
@@ -464,6 +490,8 @@ export default function Header({
             onToggleShadows={onToggleShadows}
             showMetro={showMetro}
             onToggleMetro={onToggleMetro}
+            servingFilter={servingFilter}
+            onServingFilterChange={onServingFilterChange}
             embedded
           />
 
@@ -533,6 +561,42 @@ export default function Header({
                   </button>
                 );
               })}
+
+            {/* Tillstånd-knapp */}
+            <button
+              onClick={() => onServingFilterChange(!servingFilter)}
+              title="Tillstånd"
+              className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+              style={{
+                width: 40,
+                height: 40,
+                background: servingFilter
+                  ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
+                  : "rgba(255,255,255,0.14)",
+                backdropFilter: "blur(16px) saturate(1.5)",
+                WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+                border: servingFilter
+                  ? "1px solid rgba(251,146,60,0.75)"
+                  : "0.5px solid rgba(255,255,255,0.45)",
+                boxShadow: servingFilter
+                  ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
+                  : "0 2px 8px rgba(0,0,0,0.06)",
+                color: servingFilter ? "#0f172a" : "#888",
+                opacity: servingFilter ? 1 : 0.65,
+                transform: "translateZ(0)",
+                isolation: "isolate",
+                flexShrink: 0,
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 11h1a4 4 0 0 1 0 8h-1"/>
+                <path d="M3 11h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9z"/>
+                <path d="M3 8a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3H3V8z"/>
+              </svg>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: servingFilter ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
+                Tillstånd
+              </span>
+            </button>
           </div>
 
           {/* Collapse / expand toggle — chevron ∧ when open (pointing up = hide), ∨ when closed (pointing down = show) */}

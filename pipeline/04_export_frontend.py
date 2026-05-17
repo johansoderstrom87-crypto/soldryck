@@ -14,6 +14,8 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 INPUT_FILE = os.path.join(DATA_DIR, "shadow_results.json")
 VENUES_FILE = os.path.join(DATA_DIR, "venues.geojson")
 RATINGS_FILE = os.path.join(DATA_DIR, "ratings.json")
+VERIFICATION_FILE = os.path.join(DATA_DIR, "outdoor_verification.json")
+VERIFICATION_NEG_FILE = os.path.join(DATA_DIR, "outdoor_verification_negative.json")
 OUTPUT_FILE = os.path.join(
     os.path.dirname(__file__), "..", "frontend", "app", "data", "venues-computed.ts"
 )
@@ -41,6 +43,9 @@ KNOWN_ROOFTOP_NAMES = {
 
 # Minimum OSM level to count as rooftop
 ROOFTOP_MIN_LEVEL = 6
+
+# OSM amenity types that implicitly serve alcohol
+ALCOHOL_AMENITY_TYPES = {"bar", "pub", "biergarten"}
 
 
 def compact_schedule(schedule: dict) -> dict:
@@ -95,6 +100,17 @@ def main():
             props = feat["properties"]
             level_lookup[str(props["id"])] = props.get("level", "")
 
+    # Build alcohol lookup from verification files (covers all google-verified venues)
+    alcohol_lookup = {}
+    for vfile in (VERIFICATION_FILE, VERIFICATION_NEG_FILE):
+        if os.path.exists(vfile):
+            with open(vfile, "r", encoding="utf-8") as f:
+                vdata = json.load(f)
+            for osm_id, result in vdata.items():
+                if result.get("serves_alcohol") is True:
+                    alcohol_lookup[osm_id] = True
+    print(f"  {len(alcohol_lookup)} venues med bekräftat serveringstillstånd (Google)")
+
     # Load ratings if available
     ratings_lookup: dict = {}
     if os.path.exists(RATINGS_FILE):
@@ -113,17 +129,21 @@ def main():
         rooftop = is_rooftop(data["name"], level)
         if rooftop:
             rooftop_count += 1
+        venue_type = data["type"]
+        serves_alcohol = alcohol_lookup.get(venue_id) or (venue_type in ALCOHOL_AMENITY_TYPES) or None
         venue = {
             "id": venue_id,
             "name": data["name"],
             "lat": round(data["lat"], 6),
             "lng": round(data["lng"], 6),
-            "type": data["type"],
+            "type": venue_type,
             "address": data.get("address", ""),
             "schedule": compact_schedule(data["schedule"]),
         }
         if rooftop:
             venue["rooftop"] = True
+        if serves_alcohol is True:
+            venue["servesAlcohol"] = True
         rating_entry = ratings_lookup.get(venue_id, {})
         if rating_entry.get("rating") is not None:
             venue["rating"] = rating_entry["rating"]
@@ -149,6 +169,7 @@ export interface ComputedVenue {{
   type: string;
   address: string;
   rooftop?: boolean;
+  servesAlcohol?: boolean;
   rating?: number;
   ratingCount?: number;
   /** schedule[MM-DD][hour] = SunStatus */

@@ -81,7 +81,7 @@ def search_place(name: str, lat: float, lng: float) -> dict | None:
         headers={
             "Content-Type": "application/json",
             "X-Goog-Api-Key": API_KEY,
-            "X-Goog-FieldMask": "places.id,places.displayName,places.outdoorSeating,places.location",
+            "X-Goog-FieldMask": "places.id,places.displayName,places.outdoorSeating,places.location,places.servesBeer,places.servesWine,places.servesCocktails",
         },
     )
 
@@ -179,9 +179,14 @@ def main():
             google_unknown += 1
         else:
             outdoor = place.get("outdoorSeating")
+            beer = place.get("servesBeer")
+            wine = place.get("servesWine")
+            cocktails = place.get("servesCocktails")
+            serves_alcohol = True if (beer or wine or cocktails) else (False if (beer is False and wine is False and cocktails is False) else None)
             results[venue["osm_id"]] = {
                 **venue,
                 "google_outdoor_seating": outdoor,
+                "serves_alcohol": serves_alcohol,
                 "google_id": place.get("id"),
                 "google_name": place.get("displayName", {}).get("text"),
             }

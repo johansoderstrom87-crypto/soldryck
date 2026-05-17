@@ -83,24 +83,27 @@ def main():
 
         if outdoor is True:
             # Add to main venue list for shadow computation
+            props = {
+                "id": osm_id,
+                "name": name,
+                "amenity": amenity,
+                "cuisine": tags.get("cuisine", ""),
+                "opening_hours": tags.get("opening_hours", ""),
+                "website": tags.get("website", tags.get("contact:website", "")),
+                "phone": tags.get("phone", tags.get("contact:phone", "")),
+                "addr_street": tags.get("addr:street", ""),
+                "addr_housenumber": tags.get("addr:housenumber", ""),
+                "level": tags.get("level", ""),
+                "outdoor_seating": tags.get("outdoor_seating", ""),
+                "source": "google_confirmed",
+                "google_place_id": result.get("google_id", ""),
+            }
+            if result.get("serves_alcohol") is True:
+                props["serves_alcohol"] = True
             venues_geojson["features"].append({
                 "type": "Feature",
                 "geometry": {"type": "Point", "coordinates": [lng, lat]},
-                "properties": {
-                    "id": osm_id,
-                    "name": name,
-                    "amenity": amenity,
-                    "cuisine": tags.get("cuisine", ""),
-                    "opening_hours": tags.get("opening_hours", ""),
-                    "website": tags.get("website", tags.get("contact:website", "")),
-                    "phone": tags.get("phone", tags.get("contact:phone", "")),
-                    "addr_street": tags.get("addr:street", ""),
-                    "addr_housenumber": tags.get("addr:housenumber", ""),
-                    "level": tags.get("level", ""),
-                    "outdoor_seating": tags.get("outdoor_seating", ""),
-                    "source": "google_confirmed",
-                    "google_place_id": result.get("google_id", ""),
-                },
+                "properties": props,
             })
             existing_ids.add(osm_id)
             added_to_main += 1
@@ -163,24 +166,27 @@ def main():
                 # Override OSM — lägg till på kartan
                 el = neg_elem_lookup.get(osm_id)
                 tags = el.get("tags", {}) if el else {}
+                neg_props = {
+                    "id": osm_id,
+                    "name": name,
+                    "amenity": amenity,
+                    "cuisine": tags.get("cuisine", ""),
+                    "opening_hours": tags.get("opening_hours", ""),
+                    "website": tags.get("website", tags.get("contact:website", "")),
+                    "phone": tags.get("phone", tags.get("contact:phone", "")),
+                    "addr_street": tags.get("addr:street", result.get("addr_street", "")),
+                    "addr_housenumber": tags.get("addr:housenumber", result.get("addr_housenumber", "")),
+                    "level": tags.get("level", ""),
+                    "outdoor_seating": "yes",  # Override OSM=no
+                    "source": "osm_no_google_yes",
+                    "google_place_id": result.get("google_id", ""),
+                }
+                if result.get("serves_alcohol") is True:
+                    neg_props["serves_alcohol"] = True
                 venues_geojson["features"].append({
                     "type": "Feature",
                     "geometry": {"type": "Point", "coordinates": [lng, lat]},
-                    "properties": {
-                        "id": osm_id,
-                        "name": name,
-                        "amenity": amenity,
-                        "cuisine": tags.get("cuisine", ""),
-                        "opening_hours": tags.get("opening_hours", ""),
-                        "website": tags.get("website", tags.get("contact:website", "")),
-                        "phone": tags.get("phone", tags.get("contact:phone", "")),
-                        "addr_street": tags.get("addr:street", result.get("addr_street", "")),
-                        "addr_housenumber": tags.get("addr:housenumber", result.get("addr_housenumber", "")),
-                        "level": tags.get("level", ""),
-                        "outdoor_seating": "yes",  # Override OSM=no
-                        "source": "osm_no_google_yes",
-                        "google_place_id": result.get("google_id", ""),
-                    },
+                    "properties": neg_props,
                 })
                 existing_ids.add(osm_id)
                 added_from_negative += 1

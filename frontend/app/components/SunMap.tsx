@@ -335,6 +335,7 @@ interface SunMapProps {
   focusVenueId?: string | null;
   onFocusHandled?: () => void;
   metroStation?: MetroStation | null;
+  servingFilter?: boolean;
 }
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
@@ -925,7 +926,7 @@ function buildVenuePopupHtml(
   `;
 }
 
-export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, focusVenueId, onFocusHandled, metroStation }: SunMapProps) {
+export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, focusVenueId, onFocusHandled, metroStation, servingFilter }: SunMapProps) {
   // Defer expensive map rebuild while the user is actively scrubbing the timeline
   const hour = useDeferredValue(hourProp);
 
@@ -1429,6 +1430,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       // Filter by type
       if (!matchesTypeFilter(venue, typeFilter)) return;
 
+      // Filter by serving permit
+      if (servingFilter && !venue.servesAlcohol) return;
+
       // Sun/shade filter intentionally NOT applied here — the update effect
       // below toggles visibility based on the live (hour, filter) pair so
       // scrubbing the timeline doesn't rebuild markers.
@@ -1596,7 +1600,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     return () => {
       map.off("zoomend moveend", handleViewportChange);
     };
-  }, [dateKey, typeFilter, sunRange, weather, metroStation]);
+  }, [dateKey, typeFilter, sunRange, weather, metroStation, servingFilter]);
 
   // Hour & sun/shade-filter update — fast path. Retoggles `.marker-dot`'s
   // class and visibility on existing markers. Markers outside the viewport
@@ -1688,6 +1692,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           if (dist > STATION_RADIUS_M) continue;
         }
         if (!matchesTypeFilter(venue, typeFilter)) continue;
+        if (servingFilter) continue; // unconfirmed venues have no alcohol data
 
         const icon = L.divIcon({
           className: "marker-root marker-unconfirmed",
@@ -1774,7 +1779,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       unconfirmedMarkersRef.current.forEach((mk) => mk.remove());
       unconfirmedMarkersRef.current = [];
     };
-  }, [metroStation, typeFilter]);
+  }, [metroStation, typeFilter, servingFilter]);
 
   // Shadow overlay layer
   useEffect(() => {
