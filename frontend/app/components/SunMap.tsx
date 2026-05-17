@@ -1019,6 +1019,19 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     mapRef.current = map;
 
+    // CSS-only fixes keep losing to leaflet-container's stacking context.
+    // setProperty('important') on the element beats every CSS rule and any
+    // Leaflet JS that runs after. position:fixed escapes overflow:hidden and
+    // all stacking contexts; since the map is full-screen (origin 0,0 = viewport
+    // 0,0), Leaflet's translate() coordinates stay correct.
+    map.on("popupopen", (e: any) => {
+      const el: HTMLElement | null = e.popup?.getElement?.() ?? e.popup?._container ?? null;
+      if (el) {
+        el.style.setProperty("position", "fixed", "important");
+        el.style.setProperty("z-index", "1150", "important");
+      }
+    });
+
     return () => {
       map.remove();
       mapRef.current = null;
