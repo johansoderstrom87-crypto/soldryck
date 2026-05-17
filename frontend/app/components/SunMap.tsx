@@ -2149,10 +2149,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* Search button — round, top of right-side stack */}
+      {/* Search button — round, top of right-side stack.
+          All three right-stack buttons pad against safe-area-inset-bottom so
+          they ride above the iPhone home indicator alongside the slider. */}
       <div
         ref={searchRef}
-        style={{ position: "absolute", bottom: "329px", right: "12px", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}
+        style={{ position: "absolute", bottom: "calc(329px + var(--safe-bottom, 0px))", right: "calc(12px + var(--safe-right, 0px))", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}
       >
         {searchOpen && (
           <div style={{ position: "relative" }}>
@@ -2273,7 +2275,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       </div>
 
       {/* Hitta solen FAB — orange round button, middle of right-side stack */}
-      <div style={{ position: "absolute", bottom: "277px", right: "12px", zIndex: 1001 }}>
+      <div data-onboarding="locate-btn" style={{ position: "absolute", bottom: "calc(277px + var(--safe-bottom, 0px))", right: "calc(12px + var(--safe-right, 0px))", zIndex: 1001 }}>
         <button
           onClick={handleFindSun}
           disabled={findSunState === "locating"}
@@ -2329,7 +2331,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       </div>
 
       {/* GPS locate button — bottom-right above time slider */}
-      <div style={{ position: "absolute", bottom: "225px", right: "12px", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}>
+      <div data-onboarding="locate-btn" style={{ position: "absolute", bottom: "calc(225px + var(--safe-bottom, 0px))", right: "calc(12px + var(--safe-right, 0px))", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}>
         {/* Tooltip — fades in then out, only when idle */}
         {showTooltip && geoState === "idle" && (
           <div style={{
@@ -2381,7 +2383,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       {/* "Sök i detta område" — appears below category filters after first pan (Google Maps pattern) */}
       {showSearchInArea && !areaSearchOpen && (
         <div style={{
-          position: "absolute", top: "148px", left: "50%",
+          position: "absolute", top: "calc(148px + var(--safe-top, 0px))", left: "50%",
           transform: "translateX(-50%)", zIndex: 1090, pointerEvents: "auto",
         }}>
           <button

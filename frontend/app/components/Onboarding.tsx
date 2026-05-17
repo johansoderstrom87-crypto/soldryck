@@ -1,9 +1,18 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useLayoutEffect } from "react";
 
 const STORAGE_KEY = "soldryck_onboarding_v1";
 
 interface Bullet { color: string; border?: string; text: string; }
+
+/**
+ * Onboarding spotlights used to be hard-coded pixel coordinates ("top: 78px,
+ * bottom: 220px"), which broke on small phones (iPhone SE) and large phones
+ * (Pro Max) and ignored the safe-area insets entirely. Now each step (except
+ * the intro) names a `target` data attribute, and we measure its bounding
+ * rect at runtime so the spotlight aligns with the actual element regardless
+ * of viewport size, orientation, or notch height.
+ */
 interface Step {
   emoji: string;
   shineSun?: boolean;
@@ -11,10 +20,19 @@ interface Step {
   subtitle?: string;
   body?: string;
   bullets?: Bullet[];
-  spot: React.CSSProperties;
+  /** `data-onboarding="..."` attribute on the element to highlight. */
+  target?: string;
+  /** Extra px of breathing room around the target. */
+  targetPadding?: number;
+  /** Corner radius for the spotlight cutout. */
   spotRadius: string;
-  card: React.CSSProperties;
+  /** Where the card sits relative to the spot. */
   arrowDir: "up" | "down" | "right";
+  /** Card width — kept stable per step so copy lines don't reflow. */
+  cardWidth: number;
+  /** Used only when `target` is absent (intro step). */
+  fallbackSpot?: React.CSSProperties;
+  fallbackCard?: React.CSSProperties;
 }
 
 const STEPS: Step[] = [
@@ -28,46 +46,106 @@ const STEPS: Step[] = [
       { color: "#94a3b8", text: "Uteservering med skugga just nu" },
       { color: "#e2e8f0", border: "#cbd5e1", text: "Ställen som eventuellt inte har uteservering" },
     ],
-    spot: { left: "5%", top: "25%", width: "90%", height: "32%" },
     spotRadius: "20px",
-    card: { top: "60%", left: "50%", transform: "translateX(-50%)", width: "300px" },
     arrowDir: "up",
+    cardWidth: 300,
+    fallbackSpot: { left: "5%", top: "25%", width: "90%", height: "32%" },
+    fallbackCard: { top: "60%", left: "50%", transform: "translateX(-50%)", width: "300px" },
   },
   {
     emoji: "🕐",
     title: "Bläddra timme för timme",
     body: "Dra i tidsreglaget för att se vilka ställen som har sol vid olika tider på dagen. Du kan också följa väderprognosten timme för timme.",
-    spot: { left: "3%", bottom: "0", width: "94%", height: "205px" },
-    spotRadius: "16px 16px 0 0",
-    card: { bottom: "220px", left: "50%", transform: "translateX(-50%)", width: "290px" },
+    target: "time-slider",
+    targetPadding: 8,
+    spotRadius: "20px",
     arrowDir: "down",
+    cardWidth: 290,
   },
   {
     emoji: "🍽️",
     title: "Filtrera typ av ställe",
     body: "Tryck på Mat, Café, Bar eller Takbar för att filtrera. Välj flera, eller tryck igen för att återställa.",
-    // Filter buttons: header card 74px + gap 6px = top 80px, height 40px
-    spot: { left: "50%", top: "78px", transform: "translateX(-50%)", width: "188px", height: "46px" },
+    target: "filter-row",
+    targetPadding: 6,
     spotRadius: "14px",
-    card: { top: "136px", left: "50%", transform: "translateX(-50%)", width: "290px" },
     arrowDir: "up",
+    cardWidth: 290,
   },
   {
     emoji: "📍",
     title: "GPS och närmaste sol",
     body: "GPS-knappen visar din plats. Solfläcksknappen flyger dig direkt till närmaste uteservering med sol.",
-    // GPS btn: bottom 225px, right 12px, 44×44. Sun btn: bottom 277px. Together: bottom 222px, height 106px
-    spot: { right: "8px", bottom: "222px", width: "52px", height: "106px" },
+    target: "locate-btn",
+    targetPadding: 8,
     spotRadius: "26px",
-    card: { bottom: "256px", right: "72px", width: "228px" },
     arrowDir: "right",
+    cardWidth: 228,
   },
 ];
+
+/**
+ * Union of bounding rects across every element with the given data attribute,
+ * plus padding. Returns null if no elements match (e.g. UI not mounted yet).
+ */
+function measureTarget(target: string, padding: number): { x: number; y: number; w: number; h: number } | null {
+  if (typeof document === "undefined") return null;
+  const els = document.querySelectorAll(`[data-onboarding="${target}"]`);
+  if (els.length === 0) return null;
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  els.forEach((el) => {
+    const r = (el as HTMLElement).getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return;
+    left = Math.min(left, r.left);
+    top = Math.min(top, r.top);
+    right = Math.max(right, r.right);
+    bottom = Math.max(bottom, r.bottom);
+  });
+  if (!isFinite(left)) return null;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const x = Math.max(0, left - padding);
+  const y = Math.max(0, top - padding);
+  const w = Math.min(vw, right + padding) - x;
+  const h = Math.min(vh, bottom + padding) - y;
+  return { x, y, w, h };
+}
+
+/** Place the card relative to the spot in viewport-fixed coords. */
+function placeCard(
+  spot: { x: number; y: number; w: number; h: number },
+  arrowDir: "up" | "down" | "right",
+  cardWidth: number,
+): React.CSSProperties {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const margin = 10;
+  const gap = 12;
+
+  if (arrowDir === "up") {
+    // Card below spot, horizontally centered
+    const left = Math.max(margin, Math.min(vw - cardWidth - margin, spot.x + spot.w / 2 - cardWidth / 2));
+    return { top: spot.y + spot.h + gap, left, width: cardWidth };
+  }
+  if (arrowDir === "down") {
+    // Card above spot
+    const left = Math.max(margin, Math.min(vw - cardWidth - margin, spot.x + spot.w / 2 - cardWidth / 2));
+    return { bottom: vh - spot.y + gap, left, width: cardWidth };
+  }
+  // right: card to the left of the spot
+  const right = vw - spot.x + gap;
+  // Vertically center on spot, clamp
+  const idealTop = spot.y + spot.h / 2 - 80;
+  const top = Math.max(margin, Math.min(vh - 200 - margin, idealTop));
+  return { top, right, width: cardWidth };
+}
 
 export default function Onboarding({ ready }: { ready: boolean }) {
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
+  const [spotStyle, setSpotStyle] = useState<React.CSSProperties | null>(null);
+  const [cardStyle, setCardStyle] = useState<React.CSSProperties | null>(null);
 
   useEffect(() => {
     if (!ready) return;
@@ -76,6 +154,48 @@ export default function Onboarding({ ready }: { ready: boolean }) {
       return () => clearTimeout(t);
     }
   }, [ready]);
+
+  // Recompute spot+card whenever the visible step changes, on resize, on
+  // orientation change, or after a short delay (to catch elements that mount
+  // a tick after onboarding becomes visible — e.g. the time slider track).
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const s = STEPS[step];
+
+    function recompute() {
+      if (!s.target) {
+        setSpotStyle(s.fallbackSpot ?? null);
+        setCardStyle(s.fallbackCard ?? null);
+        return;
+      }
+      const rect = measureTarget(s.target, s.targetPadding ?? 6);
+      if (!rect) {
+        // Target not mounted yet — try again shortly
+        return;
+      }
+      setSpotStyle({
+        left: rect.x,
+        top: rect.y,
+        width: rect.w,
+        height: rect.h,
+      });
+      setCardStyle(placeCard(rect, s.arrowDir, s.cardWidth));
+    }
+
+    recompute();
+    // Retry a few times in case the target mounts late (e.g. dynamic imports)
+    const r1 = setTimeout(recompute, 60);
+    const r2 = setTimeout(recompute, 250);
+    const r3 = setTimeout(recompute, 800);
+
+    window.addEventListener("resize", recompute);
+    window.addEventListener("orientationchange", recompute);
+    return () => {
+      clearTimeout(r1); clearTimeout(r2); clearTimeout(r3);
+      window.removeEventListener("resize", recompute);
+      window.removeEventListener("orientationchange", recompute);
+    };
+  }, [step, visible]);
 
   const dismiss = useCallback(() => {
     setExiting(true);
@@ -93,6 +213,10 @@ export default function Onboarding({ ready }: { ready: boolean }) {
   if (!visible) return null;
 
   const s = STEPS[step];
+
+  // If we don't have a computed spot/card yet (target not mounted), wait
+  // one frame rather than flashing a misplaced spotlight.
+  if (!spotStyle || !cardStyle) return null;
 
   return (
     <div
@@ -112,20 +236,21 @@ export default function Onboarding({ ready }: { ready: boolean }) {
         key={`spot-${step}`}
         style={{
           position: "fixed",
-          ...s.spot,
+          ...spotStyle,
           borderRadius: s.spotRadius,
           boxShadow: "0 0 0 100vmax rgba(0,0,0,0.52)",
           border: "2px solid rgba(251,146,60,0.8)",
           zIndex: 1,
           pointerEvents: "none",
           animation: "onb-pulse 2.2s ease-in-out infinite",
+          transition: "left 0.25s ease, top 0.25s ease, width 0.25s ease, height 0.25s ease",
         }}
       />
 
       {/* Card — outer positions, inner animates */}
       <div
         key={`card-${step}`}
-        style={{ position: "fixed", ...s.card, zIndex: 2, pointerEvents: "all" }}
+        style={{ position: "fixed", ...cardStyle, zIndex: 2, pointerEvents: "all" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ position: "relative", animation: "onb-enter 0.22s ease-out both" }}>

@@ -20,6 +20,25 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+/* viewportFit=cover means the app paints under the iPhone notch and home
+   indicator. Use 100dvh (not 100vh — Safari's 100vh includes the URL bar
+   and jumps when it hides) so the map fills the full visible viewport, and
+   expose the safe-area insets as CSS vars that fixed UI can pad against. */
+html, body {
+  height: 100%;
+}
+@supports (height: 100dvh) {
+  html, body {
+    height: 100dvh;
+  }
+}
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
 /* Mobile performance: backdrop-filter blur is the single most expensive
    CSS effect on older iPhone Safari — every time the map moves under the
    header/timeslider/filter pills, the blurred glass surfaces must repaint

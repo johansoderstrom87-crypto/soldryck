@@ -7,7 +7,9 @@ import Header from "./components/Header";
 import FeedbackModal from "./components/FeedbackModal";
 import SplashScreen from "./components/SplashScreen";
 import Onboarding from "./components/Onboarding";
+import OffSeasonBanner from "./components/OffSeasonBanner";
 import { fetchWeather, toLocalDateStr, type WeatherData } from "./lib/weather";
+import { isInSeason, snapToSeason } from "./lib/season";
 import type { FeedbackVenue } from "./components/SunMap";
 import type { VenueType, SunRange } from "./components/SunMap";
 import type { MetroStation } from "./data/metro-stations";
@@ -29,6 +31,12 @@ const SunMap = dynamic(() => import("./components/SunMap"), {
 
 export default function Home() {
   const now = new Date();
+  // Pipeline only computes shadow data for April–October. Outside that window
+  // every venue would render grey, making the app look broken to a winter
+  // visitor. Snap forward to the next April 1 so the demo always works; the
+  // OffSeasonBanner explains the jump.
+  const offSeason = !isInSeason(now);
+  const initialDate = snapToSeason(now);
 
   // Parse URL params for shared links
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
@@ -36,7 +44,7 @@ export default function Home() {
   const initialVenue = urlParams?.get("venue") ?? null;
 
   const [hour, setHour] = useState(initialHour);
-  const [date, setDate] = useState(now);
+  const [date, setDate] = useState(initialDate);
   const [filter, setFilter] = useState<"all" | "sun" | "shade">("all");
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
@@ -102,6 +110,7 @@ export default function Home() {
     <div className="h-full relative">
       {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
       <Onboarding ready={splashDone} />
+      {offSeason && splashDone && <OffSeasonBanner snappedDate={initialDate} />}
       <Header
         filter={filter}
         onFilterChange={setFilter}

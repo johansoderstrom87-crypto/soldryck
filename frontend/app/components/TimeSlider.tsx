@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import { type WeatherData, type HourlyWeather, getSymbolInfo, toLocalDateStr } from "../lib/weather";
+import { snapToSeason } from "../lib/season";
 import DirectionGauges from "./DirectionGauges";
 
 type SunRange = { from: number; to: number } | null;
@@ -186,11 +187,14 @@ export default function TimeSlider({
 
   const rangeMode = sunRange !== null;
 
-  // baseDate determines the start of the 7-day window; always resets to today on mount
+  // baseDate determines the start of the 7-day window. Normally "today", but
+  // when we're outside the April–October sun-data window we snap forward to
+  // the nearest in-season date so the day pills + slider show meaningful data
+  // on first paint (mirrors the snap applied in page.tsx).
   const [baseDate, setBaseDate] = useState<Date>(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return snapToSeason(today);
   });
 
   useEffect(() => {
@@ -314,8 +318,16 @@ export default function TimeSlider({
 
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 z-[1250] p-3 pointer-events-none"
-      style={{ fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif" }}
+      className="absolute bottom-0 left-0 right-0 z-[1250] pointer-events-none"
+      style={{
+        fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+        // Pad against iPhone home indicator + landscape notch — viewportFit=cover
+        // pushes content under those areas otherwise.
+        padding: "12px",
+        paddingBottom: "calc(12px + var(--safe-bottom))",
+        paddingLeft: "calc(12px + var(--safe-left))",
+        paddingRight: "calc(12px + var(--safe-right))",
+      }}
     >
       {/* Sun / temp / wind bar + range toggle button */}
       <div className="max-w-md mx-auto mt-2 mb-1 flex items-center gap-2">
@@ -401,6 +413,7 @@ export default function TimeSlider({
 
       <div
         ref={panelRef}
+        data-onboarding="time-slider"
         className="pointer-events-auto max-w-md mx-auto rounded-2xl"
         style={{
           background: "rgba(255, 255, 255, 0.3)",

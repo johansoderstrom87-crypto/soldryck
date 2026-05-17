@@ -105,6 +105,9 @@ function SettingsButton({
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [metroOpen, setMetroOpen] = useState(false);
   const [metroSearch, setMetroSearch] = useState("");
+  const [suggestionOpen, setSuggestionOpen] = useState(false);
+  const [suggestionText, setSuggestionText] = useState("");
+  const [suggestionState, setSuggestionState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const ref = useRef<HTMLDivElement>(null);
 
   const sortedStations = useMemo(
@@ -146,6 +149,25 @@ function SettingsButton({
     const next = new Set(typeFilter);
     if (next.has(type)) next.delete(type); else next.add(type);
     onTypeFilterChange(next);
+  }
+
+  async function submitSuggestion() {
+    const message = suggestionText.trim();
+    if (!message || suggestionState === "sending") return;
+    setSuggestionState("sending");
+    try {
+      const res = await fetch("/api/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      setSuggestionState("sent");
+      setSuggestionText("");
+      setTimeout(() => { setSuggestionOpen(false); setSuggestionState("idle"); }, 1200);
+    } catch {
+      setSuggestionState("error");
+    }
   }
 
   const activeCount =
@@ -418,6 +440,30 @@ function SettingsButton({
             )}
           </div>
 
+          <div className="border-t border-slate-200 my-1" />
+
+          {/* Suggestion button — opens modal */}
+          <button
+            onClick={() => { setOpen(false); setSuggestionOpen(true); setSuggestionState("idle"); }}
+            className="w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center gap-1.5 text-slate-600 hover:bg-slate-100 transition-all"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            Kom med förslag
+          </button>
+
+          {/* Privacy link */}
+          <a
+            href="/privacy"
+            className="w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center gap-1.5 text-slate-600 hover:bg-slate-100 transition-all no-underline"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            Integritet
+          </a>
+
           {/* Install app — pinned to bottom, only shown when browser supports it */}
           {installPrompt && (
             <>
@@ -435,6 +481,58 @@ function SettingsButton({
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {suggestionOpen && (
+        <div
+          className="fixed inset-0 z-[3000] flex items-center justify-center p-4"
+          style={{ background: "rgba(15,23,42,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
+          onClick={() => { if (suggestionState !== "sending") setSuggestionOpen(false); }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-1">
+              <h2 className="text-base font-semibold text-slate-800">Kom med förslag</h2>
+              <button
+                onClick={() => { if (suggestionState !== "sending") setSuggestionOpen(false); }}
+                className="text-slate-400 hover:text-slate-600 -mt-1 -mr-1 p-1"
+                aria-label="Stäng"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">
+              Saknas en uteservering, något som behöver fixas eller en idé? Skriv här.
+            </p>
+            <textarea
+              value={suggestionText}
+              onChange={(e) => setSuggestionText(e.target.value)}
+              placeholder="Ditt förslag…"
+              autoFocus
+              rows={5}
+              maxLength={2000}
+              disabled={suggestionState === "sending" || suggestionState === "sent"}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none disabled:bg-slate-50"
+            />
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="text-[11px] text-slate-400">
+                {suggestionState === "error" && "Kunde inte skicka. Försök igen."}
+                {suggestionState === "sent" && "Tack! Förslag skickat ✓"}
+              </span>
+              <button
+                onClick={submitSuggestion}
+                disabled={!suggestionText.trim() || suggestionState === "sending" || suggestionState === "sent"}
+                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {suggestionState === "sending" ? "Skickar…" : suggestionState === "sent" ? "Skickat" : "Skicka in"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -457,8 +555,11 @@ export default function Header({
 
   return (
     <div className="absolute top-0 left-0 right-0 z-[1100] pointer-events-none">
-      {/* Centered top stack — wide card + filter row */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto select-none" style={{ top: 0 }}>
+      {/* Centered top stack — wide card + filter row.
+          Pushed down by safe-area-inset-top so the card hangs below the
+          iPhone notch instead of behind it (statusBarStyle=black-translucent
+          + viewportFit=cover would otherwise overlap it). */}
+      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto select-none" style={{ top: "var(--safe-top, 0px)" }}>
 
         {/* Top card: settings on left, logo centered, favorites on right */}
         <div
@@ -511,6 +612,7 @@ export default function Header({
         <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
           {/* marginBottom collapse — no overflow:hidden so backdrop-filter has no ghost box and buttons aren't clipped */}
           <div
+            data-onboarding="filter-row"
             style={{
               display: "flex",
               gap: 6,
