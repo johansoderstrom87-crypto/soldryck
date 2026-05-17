@@ -1020,27 +1020,27 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     mapRef.current = map;
 
-    // Move each popup element to document.body on open so it escapes the
-    // leaflet-container stacking context entirely.  document.body has no
-    // intermediate stacking contexts so z=9999 beats Header (z=1100).
-    // The map is full-screen (container origin = viewport 0,0) so Leaflet's
-    // translate() coords stay correct for position:fixed, and _updatePosition
-    // keeps calling setPosition on the element as the map pans — so the popup
-    // remains anchored to its marker.
-    // Leaflet's fade-in sets opacity:0 and expects the element to be inside
-    // .leaflet-fade-anim to get opacity:1 via CSS — force it visible here.
-    map.on("popupopen", (e: any) => {
-      const el: HTMLElement | null =
-        e.popup?.getElement?.() ?? e.popup?._container ?? null;
-      if (!el) return;
-      document.body.appendChild(el);
-      el.style.setProperty("position", "fixed", "important");
-      el.style.setProperty("z-index", "9999", "important");
-      el.style.setProperty("opacity", "1", "important");
-      el.style.setProperty("transition", "none", "important");
+    // Anchor popup to its marker during drag. Leaflet's DivOverlay only
+    // calls _updatePosition on zoom/viewreset, not on move, so without this
+    // the popup drifts while the map pans.
+    map.on("move", () => {
+      const popup = (map as any)._popup;
+      if (popup?._updatePosition) popup._updatePosition();
     });
 
+    // Move the popup pane to the SunMap root div so it escapes
+    // leaflet-container's stacking context. z=1150 (CSS) then sits in the
+    // root stacking context, above Header (z=1100). pointer-events:none on
+    // the pane (set below + in CSS) lets map drag/click pass through.
+    const popupPane = map.getPanes().popupPane as HTMLElement;
+    const sunMapRoot = containerRef.current?.parentElement;
+    if (sunMapRoot) {
+      sunMapRoot.appendChild(popupPane);
+      popupPane.style.pointerEvents = "none";
+    }
+
     return () => {
+      popupPane.remove();
       map.remove();
       mapRef.current = null;
     };
