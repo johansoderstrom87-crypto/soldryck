@@ -28,12 +28,21 @@ interface ClaimedVenueData {
     description: string;
   };
 }
+// Populated at runtime from /api/claimed-venues so admin edits go live without a redeploy.
+// Module-level mutable: popups build lazily on open and read this directly.
 let claimedVenues: Record<string, ClaimedVenueData> = {};
-try {
-  const claimedData = require("../data/claimed-venues.json");
-  claimedVenues = claimedData.venues ?? {};
-} catch {
-  // claimed-venues.json saknas — ingen happy hour-data
+
+async function refreshClaimedVenues(): Promise<void> {
+  try {
+    const res = await fetch("/api/claimed-venues", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && typeof data.venues === "object") {
+      claimedVenues = data.venues;
+    }
+  } catch {
+    // Network/parse failure — keep whatever we already have (possibly empty).
+  }
 }
 
 import { type WeatherData, getSymbolInfo } from "../lib/weather";
@@ -976,6 +985,13 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
 
+  // Fetch claimed venues once on mount. Popups read the module-level
+  // `claimedVenues` lazily on open, so a one-shot load is enough — no
+  // need to rebuild markers or force re-renders.
+  useEffect(() => {
+    refreshClaimedVenues();
+  }, []);
+
   // Initialize map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -1020,27 +1036,38 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     mapRef.current = map;
 
-    // Anchor popup to its marker during drag. Leaflet's DivOverlay only
-    // calls _updatePosition on zoom/viewreset, not on move, so without this
-    // the popup drifts while the map pans.
-    map.on("move", () => {
-      const popup = (map as any)._popup;
-      if (popup?._updatePosition) popup._updatePosition();
+    // Leaflet creates every pane (including popupPane) inside mapPane, which
+    // gets a transform during pan/zoom — that's how popups normally stay
+    // anchored to the map. mapPane's transform also creates a stacking
+    // context that traps popups below the Header (z=1100).
+    //
+    // Fix: create a sibling popup pane in document.body (escaping all
+    // stacking contexts → z can beat the Header) and mirror mapPane's
+    // CSS transform onto it on every map move/zoom event. Popups bound
+    // with { pane: "appPopupPane" } render here and visually follow the map.
+    const appPopupPane = map.createPane("appPopupPane", document.body);
+    appPopupPane.style.position = "absolute";
+    appPopupPane.style.top = "0";
+    appPopupPane.style.left = "0";
+    appPopupPane.style.zIndex = "1150";
+    appPopupPane.style.pointerEvents = "none";
+    const syncPaneTransform = () => {
+      const mapPanePos = (map as any)._getMapPanePos?.() ?? { x: 0, y: 0 };
+      appPopupPane.style.transform = `translate3d(${mapPanePos.x}px, ${mapPanePos.y}px, 0)`;
+    };
+    syncPaneTransform();
+    map.on("move zoom viewreset zoomanim", syncPaneTransform);
+
+    // Center marker on screen when its popup opens (user request: popup
+    // should be centered, not just brought into view by autoPan).
+    map.on("popupopen", (e: any) => {
+      const latlng = e.popup?.getLatLng?.();
+      if (latlng) map.panTo(latlng, { animate: true, duration: 0.4 });
     });
 
-    // Move the popup pane to the SunMap root div so it escapes
-    // leaflet-container's stacking context. z=1150 (CSS) then sits in the
-    // root stacking context, above Header (z=1100). pointer-events:none on
-    // the pane (set below + in CSS) lets map drag/click pass through.
-    const popupPane = map.getPanes().popupPane as HTMLElement;
-    const sunMapRoot = containerRef.current?.parentElement;
-    if (sunMapRoot) {
-      sunMapRoot.appendChild(popupPane);
-      popupPane.style.pointerEvents = "none";
-    }
-
     return () => {
-      popupPane.remove();
+      map.off("move zoom viewreset zoomanim", syncPaneTransform);
+      appPopupPane.remove();
       map.remove();
       mapRef.current = null;
     };
@@ -1486,9 +1513,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         () => buildVenuePopupHtml(venue, dateKey, hourRef.current, weatherRef.current),
         {
           maxWidth: 300,
-          autoPan: true,
-          autoPanPaddingTopLeft: L.point(20, 180),
-          autoPanPaddingBottomRight: L.point(20, 240),
+          pane: "appPopupPane",
+          autoPan: false,
         },
       );
 
@@ -1718,9 +1744,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
         const popup = L.popup({
           maxWidth: 280,
-          autoPan: true,
-          autoPanPaddingTopLeft: L.point(20, 180),
-          autoPanPaddingBottomRight: L.point(20, 240),
+          pane: "appPopupPane",
+          autoPan: false,
         }).setContent(`
           <div style="min-width:220px">
             <div style="margin-bottom:4px">

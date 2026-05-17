@@ -46,15 +46,10 @@ body {
   overflow: visible !important;
 }
 
-/* Popup pane is moved to SunMap root div at map init (see SunMap.tsx) to
-   escape leaflet-container's stacking context. z=1150 puts it above Header
-   (z=1100) and buttons (z=1001), below TimeSlider (z=1250).
-   pointer-events:none lets map drag/click pass through the pane;
-   .leaflet-popup re-enables it for the popup card itself. */
-.leaflet-popup-pane {
-  z-index: 1150 !important;
-  pointer-events: none;
-}
+/* Popups render in a custom "appPopupPane" created in document.body by
+   SunMap.tsx (which mirrors mapPane's transform to stay anchored).
+   pointer-events:none on the pane → map drag/click pass through;
+   .leaflet-popup → re-enable clicks on the popup card itself. */
 .leaflet-popup {
   pointer-events: auto;
 }
