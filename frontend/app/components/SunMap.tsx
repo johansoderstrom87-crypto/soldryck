@@ -1019,22 +1019,27 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     mapRef.current = map;
 
-    // Move the popup pane to the SunMap root div so it escapes
-    // leaflet-container's stacking context. The pane's z=1150 (CSS) then
-    // sits directly in the root stacking context, beating the Header (z=1100).
-    // pointer-events:none on the pane lets map drag/click pass through;
-    // .leaflet-popup (CSS) restores pointer-events:auto for the popup itself.
-    // The pane's coordinate origin stays the same (SunMap root = full-screen),
-    // so Leaflet's transform-based positioning remains correct.
-    const popupPane = map.getPanes().popupPane as HTMLElement;
-    const sunMapRoot = containerRef.current?.parentElement;
-    if (sunMapRoot) {
-      sunMapRoot.appendChild(popupPane);
-      popupPane.style.pointerEvents = "none";
-    }
+    // Move each popup element to document.body on open so it escapes the
+    // leaflet-container stacking context entirely.  document.body has no
+    // intermediate stacking contexts so z=9999 beats Header (z=1100).
+    // The map is full-screen (container origin = viewport 0,0) so Leaflet's
+    // translate() coords stay correct for position:fixed, and _updatePosition
+    // keeps calling setPosition on the element as the map pans — so the popup
+    // remains anchored to its marker.
+    // Leaflet's fade-in sets opacity:0 and expects the element to be inside
+    // .leaflet-fade-anim to get opacity:1 via CSS — force it visible here.
+    map.on("popupopen", (e: any) => {
+      const el: HTMLElement | null =
+        e.popup?.getElement?.() ?? e.popup?._container ?? null;
+      if (!el) return;
+      document.body.appendChild(el);
+      el.style.setProperty("position", "fixed", "important");
+      el.style.setProperty("z-index", "9999", "important");
+      el.style.setProperty("opacity", "1", "important");
+      el.style.setProperty("transition", "none", "important");
+    });
 
     return () => {
-      popupPane.remove();
       map.remove();
       mapRef.current = null;
     };
