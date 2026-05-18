@@ -11,6 +11,8 @@ import L from "leaflet";
 // have something to call against when the JSON is still in flight.
 import * as venuesModule from "../data/venues-computed";
 import * as mockVenuesModule from "../data/mock-venues";
+import type { ComputedVenue } from "../data/venues-computed";
+import { useRainRadar } from "../hooks/useRainRadar";
 const venueModule: typeof venuesModule & { mockVenues?: unknown } = venuesModule;
 
 let unconfirmedModule: { unconfirmedVenues: any[] } | null = null;
@@ -659,6 +661,7 @@ type VenueHoursPayload = {
 } | null;
 const venuePhotoCache = new Map<string, string | null>();
 const venueHoursCache = new Map<string, VenueHoursPayload>();
+const venueTrustCache = new Map<string, { reports: number; lastReportAt: string | null }>();
 
 // User's current GPS position. Set by handleLocate's watchPosition callback,
 // read by buildVenuePopupHtml so popups can show walking time without going
@@ -761,6 +764,35 @@ function applyMarkerVisualState(marker: L.Marker, state: { className: string; vi
   const dot = iconEl.firstElementChild as HTMLElement | null;
   if (dot) dot.className = `marker-dot ${state.className}`;
   iconEl.style.display = state.visible ? "" : "none";
+}
+
+/**
+ * Render the "X rapporter senaste 30 dagarna"-chip. Fetches /api/venue-trust
+ * lazily on popup open; cached per-session so the chip pops in instantly on
+ * subsequent opens of the same venue. Hidden when count is 0 — a "0 reports"
+ * chip would just clutter the metadata row.
+ */
+function renderVenueTrust(container: HTMLElement, venue: { id: string | number }) {
+  const inject = (data: { reports: number; lastReportAt: string | null }) => {
+    if (!data || data.reports < 1) return;
+    const plural = data.reports === 1 ? "rapport" : "rapporter";
+    container.innerHTML = `<span title="Användare som rapporterat solförhållanden här senaste 30 dagarna" style="display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:1px 6px;background:#f0fdf4;border-radius:999px;color:#166534;font-size:10px;font-weight:600">
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      ${data.reports} ${plural}
+    </span>`;
+  };
+
+  const cached = venueTrustCache.get(String(venue.id));
+  if (cached) { inject(cached); return; }
+
+  fetch(`/api/venue-trust?id=${encodeURIComponent(String(venue.id))}`)
+    .then((r) => r.ok ? r.json() : null)
+    .then((data: { reports: number; lastReportAt: string | null } | null) => {
+      if (!data) return;
+      venueTrustCache.set(String(venue.id), data);
+      inject(data);
+    })
+    .catch(() => { /* trust chip is non-critical */ });
 }
 
 /**
@@ -1055,7 +1087,7 @@ function buildVenuePopupHtml(
         <strong style="font-size:17px;line-height:1.2;flex:1;margin-right:6px">${venue.name}</strong>
         <span style="font-size:20px;flex-shrink:0">${statusToEmoji(status)}</span>
       </div>
-      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}${priceHtml}${wheelchairHtml}${confHtml}${walkHtml}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}${priceHtml}${wheelchairHtml}${confHtml}${walkHtml}<span id="venue-trust-${venue.id}"></span></div>
       <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
       <div style="background:rgba(255,255,255,0.55);border-radius:8px;padding:5px 6px;margin-top:8px;border:0.5px solid rgba(255,255,255,0.7)">
         <div style="display:flex;gap:2px">${shadowTimeline}</div>
@@ -1126,15 +1158,19 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // the JSON payload arrives (page.tsx calls setVenues() at that point).
   // Until then we fall back to the 8-venue mock so the map isn't blank.
   const storeVenues = venueModule.useVenues();
-  const allVenues: any[] = storeVenues.length > 0
+  // Mock data uses a slightly different shape (uncompressed "sun"/"shade",
+  // number-keyed hours) — the `unknown` cast acknowledges that runtime
+  // boundary; the rest of SunMap reads venues through the wider
+  // ComputedVenue interface to stay typesafe internally.
+  const allVenues: ComputedVenue[] = storeVenues.length > 0
     ? storeVenues
-    : (mockVenuesModule.mockVenues as unknown as any[]);
+    : (mockVenuesModule.mockVenues as unknown as ComputedVenue[]);
 
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   // Parallel array of (marker, venue) so the hour-update effect can recompute
   // status without rebuilding markers. Kept in lockstep with markersRef.
-  const markerVenuesRef = useRef<{ marker: L.Marker; venue: any }[]>([]);
+  const markerVenuesRef = useRef<{ marker: L.Marker; venue: ComputedVenue }[]>([]);
   // Weather snapshot read by the hour-update effect (avoids making `weather`
   // a dep of the cheap update path — only the build effect rebuilds on weather).
   const weatherRef = useRef<WeatherData | null>(null);
@@ -1681,7 +1717,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     markersRef.current = [];
     markerVenuesRef.current = [];
 
-    allVenues.forEach((venue: any) => {
+    allVenues.forEach((venue: ComputedVenue) => {
       // Filter by metro station proximity
       if (metroStation) {
         const dist = distanceM(venue.lat, venue.lng, metroStation.lat, metroStation.lng);
@@ -1784,6 +1820,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
         const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
         if (hoursContainer) renderVenueHours(hoursContainer, venue);
+
+        const trustContainer = document.getElementById(`venue-trust-${venue.id}`);
+        if (trustContainer) renderVenueTrust(trustContainer, venue);
 
         // Book-bord link — track click but let the anchor navigate normally
         const bookBtn = document.querySelector(`.book-btn[data-venue-id="${venue.id}"]`);
@@ -2020,7 +2059,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !focusVenueId) return;
-    const targetVenue = allVenues.find((v: any) => v.id === focusVenueId);
+    const targetVenue = allVenues.find((v: ComputedVenue) => v.id === focusVenueId);
     if (targetVenue) {
       map.setView([targetVenue.lat, targetVenue.lng], 16, { animate: true });
       const found = markerVenuesRef.current.find(({ marker: m }) => {
@@ -2160,57 +2199,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     };
   }, [metroStation, typeFilter, servingFilter]);
 
-  // Rain radar overlay — RainViewer's free public tile service. We refresh
-  // the metadata every 5 min (their frames update every 10 min). No API key,
-  // attribution shown via map credits. Toggled via the Regnradar-switch in
-  // settings dropdown.
-  useEffect(() => {
-    if (!showRain) return;
-
-    let rainLayer: L.TileLayer | null = null;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    async function refresh() {
-      if (cancelled) return;
-      const m = mapRef.current;
-      if (!m) return;
-      try {
-        const res = await fetch("https://api.rainviewer.com/public/weather-maps.json");
-        if (!res.ok) return;
-        const data = await res.json();
-        const frames = (data?.radar?.past ?? []) as Array<{ path: string; time: number }>;
-        const latest = frames[frames.length - 1];
-        if (!latest || cancelled) return;
-        const host = data.host as string | undefined;
-        if (!host) return;
-        const next = L.tileLayer(
-          `${host}${latest.path}/256/{z}/{x}/{y}/2/1_1.png`,
-          {
-            opacity: 0.55,
-            maxZoom: 19,
-            attribution: '<a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a>',
-          },
-        ).addTo(m);
-        // Cross-fade: add the new layer, then remove the old after one frame.
-        if (rainLayer) {
-          const old = rainLayer;
-          setTimeout(() => old.remove(), 100);
-        }
-        rainLayer = next;
-      } catch { /* silently ignore — radar is non-critical */ }
-
-      timer = setTimeout(refresh, 5 * 60 * 1000);
-    }
-
-    refresh();
-
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-      if (rainLayer) rainLayer.remove();
-    };
-  }, [showRain]);
+  // Rain radar overlay — RainViewer's free public tile service. Extracted
+  // to a hook so SunMap can incrementally shrink (#49). Same pattern fits
+  // the shadow / metro / geolocation effects when we keep splitting.
+  useRainRadar(mapRef, showRain);
 
   // Shadow overlay layer
   useEffect(() => {
@@ -2383,7 +2375,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         const { latitude, longitude } = pos.coords;
         const cosLat = Math.cos((latitude * Math.PI) / 180);
 
-        const sunnyVenues = allVenues.filter((v: any) => {
+        const sunnyVenues = allVenues.filter((v: ComputedVenue) => {
           // getStatus returns the compressed code ("s") from the JSON store;
           // mock-venues uses the legacy "sun" form, hence the OR.
           const s = getStatus(v, dateKey, hourRef.current) as string;

@@ -1,6 +1,13 @@
 // Bumped on cache-strategy change — old caches will be deleted on activate.
-const CACHE_NAME = "soldryck-v3";
-const PRECACHE = ["/", "/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
+const CACHE_NAME = "soldryck-v4";
+const OFFLINE_URL = "/offline";
+const PRECACHE = [
+  "/",
+  OFFLINE_URL,
+  "/manifest.json",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+];
 
 // Per-route TTLs for /api/* fallback. The previous version cached every API
 // response indefinitely as offline fallback, which meant a user opening the
@@ -134,6 +141,8 @@ self.addEventListener("fetch", (e) => {
   if (isNavigate) {
     // Network-first for HTML — falls back to whatever's cached (no TTL —
     // a stale shell is fine, the app rehydrates from live data on connect).
+    // If neither network nor cache works, fall back to the precached
+    // /offline page so we never show the browser's default error chrome.
     e.respondWith(
       fetch(request)
         .then((res) => {
@@ -141,7 +150,11 @@ self.addEventListener("fetch", (e) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           return res;
         })
-        .catch(() => caches.match(request))
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          return caches.match(OFFLINE_URL);
+        })
     );
     return;
   }

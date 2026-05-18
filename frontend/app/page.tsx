@@ -131,7 +131,7 @@ export default function Home() {
   const sunCount = useMemo(
     () =>
       allVenues.filter(
-        (v: any) => {
+        (v: ComputedVenue) => {
           // Mock data uses legacy "sun"; JSON store uses compressed "s".
           const s = getStatus(v, dateKey, hour) as string;
           return s === "sun" || s === "s";
