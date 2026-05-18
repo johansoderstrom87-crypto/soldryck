@@ -9,17 +9,25 @@ import SplashScreen from "./components/SplashScreen";
 import Onboarding from "./components/Onboarding";
 import OffSeasonBanner from "./components/OffSeasonBanner";
 import IosInstallHint from "./components/IosInstallHint";
+import VenuesLoadingPill from "./components/VenuesLoadingPill";
 import { fetchWeather, toLocalDateStr, type WeatherData } from "./lib/weather";
 import { isInSeason, snapToSeason } from "./lib/season";
+import { track, installGlobalErrorHandlers } from "./lib/analytics";
 import type { FeedbackVenue } from "./components/SunMap";
 import type { VenueType, SunRange } from "./components/SunMap";
 import type { MetroStation } from "./data/metro-stations";
 
 // Mock baseline data — tiny (8 venues), safe to keep in the main bundle as
-// a fallback so the UI renders something while venues-computed downloads
-// (or if the dynamic import fails altogether).
+// a fallback so the UI renders something while the JSON payload downloads
+// (or if the fetch fails altogether).
 const mockData = require("./data/mock-venues");
-type VenueModule = typeof import("./data/venues-computed");
+import {
+  setVenues,
+  getVenues,
+  getClosestDateKey as computedGetDateKey,
+  getVenueStatus as computedGetStatus,
+  type ComputedVenue,
+} from "./data/venues-computed";
 
 const SunMap = dynamic(() => import("./components/SunMap"), {
   ssr: false,
@@ -58,26 +66,54 @@ export default function Home() {
   const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
   const [servingFilter, setServingFilter] = useState(false);
   const [openNowFilter, setOpenNowFilter] = useState(false);
-  const [splashDone, setSplashDone] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches
-  );
+  // Splash is skipped for users who already added Soldryck to the home
+  // screen — they saw it on first install. Initial state must be false so
+  // the server render matches the first client render (no hydration
+  // mismatch warning); the standalone check happens in the effect below
+  // so a re-render flips splashDone before any meaningful paint.
+  const [splashDone, setSplashDone] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isPWA =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as { standalone?: boolean }).standalone === true;
+    if (isPWA) setSplashDone(true);
 
-  // Lazy-load the ~5.5 MB venues-computed module. Keeping it out of the main
-  // bundle lets older phones become interactive in ~2 s instead of waiting
-  // 10–15 s for the full payload to download + JS-parse. The mock fallback
-  // (8 venues) provides a baseline while the real data is in flight.
-  const [venueData, setVenueData] = useState<VenueModule | null>(null);
+    // One-shot page-view + global error capture. Anonymous (no userId) and
+    // gated on Do-Not-Track via lib/analytics. Cleanup uninstalls listeners
+    // on unmount — irrelevant in production but keeps Strict Mode happy.
+    track("page_view", { pwa: isPWA, off_season: offSeason });
+    return installGlobalErrorHandlers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch the ~6 MB venues JSON payload separately from the main JS bundle.
+  // The previous implementation imported the data as a TS module; that meant
+  // every page load shipped the array as JavaScript (slow to parse on phones)
+  // and webpack couldn't gzip it as effectively as raw JSON. Now the bundle
+  // ships only the helpers + type definitions, and we hydrate the store
+  // from `/data/venues-computed.json` on mount.
+  //
+  // While the JSON is in flight, SunMap renders the 8-venue mock fallback
+  // (kept in the main bundle for instant first paint), and VenuesLoadingPill
+  // shows ambient progress to the user.
+  const [venuesLoaded, setVenuesLoaded] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    import("./data/venues-computed")
-      .then((m) => { if (!cancelled) setVenueData(m as unknown as VenueModule); })
-      .catch(() => { /* keep mockData fallback */ });
+    fetch("/data/venues-computed.json")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: ComputedVenue[] | null) => {
+        if (cancelled || !data) return;
+        setVenues(data);
+        setVenuesLoaded(true);
+      })
+      .catch(() => { /* mock fallback remains in the store sentinel */ });
     return () => { cancelled = true; };
   }, []);
 
-  const allVenues = venueData?.venues ?? mockData.mockVenues;
-  const getDateKey = venueData?.getClosestDateKey ?? mockData.getClosestDateKey;
-  const getStatus = venueData?.getVenueStatus ?? mockData.getVenueStatus;
+  const allVenues = venuesLoaded ? getVenues() : (mockData.mockVenues as unknown as ComputedVenue[]);
+  const getDateKey = venuesLoaded ? computedGetDateKey : mockData.getClosestDateKey;
+  const getStatus = venuesLoaded ? computedGetStatus : mockData.getVenueStatus;
 
   const dateKey = useMemo(() => getDateKey(date), [date, getDateKey]);
   const dateStr = useMemo(() => toLocalDateStr(date), [date]);
@@ -94,7 +130,8 @@ export default function Home() {
     () =>
       allVenues.filter(
         (v: any) => {
-          const s = getStatus(v, dateKey, hour);
+          // Mock data uses legacy "sun"; JSON store uses compressed "s".
+          const s = getStatus(v, dateKey, hour) as string;
           return s === "sun" || s === "s";
         }
       ).length,
@@ -114,6 +151,7 @@ export default function Home() {
       <Onboarding ready={splashDone} />
       {offSeason && splashDone && <OffSeasonBanner snappedDate={initialDate} />}
       {splashDone && <IosInstallHint />}
+      {splashDone && <VenuesLoadingPill loading={!venuesLoaded} />}
       <Header
         filter={filter}
         onFilterChange={setFilter}

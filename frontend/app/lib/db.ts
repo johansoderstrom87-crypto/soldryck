@@ -31,6 +31,19 @@ export async function ensureTable() {
   await p.query(`ALTER TABLE feedback ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'schedule'`);
 }
 
+export async function ensureSuggestionsTable() {
+  const p = getPool();
+  if (!p) return;
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS suggestions (
+      id SERIAL PRIMARY KEY,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'new',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+}
+
 export async function ensurePushTable() {
   const p = getPool();
   if (!p) return;
@@ -43,4 +56,26 @@ export async function ensurePushTable() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+}
+
+export async function ensureEventsTable() {
+  const p = getPool();
+  if (!p) return;
+  // Anonymous event stream — no user-identifying data, just session id and
+  // a small JSONB payload. Indexed by name + time so the admin view can
+  // produce "events per hour" / "top events"-counts without scanning all
+  // rows. Older rows can be deleted periodically with a simple cron.
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS events (
+      id BIGSERIAL PRIMARY KEY,
+      session_id TEXT,
+      name TEXT NOT NULL,
+      props JSONB NOT NULL DEFAULT '{}'::jsonb,
+      path TEXT,
+      occurred_at TIMESTAMPTZ NOT NULL,
+      received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await p.query(`CREATE INDEX IF NOT EXISTS events_name_received_idx ON events (name, received_at DESC)`);
+  await p.query(`CREATE INDEX IF NOT EXISTS events_session_idx ON events (session_id, received_at DESC)`);
 }

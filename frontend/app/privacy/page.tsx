@@ -124,9 +124,32 @@ export default function PrivacyPage() {
 
       <Section title="Cookies &amp; analytics">
         <p>
-          Vi använder <strong>inga</strong> cookies, ingen analytics, inga
-          tredjepartsspårare. Det finns inget reklamnätverk. Hosting-leverantören
-          (Railway) ser vanliga åtkomstloggar som varje webbserver gör.
+          Vi använder <strong>inga cookies</strong>, inga reklamnätverk och inga
+          tredjepartsspårare. Hosting-leverantören (Railway) ser vanliga
+          åtkomstloggar som varje webbserver gör.
+        </p>
+        <p>
+          För att förstå vilka funktioner som faktiskt används loggar vi{" "}
+          <strong>anonyma händelseräknare</strong> i vår egen databas:
+          knappklick som &quot;Hitta solen&quot;, &quot;Favorit tillagd&quot;, popup-öppningar
+          (bara venue-typ — restaurang/café/bar/takbar) och liknande. Vi sparar
+          <strong> ingen IP-adress, inget användar-id och ingen koppling
+          till dig som person</strong> — bara en slumpmässig session-id som
+          rensas när du stänger fliken.
+        </p>
+        <p>
+          Om din webbläsare skickar <strong>Do-Not-Track</strong> eller{" "}
+          <strong>Global Privacy Control</strong> stänger vi av all
+          händelseloggning helt automatiskt.
+        </p>
+      </Section>
+
+      <Section title="Felrapportering">
+        <p>
+          Om något kraschar i webbläsaren skickar vi en kort sammanfattning
+          (felmeddelande + fil + radnummer) till vår egen databas så vi kan
+          fixa buggar. Inget om sidans innehåll eller om dig — bara
+          stacktrace-fragmentet. Stängs också av av Do-Not-Track.
         </p>
       </Section>
 

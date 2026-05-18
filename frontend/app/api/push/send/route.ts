@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import webpush from "web-push";
 import { getPool, ensurePushTable } from "../../../lib/db";
-import { venues, getClosestDateKey, getVenueStatus } from "../../../data/venues-computed";
+import { getClosestDateKey, getVenueStatus, type ComputedVenue } from "../../../data/venues-computed";
+import { loadVenues } from "../../../lib/venues-server";
 
 const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
@@ -69,7 +70,8 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: true, skipped: "bad weather" });
   }
 
-  const venueMap = new Map(venues.map((v) => [v.id, v]));
+  const venues = await loadVenues();
+  const venueMap = new Map<string, ComputedVenue>(venues.map((v) => [v.id, v]));
   const { rows } = await pool.query<{
     endpoint: string;
     subscription: any;

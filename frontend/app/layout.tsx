@@ -1,5 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Inter, Outfit } from "next/font/google";
+// Self-host Leaflet's stylesheet via the npm package — bundled by Next so
+// it's served from the same origin (no render-blocking third-party request
+// + no single-point-of-failure on unpkg). MUST come before globals.css so
+// our own .leaflet-* overrides can win on specificity ties.
+import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -95,13 +100,9 @@ export default function RootLayout({
   return (
     <html lang="sv" className={`${geistSans.variable} ${inter.variable} ${outfit.variable} h-full`}>
       <head>
-        <link
-          rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-          crossOrigin=""
-        />
-        {/* Icons handled by Next's metadata.icons — see above. */}
+        {/* Leaflet CSS is imported via `import "leaflet/dist/leaflet.css"`
+            in this file — Next bundles + serves from the same origin.
+            Icons handled by Next's metadata.icons — see above. */}
       </head>
       <body className="h-full overflow-hidden">
         {children}
