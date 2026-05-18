@@ -37,6 +37,21 @@ html, body {
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+
+  /* Border-radius scale. Use these vars (or their numeric equivalents) for
+     all new surfaces so the geometry feels intentional rather than ad-hoc.
+       --r-xs: 4    — hairline strokes, single-line tags
+       --r-sm: 8    — small chips, dense rows, status pills
+       --r-md: 12   — buttons, list cards, day-pills
+       --r-lg: 16   — toolbars, mid panels
+       --r-xl: 20   — popups, modals, hero glass surfaces
+       --r-full: 999 — circular FABs / dot indicators */
+  --r-xs: 4px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-full: 999px;
 }
 
 /* Mobile performance: backdrop-filter blur is the single most expensive
@@ -86,7 +101,7 @@ html, body {
 
 .leaflet-popup-content-wrapper {
   background: rgba(255, 255, 255, 0.72) !important;
-  border-radius: 20px !important;
+  border-radius: var(--r-xl) !important;
   border: 0.5px solid rgba(255, 255, 255, 0.7) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
   overflow: hidden !important;
@@ -191,6 +206,32 @@ html, body {
   opacity: 0.6;
 }
 
+/* Rooftop venues — the brand's hero feature. Get a violet halo ring outside
+   the white border so they pop against the amber/slate sun/shade palette.
+   At badge-zoom the glow intensifies; the dot's status colour (sun/shade)
+   is unchanged so users still read sun-state at a glance. */
+.marker-rooftop .marker-dot {
+  box-shadow:
+    0 0 0 2px rgba(139, 92, 246, 0.65),
+    0 1px 3px rgba(0, 0, 0, 0.18);
+}
+.show-badges .marker-rooftop .marker-dot {
+  box-shadow:
+    0 0 0 2px rgba(139, 92, 246, 0.75),
+    0 0 14px rgba(139, 92, 246, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Subtle violet tint in the rooftop badge — recognisable as the same accent
+   without overriding the glassmorphism look of the standard badge. */
+.marker-rooftop .marker-badge {
+  border-color: rgba(139, 92, 246, 0.35);
+}
+.marker-rooftop .marker-badge-icon {
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+}
+
 /* Unconfirmed venues: hidden until zoom >= 17 */
 .marker-unconfirmed { display: none !important; }
 .show-badges .marker-unconfirmed { display: block !important; }
@@ -227,7 +268,7 @@ html, body {
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
   border: 0.5px solid rgba(0, 0, 0, 0.1);
-  border-radius: 999px;
+  border-radius: var(--r-full);
   padding: 5px 12px 5px 5px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
   pointer-events: auto;
@@ -416,7 +457,7 @@ html, body {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
 }
@@ -530,7 +571,7 @@ html, body {
   padding: 8px 10px;
   background: linear-gradient(180deg, #fafafa 0%, #f5f5f4 100%);
   border: 1px solid #e7e5e4;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
 }
@@ -554,7 +595,7 @@ html, body {
   margin: 0 -10px;
   padding-left: 10px;
   padding-right: 10px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   border-bottom-color: transparent;
 }
 .venue-hours-day {
@@ -575,6 +616,97 @@ html, body {
   color: #cbd5e1;
   font-style: italic;
   font-weight: 400;
+}
+
+/* Popup action buttons. Used to be inline-styled in buildVenuePopupHtml,
+   which made it easy for the favourite / map / share / feedback / claim
+   visuals to drift apart over time. These classes give them a single,
+   consistent design language: 32 px height, --r-sm corners, subtle
+   borders, hover lift. */
+.popup-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.popup-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.popup-btn {
+  height: 32px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: #fff;
+  font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, transform 0.08s ease;
+}
+.popup-btn:active { transform: scale(0.97); }
+.popup-btn-icon {
+  flex: 0 0 32px;
+  width: 32px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: inherit;
+  text-decoration: none;
+}
+.popup-btn-icon:hover { background: #f8fafc; }
+.popup-btn-fav {
+  flex: 0 0 32px;
+  width: 32px;
+  background: #fff;
+  border: 1px solid #fecaca;
+  color: #ef4444;
+  font-size: 16px;
+}
+.popup-btn-fav:hover { background: #fef2f2; }
+.popup-btn-primary {
+  flex: 1;
+  min-width: 0;
+  background: #f59e0b;
+  color: #fff;
+}
+.popup-btn-primary:hover { background: #d97706; }
+.popup-btn-seating {
+  flex: 1;
+  min-width: 0;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #d1fae5;
+  font-size: 10px;
+}
+.popup-btn-seating:hover { background: #d1fae5; }
+.popup-btn-link {
+  background: none;
+  border: none;
+  color: #cbd5e1;
+  font-size: 10px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+  font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
+}
+.popup-btn-link:hover { color: #64748b; }
+.popup-claim-link {
+  font-size: 9px;
+  color: #cbd5e1;
+  text-decoration: none;
+  font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
+}
+.popup-claim-link:hover { color: #64748b; }
+.popup-verified-tag {
+  font-size: 9px;
+  color: #16a34a;
+  font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
 }
 
 @keyframes onb-pulse {

@@ -29,6 +29,19 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   manifest: "/manifest.json",
+  // Favicon hierarchy — without these the desktop tab shows the empty
+  // placeholder favicon. Modern browsers prefer SVG (sharp at every size),
+  // falling back to the PNGs for Safari/iOS and apple-touch-icon for the
+  // home-screen tile on legacy iOS.
+  icons: {
+    icon: [
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
     // Use black-translucent so iOS extends the app under the notch and lets
@@ -88,7 +101,7 @@ export default function RootLayout({
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossOrigin=""
         />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        {/* Icons handled by Next's metadata.icons — see above. */}
       </head>
       <body className="h-full overflow-hidden">
         {children}

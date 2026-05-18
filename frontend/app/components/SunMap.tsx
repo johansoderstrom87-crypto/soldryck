@@ -994,11 +994,10 @@ function buildVenuePopupHtml(
       ${sunArrivesLine}
       ${bestHourLine}
       ${happyHourHtml}
-      <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+      <div class="popup-actions">
         <button
-          class="fav-btn"
+          class="popup-btn popup-btn-fav fav-btn"
           data-venue-id="${venue.id}"
-          style="flex:0 0 32px;height:32px;border:1px solid #fecaca;border-radius:8px;background:#fff;color:#ef4444;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center"
           title="Spara som favorit"
         >${getFavorites().has(venue.id) ? "&#10084;&#65039;" : "&#9825;"}</button>
         <a
@@ -1006,24 +1005,22 @@ function buildVenuePopupHtml(
           target="_blank"
           rel="noopener noreferrer"
           title="Öppna i Google Maps"
-          style="flex:0 0 32px;height:32px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none"
+          class="popup-btn popup-btn-icon"
         ><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></a>
         <button
-          class="share-btn"
+          class="popup-btn popup-btn-primary share-btn"
           data-venue-id="${venue.id}"
           data-venue-name="${venue.name}"
-          style="flex:1;height:32px;border:none;border-radius:8px;background:#f59e0b;color:#fff;font-size:11px;font-weight:600;cursor:pointer"
         >&#128279; Dela</button>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+      <div class="popup-actions-row">
         <button
-          class="feedback-btn"
+          class="popup-btn-link feedback-btn"
           data-venue-id="${venue.id}"
-          style="border:none;background:none;color:#cbd5e1;font-size:10px;cursor:pointer;text-decoration:underline;text-underline-offset:2px;padding:0"
         >St&auml;mmer inte?</button>
         ${claimed
-          ? `<span style="font-size:9px;color:#86efac">&#10003; Verifierat st&auml;lle</span>`
-          : `<a href="mailto:johan.soderstrom.87@gmail.com?subject=${encodeURIComponent(`Soldryck – Claima: ${venue.name} (ID: ${venue.id})`)}&body=${encodeURIComponent(`Hej!\n\nJag är ägare till ${venue.name} och vill verifiera mitt ställe på Soldryck.\n\nNamn:\nTelefon:\nE-post till verksamheten:\nHemsida:\n\nVad jag vill lägga till:\n`)}" style="font-size:9px;color:#cbd5e1;text-decoration:none" title="Äger du detta ställe?">Äger du det h&auml;r?</a>`
+          ? `<span class="popup-verified-tag">&#10003; Verifierat st&auml;lle</span>`
+          : `<a href="mailto:johan.soderstrom.87@gmail.com?subject=${encodeURIComponent(`Soldryck – Claima: ${venue.name} (ID: ${venue.id})`)}&body=${encodeURIComponent(`Hej!\n\nJag är ägare till ${venue.name} och vill verifiera mitt ställe på Soldryck.\n\nNamn:\nTelefon:\nE-post till verksamheten:\nHemsida:\n\nVad jag vill lägga till:\n`)}" class="popup-claim-link" title="Äger du detta ställe?">Äger du det h&auml;r?</a>`
         }
       </div>
     </div>
@@ -1126,6 +1123,27 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         // Pre-fetch 4 extra tile columns/rows beyond the visible viewport so
         // they're already loaded when the user pans into that area.
         // Default is 2; 4–5 eliminates most blank-tile flashes on fast pans.
+        keepBuffer: 5,
+      }
+    ).addTo(map);
+
+    // Dark tileset, lives in its own pane (sits just above the regular tile
+    // pane) and starts invisible. The darkness effect below fades its opacity
+    // in/out as ambient darkness crosses 0.4 — true dark mode for evenings
+    // and overcast nights, instead of just dimming the light tiles. Skipping
+    // pre-load on phones with weak CPU would help but Carto tile fetch is
+    // cheap and the tiles are tiny.
+    const darkPane = map.createPane("darkTiles");
+    darkPane.style.zIndex = "201"; // tilePane=200, overlayPane=400
+    darkPane.style.opacity = "0";
+    darkPane.style.transition = "opacity 0.8s ease";
+    darkPane.style.pointerEvents = "none";
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      {
+        pane: "darkTiles",
+        maxZoom: 19,
+        updateWhenIdle: false,
         keepBuffer: 5,
       }
     ).addTo(map);
@@ -1608,8 +1626,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       // class in CSS, so flipping marker-shade <-> marker-sun on hour change
       // doesn't require resizing the Leaflet icon container.
       const ICON_SIZE = 18;
+      const rootClasses = `marker-root${venue.rooftop ? " marker-rooftop" : ""}`;
       const icon = L.divIcon({
-        className: "marker-root",
+        className: rootClasses,
         html: `<div class="marker-dot ${markerClass}"></div>${badgeHtml}`,
         iconSize: [ICON_SIZE, ICON_SIZE],
         iconAnchor: [ICON_SIZE / 2, ICON_SIZE / 2],
@@ -1957,13 +1976,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             <div style="background:${noticeBg};border:1px solid ${noticeBorder};border-radius:7px;padding:6px 9px;margin-top:8px;font-size:11px;color:${noticeColor}">
               ${noticeText}
             </div>
-            <div style="display:flex;gap:4px;margin-top:8px">
+            <div class="popup-actions">
               <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" title="Öppna i Google Maps"
-                style="flex:0 0 32px;padding:3px;border:1px solid #fca5a5;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none">
+                class="popup-btn popup-btn-icon">
                 ${mapsPinSvg}
               </a>
-              <button class="seating-btn" data-venue-id="${venue.id}"
-                style="flex:1;padding:3px 8px;border:1px solid #d1fae5;border-radius:6px;background:#ecfdf5;color:#065f46;font-size:10px;cursor:pointer;text-align:center;font-weight:500">
+              <button class="popup-btn popup-btn-seating seating-btn" data-venue-id="${venue.id}">
                 Vet du?
               </button>
             </div>
@@ -2262,11 +2280,21 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     const overlayPane = container.querySelector<HTMLElement>(".leaflet-overlay-pane");
     if (!tilePane || !overlayPane) return;
 
-    const brightness = Math.max(0.35, 1 - darkness * 0.9);
+    // Crossfade the dark CARTO tileset on top of the light one. Starts
+    // appearing at darkness 0.4, fully covers at 0.7. Above the crossfade
+    // we pull back the brightness filter on the light tiles (since the
+    // dark layer now defines the look) — otherwise the result is doubly
+    // darkened and looks like a power-cut.
+    const darkBlend = Math.max(0, Math.min(1, (darkness - 0.4) / 0.3));
+    const darkPane = mapRef.current?.getPane("darkTiles");
+    if (darkPane) darkPane.style.opacity = String(darkBlend);
+
+    const effectiveDarkness = darkness * (1 - darkBlend * 0.85);
+    const brightness = Math.max(0.35, 1 - effectiveDarkness * 0.9);
     const [r, , b] = ambientColor.split(",").map((n) => Number(n.trim()));
     const warmBias = (r - b) / 255;
-    const hueRotate = -warmBias * 12 * darkness;
-    const saturate = 1 - darkness * 0.25;
+    const hueRotate = -warmBias * 12 * effectiveDarkness;
+    const saturate = 1 - effectiveDarkness * 0.25;
 
     const tileFilter = `brightness(${brightness}) saturate(${saturate}) hue-rotate(${hueRotate}deg)`;
     tilePane.style.filter = tileFilter;
@@ -2381,12 +2409,28 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* Search button — round, top of right-side stack.
-          All three right-stack buttons pad against safe-area-inset-bottom so
-          they ride above the iPhone home indicator alongside the slider. */}
+      {/* Right-side button stack.
+          Single flex column anchored at bottom + right (safe-area aware).
+          Children stack visually: search (top) → find-sun → GPS (bottom).
+          Each row's left-side sibling (search input, find-sun toast, GPS
+          tooltip) is either an in-row flex sibling or absolutely positioned
+          inside the row's `position: relative` wrapper, so they extend left
+          without disturbing the stack's right-edge alignment. */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "calc(225px + var(--safe-bottom, 0px))",
+          right: "calc(12px + var(--safe-right, 0px))",
+          zIndex: 1001,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: 8,
+        }}
+      >
       <div
         ref={searchRef}
-        style={{ position: "absolute", bottom: "calc(329px + var(--safe-bottom, 0px))", right: "calc(12px + var(--safe-right, 0px))", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}
+        style={{ display: "flex", alignItems: "center", gap: 8 }}
       >
         {searchOpen && (
           <div style={{ position: "relative" }}>
@@ -2511,8 +2555,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         </button>
       </div>
 
-      {/* Hitta solen FAB — orange round button, middle of right-side stack */}
-      <div data-onboarding="locate-btn" style={{ position: "absolute", bottom: "calc(277px + var(--safe-bottom, 0px))", right: "calc(12px + var(--safe-right, 0px))", zIndex: 1001 }}>
+      {/* Hitta solen FAB — middle of right-side stack.
+          `position: relative` so the discovery pulse and result toast
+          (both `position: absolute`) anchor against this wrapper. */}
+      <div data-onboarding="locate-btn" style={{ position: "relative" }}>
         {/* First-time-discovery pulse — fires three rings on first map view
             then never again (localStorage flag). Sits behind the FAB and
             ignores pointer events, so the button still receives clicks. */}
@@ -2613,8 +2659,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         </button>
       </div>
 
-      {/* GPS locate button — bottom-right above time slider */}
-      <div data-onboarding="locate-btn" style={{ position: "absolute", bottom: "calc(225px + var(--safe-bottom, 0px))", right: "calc(12px + var(--safe-right, 0px))", zIndex: 1001, display: "flex", alignItems: "center", gap: 8 }}>
+      {/* GPS locate button — bottom of right-side stack.
+          Row layout so the GPS-hint tooltip sits to the LEFT of the button. */}
+      <div data-onboarding="locate-btn" style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {/* Tooltip — fades in then out, only when idle */}
         {showTooltip && geoState === "idle" && (
           <div style={{
@@ -2662,6 +2709,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           )}
         </button>
       </div>
+      </div>{/* /right-side button stack */}
 
       {/* "Hämtar öppettider..." — small status pill while the open-now
           fetcher loop is in flight, so users know markers are still
