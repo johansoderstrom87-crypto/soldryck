@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { getFavorites, saveFavorites } from "../lib/favorites";
 import { subscribeToPush, unsubscribeFromPush, getPushStatus } from "../lib/push";
 import WeeklyPlanner from "./WeeklyPlanner";
+import SyncFavoritesModal from "./SyncFavoritesModal";
 
 type HoursResult = { openNow: boolean | null; closesAt: string | null } | null;
+type TrendingItem = { id: string; name: string; lat: number; lng: number; type: string; rooftop?: boolean; count: number };
 
 interface FavoritesPanelProps {
   venues: { id: string; name: string; type: string; address: string; lat: number; lng: number }[];
@@ -29,11 +31,13 @@ function sunStyle(raw: string | undefined) {
 export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey, embedded }: FavoritesPanelProps) {
   const [open, setOpen] = useState(false);
   const [plannerOpen, setPlannerOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [hoursMap, setHoursMap] = useState<Map<string, HoursResult | "loading">>(new Map());
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const [trending, setTrending] = useState<TrendingItem[]>([]);
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
 
@@ -52,6 +56,16 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // Fetch the 24 h trending list when the panel opens. Cached server-side
+  // for 1 min, so cheap to refetch. Silent if the request fails.
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/trending")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => setTrending(d?.trending ?? []))
+      .catch(() => setTrending([]));
   }, [open]);
 
   // Fetch opening hours when panel opens
@@ -97,6 +111,9 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
     <div ref={ref} className="relative">
       <button
         ref={btnRef}
+        aria-label={`Favoriter${favIds.size > 0 ? ` (${favIds.size} sparade)` : ""}`}
+        aria-expanded={open}
+        aria-haspopup="menu"
         onClick={() => {
           if (embedded && btnRef.current) {
             const r = btnRef.current.getBoundingClientRect();
@@ -165,6 +182,40 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
             isolation: "isolate",
           }}
         >
+          {/* Trending section — top of dropdown, only when we have data
+              and the user hasn't already opened the panel from a sun-empty
+              state. Charm before utility. */}
+          {trending.length > 0 && (
+            <>
+              <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide px-1 mb-1.5 flex items-center gap-1.5">
+                <span aria-hidden>🔥</span>
+                <span>Trending senaste dygnet</span>
+              </div>
+              <div className="flex flex-col gap-0.5 mb-2">
+                {trending.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { onSelectVenue(t.id); setOpen(false); }}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-white/60 transition-colors"
+                  >
+                    <span
+                      className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: "linear-gradient(135deg, #fb923c, #f59e0b)", fontSize: 10, color: "#fff", fontWeight: 800 }}
+                      aria-hidden
+                    >
+                      {trending.indexOf(t) + 1}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-700 truncate flex-1">{t.name}</span>
+                    {t.rooftop && (
+                      <span className="text-[9px] text-purple-600 font-bold flex-shrink-0">↑ Takbar</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="border-t border-slate-200 my-1.5" />
+            </>
+          )}
+
           <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide px-1 mb-1.5">
             Mina favoriter ({favIds.size})
           </div>
@@ -239,6 +290,7 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
                       onClick={(e) => { e.stopPropagation(); removeFavorite(v.id); }}
                       className="flex-shrink-0 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-sm leading-none pt-0.5"
                       title="Ta bort"
+                      aria-label={`Ta bort ${v.name} från favoriter`}
                     >
                       &times;
                     </button>
@@ -262,6 +314,16 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
                   <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
                 <span className="flex-1">Veckoplan — när är det sol?</span>
+              </button>
+              <button
+                onClick={() => { setOpen(false); setSyncOpen(true); }}
+                className="w-full text-left px-2 py-1.5 rounded-lg text-xs flex items-center gap-2 text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12a9 9 0 1 1-9-9" />
+                  <polyline points="21 4 21 12 13 12" />
+                </svg>
+                <span className="flex-1">Synka till andra enheter</span>
               </button>
               <button
                 onClick={handleTogglePush}
@@ -291,6 +353,8 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
           onSelectVenue={(id) => { onSelectVenue(id); setPlannerOpen(false); }}
         />
       )}
+
+      {syncOpen && <SyncFavoritesModal onClose={() => setSyncOpen(false)} />}
     </div>
   );
 }

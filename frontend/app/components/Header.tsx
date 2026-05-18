@@ -56,6 +56,8 @@ interface HeaderProps {
   onToggleShadows: () => void;
   showMetro: boolean;
   onToggleMetro: () => void;
+  showRain: boolean;
+  onToggleRain: () => void;
   metroStation: MetroStation | null;
   onMetroStationChange: (station: MetroStation | null) => void;
   servingFilter: boolean;
@@ -79,6 +81,7 @@ const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: str
 function SettingsButton({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
   metroStation, onMetroStationChange, showShadows, onToggleShadows, showMetro, onToggleMetro,
+  showRain, onToggleRain,
   servingFilter, onServingFilterChange, embedded,
 }: {
   filter: "all" | "sun" | "shade";
@@ -93,6 +96,8 @@ function SettingsButton({
   onToggleShadows: () => void;
   showMetro: boolean;
   onToggleMetro: () => void;
+  showRain: boolean;
+  onToggleRain: () => void;
   servingFilter: boolean;
   onServingFilterChange: (v: boolean) => void;
   embedded?: boolean;
@@ -134,6 +139,16 @@ function SettingsButton({
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
+  // Escape closes the suggestion modal (unless we're mid-send).
+  useEffect(() => {
+    if (!suggestionOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && suggestionState !== "sending") setSuggestionOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [suggestionOpen, suggestionState]);
+
   const handleInstall = async () => {
     if (!installPrompt) return;
     installPrompt.prompt();
@@ -172,6 +187,9 @@ function SettingsButton({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
+        aria-label={open ? "Stäng inställningar" : `Inställningar och filter${activeCount > 0 ? ` (${activeCount} aktiva)` : ""}`}
+        aria-expanded={open}
+        aria-haspopup="menu"
         className={embedded
           ? "rounded-xl flex items-center justify-center transition-all text-slate-700 relative hover:bg-white/40"
           : "rounded-xl flex items-center justify-center transition-all text-slate-700 relative"}
@@ -233,6 +251,8 @@ function SettingsButton({
               <button
                 key={o.value}
                 onClick={() => onFilterChange(o.value)}
+                aria-pressed={filter === o.value}
+                aria-label={`Visa ${o.label.toLowerCase()}`}
                 className={`px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center gap-1.5 transition-all ${
                   filter === o.value ? o.activeClass : "text-slate-500 hover:bg-slate-100"
                 }`}
@@ -248,6 +268,8 @@ function SettingsButton({
           {/* Shadows toggle */}
           <button
             onClick={() => { onToggleShadows(); }}
+            aria-pressed={showShadows}
+            aria-label={showShadows ? "Dölj skuggor på kartan" : "Visa skuggor på kartan"}
             className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
               showShadows ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
             }`}
@@ -264,9 +286,34 @@ function SettingsButton({
             </span>
           </button>
 
+          {/* Regnradar toggle */}
+          <button
+            onClick={() => { onToggleRain(); }}
+            aria-pressed={showRain}
+            aria-label={showRain ? "Dölj regnradar" : "Visa regnradar"}
+            className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
+              showRain ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9" />
+                <line x1="8" y1="19" x2="8" y2="21" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+                <line x1="16" y1="19" x2="16" y2="21" />
+              </svg>
+              Regnradar
+            </span>
+            <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${showRain ? "bg-white/30" : "bg-slate-200"}`}>
+              <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${showRain ? "translate-x-3" : "translate-x-0"}`} />
+            </span>
+          </button>
+
           {/* Tunnelbana toggle */}
           <button
             onClick={() => { onToggleMetro(); }}
+            aria-pressed={showMetro}
+            aria-label={showMetro ? "Dölj tunnelbanenät" : "Visa tunnelbanenät"}
             className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
               showMetro ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
             }`}
@@ -441,6 +488,9 @@ function SettingsButton({
 
       {suggestionOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Kom med förslag"
           className="fixed inset-0 z-[3000] flex items-center justify-center p-4"
           style={{ background: "rgba(15,23,42,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
           onClick={() => { if (suggestionState !== "sending") setSuggestionOpen(false); }}
@@ -496,7 +546,7 @@ function SettingsButton({
 
 export default function Header({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
-  showShadows, onToggleShadows, showMetro, onToggleMetro,
+  showShadows, onToggleShadows, showMetro, onToggleMetro, showRain, onToggleRain,
   metroStation, onMetroStationChange, servingFilter, onServingFilterChange,
   openNowFilter, onOpenNowFilterChange,
   venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey,
@@ -547,6 +597,8 @@ export default function Header({
             onToggleShadows={onToggleShadows}
             showMetro={showMetro}
             onToggleMetro={onToggleMetro}
+            showRain={showRain}
+            onToggleRain={onToggleRain}
             servingFilter={servingFilter}
             onServingFilterChange={onServingFilterChange}
             embedded
@@ -590,6 +642,8 @@ export default function Header({
                     key={type}
                     onClick={() => toggleType(type)}
                     title={label}
+                    aria-label={`Filter ${label}`}
+                    aria-pressed={typeFilter.has(type)}
                     className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
                     style={{
                       width: 40,
@@ -613,7 +667,7 @@ export default function Header({
                     }}
                   >
                     <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#0f172a" : "rgba(0,0,0,0.65)" }}>
                       {label === "Bar & Pub" ? "Bar" : label}
                     </span>
                   </button>
@@ -624,6 +678,8 @@ export default function Header({
             <button
               onClick={() => onServingFilterChange(!servingFilter)}
               title="Tillstånd"
+              aria-label="Filter Tillstånd — bara serveringsställen"
+              aria-pressed={servingFilter}
               className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
               style={{
                 width: 40,
@@ -651,7 +707,7 @@ export default function Header({
                 <path d="M3 11h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9z"/>
                 <path d="M3 8a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3H3V8z"/>
               </svg>
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: servingFilter ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: servingFilter ? "#0f172a" : "rgba(0,0,0,0.65)" }}>
                 Tillstånd
               </span>
             </button>
@@ -661,6 +717,8 @@ export default function Header({
             <button
               onClick={() => onOpenNowFilterChange(!openNowFilter)}
               title="Öppet just nu"
+              aria-label="Filter Öppet just nu"
+              aria-pressed={openNowFilter}
               className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
               style={{
                 width: 40,
@@ -687,7 +745,7 @@ export default function Header({
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7v5l3 2" />
               </svg>
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: openNowFilter ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: openNowFilter ? "#0f172a" : "rgba(0,0,0,0.65)" }}>
                 Öppet
               </span>
             </button>
@@ -697,6 +755,8 @@ export default function Header({
           <button
             onClick={() => setFiltersOpen((v) => !v)}
             title={filtersOpen ? "Dölj filter" : "Visa filter"}
+            aria-label={filtersOpen ? "Dölj filterraden" : "Visa filterraden"}
+            aria-expanded={filtersOpen}
             style={{
               background: "rgba(255,255,255,0.28)",
               backdropFilter: "blur(14px) saturate(1.3)",

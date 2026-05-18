@@ -58,6 +58,24 @@ export async function ensurePushTable() {
   `);
 }
 
+export async function ensureFavoriteSyncsTable() {
+  const p = getPool();
+  if (!p) return;
+  // Anonymous favorite sync — a short code maps to a list of venue IDs.
+  // No user ID, no IP stored. Codes are intentionally short (6 chars from
+  // an unambiguous alphabet) so users can type them on another device.
+  // last_seen_at is bumped on every GET so we can prune stale codes later.
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS favorite_syncs (
+      code TEXT PRIMARY KEY,
+      favorite_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
 export async function ensureEventsTable() {
   const p = getPool();
   if (!p) return;

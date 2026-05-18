@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useMemo, useDeferredValue, useState } from "react";
 import AreaSearchPanel from "./AreaSearchPanel";
+import SunCompass from "./SunCompass";
 import L from "leaflet";
 
 // Helpers come from the venues-computed module (always present, even before
@@ -347,6 +348,7 @@ interface SunMapProps {
   metroStation?: MetroStation | null;
   servingFilter?: boolean;
   openNowFilter?: boolean;
+  showRain?: boolean;
 }
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
@@ -368,6 +370,26 @@ function statusToLabel(s: NormalizedStatus): string {
 
 function statusToEmoji(s: NormalizedStatus): string {
   return { sun: "\u2600\uFE0F", partial: "\u26C5", shade: "\uD83C\uDF25\uFE0F", night: "\uD83C\uDF19" }[s];
+}
+
+/**
+ * Sun confidence \u2014 combines the shadow ray-cast result with live SMHI weather
+ * so users can compare two venues that both "have sun" but one is under
+ * incoming clouds. Higher = more likely you'll actually feel sun on your face.
+ * 100 = clear sky + sun lit by ray-cast. 0 = shade or rain.
+ */
+function sunConfidence(status: NormalizedStatus, symbolCode: number | undefined): number {
+  let pct = status === "sun" ? 100 : status === "partial" ? 50 : 0;
+  if (symbolCode === undefined) return pct;
+  if (symbolCode <= 2) pct -= 0;                                    // klart
+  else if (symbolCode <= 4) pct -= 15;                              // halv-klart
+  else if (symbolCode === 5 || symbolCode === 6) pct -= 40;         // mulet
+  else if (symbolCode === 7) pct -= 30;                             // dimma
+  else if (symbolCode === 11 || symbolCode === 21) pct -= 100;      // \u00E5ska
+  else if ((symbolCode >= 8 && symbolCode <= 10) ||
+           (symbolCode >= 18 && symbolCode <= 20)) pct -= 90;       // regn
+  else pct -= 50;                                                   // sn\u00F6/sn\u00F6blandat
+  return Math.max(0, Math.min(100, pct));
 }
 
 function typeToLabel(type: string): string {
@@ -973,12 +995,30 @@ function buildVenuePopupHtml(
       </span>`
     : "";
 
+  // Sun confidence — shadow ray-cast × weather. Hidden when 0 (shade/night)
+  // because all-grey markers are already visually clear about that.
+  const wSymbol = weather?.hourly[hour]?.symbolCode;
+  const conf = sunConfidence(status, wSymbol);
+  const confHtml = conf > 0
+    ? (() => {
+        const tier = conf >= 80 ? { bg: "#dcfce7", fg: "#14532d" }
+                  : conf >= 50 ? { bg: "#fef3c7", fg: "#92400e" }
+                  :              { bg: "#f1f5f9", fg: "#475569" };
+        return `<span title="Sannolikheten att du faktiskt känner sol — kombinerar skugg-beräkningen med vädret" style="display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:1px 6px;background:${tier.bg};border-radius:999px;color:${tier.fg};font-size:10px;font-weight:700">
+          ${conf}% sol
+        </span>`;
+      })()
+    : "";
+
   const cachedPhoto = venuePhotoCache.get(venue.id);
   const photoContainerHtml = cachedPhoto === null
     ? ""
     : `<div id="venue-photo-${venue.id}" style="margin:-12px -16px 10px -16px;height:140px;background:linear-gradient(180deg,#f1f5f9,#e2e8f0);border-radius:12px 12px 0 0;overflow:hidden">${cachedPhoto ? `<img src="${cachedPhoto}" alt="${venue.name}" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" />` : ""}</div>`;
 
-  const mapUrl = `https://www.google.com/maps/place/${encodeURIComponent(venue.name)}/@${venue.lat},${venue.lng},17z`;
+  // Walking directions deep-link — Google Maps uses the user's current
+  // location as origin by default. Most clicks come from people on the
+  // ground who actually want to walk there, not browse the venue listing.
+  const mapUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}&destination_place_id=&travelmode=walking`;
 
   return `
     <div style="min-width:260px">
@@ -987,7 +1027,7 @@ function buildVenuePopupHtml(
         <strong style="font-size:17px;line-height:1.2;flex:1;margin-right:6px">${venue.name}</strong>
         <span style="font-size:20px;flex-shrink:0">${statusToEmoji(status)}</span>
       </div>
-      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}${walkHtml}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}${confHtml}${walkHtml}</div>
       <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
       <div style="background:rgba(255,255,255,0.55);border-radius:8px;padding:5px 6px;margin-top:8px;border:0.5px solid rgba(255,255,255,0.7)">
         <div style="display:flex;gap:2px">${shadowTimeline}</div>
@@ -1031,7 +1071,7 @@ function buildVenuePopupHtml(
   `;
 }
 
-export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, focusVenueId, onFocusHandled, metroStation, servingFilter, openNowFilter = false }: SunMapProps) {
+export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, showRain = false, focusVenueId, onFocusHandled, metroStation, servingFilter, openNowFilter = false }: SunMapProps) {
   // Defer expensive map rebuild while the user is actively scrubbing the timeline
   const hour = useDeferredValue(hourProp);
 
@@ -1662,7 +1702,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       );
 
       marker.on("popupopen", () => {
-        track("popup_opened", { type: venue.type, rooftop: !!venue.rooftop });
+        // Include venue.id so /api/trending can roll up by venue. Type+rooftop
+        // stay for type-level analytics; the id is anonymous (just a public
+        // OSM/Google identifier, nothing about the user).
+        track("popup_opened", { id: String(venue.id), type: venue.type, rooftop: !!venue.rooftop });
         // Favorite button
         const favBtn = document.querySelector(`.fav-btn[data-venue-id="${venue.id}"]`);
         if (favBtn) {
@@ -1973,7 +2016,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           ? "Enligt Google: <b>ingen uteservering</b>"
           : "Ingen bekr&auml;ftad uteservering";
 
-        const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(venue.name)}/@${venue.lat},${venue.lng},17z`;
+        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}&travelmode=walking`;
         const mapsPinSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg>`;
 
         const popup = L.popup({
@@ -2038,6 +2081,58 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       unconfirmedMarkersRef.current = [];
     };
   }, [metroStation, typeFilter, servingFilter]);
+
+  // Rain radar overlay — RainViewer's free public tile service. We refresh
+  // the metadata every 5 min (their frames update every 10 min). No API key,
+  // attribution shown via map credits. Toggled via the Regnradar-switch in
+  // settings dropdown.
+  useEffect(() => {
+    if (!showRain) return;
+
+    let rainLayer: L.TileLayer | null = null;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    async function refresh() {
+      if (cancelled) return;
+      const m = mapRef.current;
+      if (!m) return;
+      try {
+        const res = await fetch("https://api.rainviewer.com/public/weather-maps.json");
+        if (!res.ok) return;
+        const data = await res.json();
+        const frames = (data?.radar?.past ?? []) as Array<{ path: string; time: number }>;
+        const latest = frames[frames.length - 1];
+        if (!latest || cancelled) return;
+        const host = data.host as string | undefined;
+        if (!host) return;
+        const next = L.tileLayer(
+          `${host}${latest.path}/256/{z}/{x}/{y}/2/1_1.png`,
+          {
+            opacity: 0.55,
+            maxZoom: 19,
+            attribution: '<a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a>',
+          },
+        ).addTo(m);
+        // Cross-fade: add the new layer, then remove the old after one frame.
+        if (rainLayer) {
+          const old = rainLayer;
+          setTimeout(() => old.remove(), 100);
+        }
+        rainLayer = next;
+      } catch { /* silently ignore — radar is non-critical */ }
+
+      timer = setTimeout(refresh, 5 * 60 * 1000);
+    }
+
+    refresh();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      if (rainLayer) rainLayer.remove();
+    };
+  }, [showRain]);
 
   // Shadow overlay layer
   useEffect(() => {
@@ -2548,6 +2643,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             else setSearchOpen(true);
           }}
           title={searchOpen ? "Stäng sök" : "Sök ställe"}
+          aria-label={searchOpen ? "Stäng sökning" : "Sök ställe"}
+          aria-expanded={searchOpen}
           style={{
             ...glassStyle,
             width: 44,
@@ -2634,6 +2731,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             findSunState === "error" ? (findSunMsg ?? "Kunde inte hämta position") :
             "Hitta närmaste uteservering med sol"
           }
+          aria-label={
+            findSunState === "locating" ? "Letar efter närmaste sol…" :
+            "Hitta närmaste uteservering med sol"
+          }
+          aria-busy={findSunState === "locating"}
           style={{
             width: 44,
             height: 44,
@@ -2702,6 +2804,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         <button
           onClick={() => { setShowTooltip(false); handleLocate(); }}
           title={geoState === "located" ? "Dölj min position" : "Visa min position"}
+          aria-label={geoState === "located" ? "Dölj min position på kartan" : "Visa min position på kartan"}
+          aria-pressed={geoState === "located"}
+          aria-busy={geoState === "locating"}
           style={{
             ...glassStyle,
             width: 44,
@@ -2803,6 +2908,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           getSunHours={getSunHrs}
         />
       )}
+
+      <SunCompass hour={hourProp} date={date} />
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }

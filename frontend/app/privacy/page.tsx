@@ -77,11 +77,25 @@ export default function PrivacyPage() {
         <p>För att appen ska kännas snabb och kommer-ihåg lagrar vi följande lokalt i din webbläsare:</p>
         <ul>
           <li><strong>Favoriter</strong> — lista över venue-ID:n du sparat.</li>
+          <li><strong>Sync-kod</strong> — om du valt att synka favoriter till andra enheter (6-tecken-kod).</li>
           <li><strong>Väder-cache</strong> — senaste SMHI-prognosen, max 30 min gammal.</li>
           <li><strong>Onboarding-flag</strong> — så vi inte visar välkomstturen varje gång.</li>
         </ul>
         <p>
           Inget av detta lämnar din enhet. Rensar du webbplatsdata försvinner allt.
+        </p>
+      </Section>
+
+      <Section title="Synka favoriter mellan enheter">
+        <p>
+          Om du använder &quot;Synka till andra enheter&quot; skapar vi en{" "}
+          <strong>anonym 6-teckens-kod</strong> som mappar till en lista över
+          venue-id:n du sparat. Inget om vem du är — bara koden och listan.
+        </p>
+        <p>
+          Vem som helst som har koden kan läsa eller skriva över listan. Behandla
+          den som ett lösenord — dela bara med enheter du litar på. Du kan generera
+          en ny när som helst i favorit-panelen.
         </p>
       </Section>
 

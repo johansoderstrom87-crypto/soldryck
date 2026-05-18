@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface FeedbackModalProps {
   venue: {
@@ -44,6 +44,16 @@ export default function FeedbackModal({ venue, onClose }: FeedbackModalProps) {
   const isSeating = venue.mode === "seating";
   const hasInput = isSeating ? comment.trim().length > 0 : Object.values(schedule).some((v) => v !== null);
 
+  // Escape closes the modal (unless we're mid-send — abandoning a half-sent
+  // request would leave the user wondering if it landed).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !sending) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose, sending]);
+
   const submit = async () => {
     if (!hasInput) return;
     setSending(true);
@@ -74,6 +84,9 @@ export default function FeedbackModal({ venue, onClose }: FeedbackModalProps) {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={isSeating ? "Bekräfta uteservering" : "Rapportera solförhållanden"}
       className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center"
       onClick={onClose}
     >
@@ -111,6 +124,7 @@ export default function FeedbackModal({ venue, onClose }: FeedbackModalProps) {
               </div>
               <button
                 onClick={onClose}
+                aria-label="Stäng"
                 className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200"
               >
                 &#x2715;

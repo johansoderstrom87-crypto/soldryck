@@ -84,6 +84,7 @@ function Calendar({ value, onSelect, onClose }: CalendarProps) {
       <div className="flex items-center justify-between mb-2 px-1">
         <button
           onClick={prevMonth}
+          aria-label="Föregående månad"
           style={{
             width: 28, height: 28, borderRadius: 8,
             background: "rgba(255,255,255,0.75)",
@@ -97,6 +98,7 @@ function Calendar({ value, onSelect, onClose }: CalendarProps) {
         </span>
         <button
           onClick={nextMonth}
+          aria-label="Nästa månad"
           style={{
             width: 28, height: 28, borderRadius: 8,
             background: "rgba(255,255,255,0.75)",
@@ -342,6 +344,8 @@ export default function TimeSlider({
             }
           }}
           title={rangeMode ? "Visa enstaka timme" : "Filtrera på soltimmar"}
+          aria-label={rangeMode ? "Stäng tidsintervall, visa enstaka timme" : "Aktivera tidsintervall för soltimmar"}
+          aria-pressed={rangeMode}
           className="pointer-events-auto flex-shrink-0 rounded-xl flex items-center justify-center transition-all"
           style={{
             width: 36,
@@ -395,9 +399,9 @@ export default function TimeSlider({
                 lineHeight: 1,
                 transform: `scale(${isSelected ? 1.8 : 1})`,
                 transformOrigin: "bottom center",
-                opacity: past ? 0.38 : 1,
+                opacity: past ? 0.55 : 1,
                 filter: past
-                  ? "grayscale(0.9) drop-shadow(0 1px 3px rgba(0,0,0,0.35))"
+                  ? "grayscale(0.8) drop-shadow(0 1px 3px rgba(0,0,0,0.35))"
                   : isSelected
                   ? "drop-shadow(0 2px 8px rgba(0,0,0,0.55)) drop-shadow(0 0 12px rgba(255,200,50,0.55))"
                   : "drop-shadow(0 0 4px rgba(255,255,255,0.9)) drop-shadow(0 2px 6px rgba(0,0,0,0.6))",
@@ -472,7 +476,7 @@ export default function TimeSlider({
                     transform: "translate(-50%, -50%)",
                     fontSize: 10,
                     fontWeight: 700,
-                    color: past ? "rgba(0,0,0,0.38)" : "rgba(0,0,0,0.85)",
+                    color: past ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.85)",
                     opacity: hidden ? 0 : 1,
                     transition: "opacity 0.15s ease-out, color 0.2s",
                   }}

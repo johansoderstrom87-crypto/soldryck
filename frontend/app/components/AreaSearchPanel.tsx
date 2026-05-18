@@ -164,7 +164,7 @@ function VenueCard({
 
   const DAYS = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
   const todayMon0 = (new Date().getDay() + 6) % 7;
-  const mapUrl = `https://www.google.com/maps/place/${encodeURIComponent(venue.name)}/@${venue.lat},${venue.lng},17z`;
+  const mapUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}&travelmode=walking`;
 
   return (
     <div style={{
