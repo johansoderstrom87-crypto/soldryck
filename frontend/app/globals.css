@@ -18,6 +18,15 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+  /* Prevent iOS Safari rubber-band scroll — when the user pans the Leaflet
+     map all the way to an edge, the whole document used to bounce, which
+     made every absolute-positioned UI element (header, slider, buttons)
+     look like it was sliding around. `overscroll-behavior: none` kills the
+     bounce so absolute children stay rock-steady. */
+  overscroll-behavior: none;
+}
+html {
+  overscroll-behavior: none;
 }
 
 /* viewportFit=cover means the app paints under the iPhone notch and home

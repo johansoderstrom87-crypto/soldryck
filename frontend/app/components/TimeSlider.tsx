@@ -320,7 +320,7 @@ export default function TimeSlider({
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-[1250] pointer-events-none"
+      className="absolute bottom-0 left-0 right-0 z-[1250] pointer-events-none"
       style={{
         fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
         // Pad against iPhone home indicator + landscape notch — viewportFit=cover

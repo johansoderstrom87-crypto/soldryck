@@ -2613,7 +2613,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           without disturbing the stack's right-edge alignment. */}
       <div
         style={{
-          position: "fixed",
+          position: "absolute",
           bottom: "calc(225px + var(--safe-bottom, 0px))",
           right: "calc(12px + var(--safe-right, 0px))",
           zIndex: 1001,
@@ -2921,7 +2921,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           updating rather than thinking the filter is broken. */}
       {openNowFilter && openNowFetching > 0 && (
         <div style={{
-          position: "fixed",
+          position: "absolute",
           top: "calc(160px + var(--safe-top, 0px))",
           left: "50%",
           transform: "translateX(-50%)",
@@ -2949,7 +2949,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       {/* "Sök i detta område" — appears below category filters after first pan (Google Maps pattern) */}
       {showSearchInArea && !areaSearchOpen && (
         <div style={{
-          position: "fixed", top: "calc(148px + var(--safe-top, 0px))", left: "50%",
+          position: "absolute", top: "calc(148px + var(--safe-top, 0px))", left: "50%",
           transform: "translateX(-50%)", zIndex: 1090, pointerEvents: "auto",
         }}>
           <button

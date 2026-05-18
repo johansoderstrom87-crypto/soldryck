@@ -610,7 +610,7 @@ export default function Header({
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[1100] pointer-events-none">
+    <div className="absolute top-0 left-0 right-0 z-[1100] pointer-events-none">
       {/* Centered top stack — wide card + filter row.
           Pushed down by safe-area-inset-top so the card hangs below the
           iPhone notch instead of behind it (statusBarStyle=black-translucent
