@@ -106,6 +106,10 @@ def elements_to_geojson(elements: list) -> dict:
                     "addr_housenumber": tags.get("addr:housenumber", ""),
                     "level": tags.get("level", ""),
                     "outdoor_seating": tags.get("outdoor_seating", ""),
+                    # Wheelchair accessibility — OSM lets values be "yes",
+                    # "no", "limited", or "designated". Used by frontend
+                    # filter (#42) — empty when unknown.
+                    "wheelchair": tags.get("wheelchair", ""),
                 },
             }
         )

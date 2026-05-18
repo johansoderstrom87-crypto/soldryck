@@ -239,6 +239,36 @@ html, body {
   color: #7c3aed;
 }
 
+/* Happy-hour active — venues with a claimed happyHour that's running RIGHT
+   NOW at the user's selected hour get a magenta halo, distinct from the
+   amber sun glow and the violet rooftop ring. Helps users spot verified
+   spots offering discounts at the time they're scrubbing to. */
+.marker-happyhour-active .marker-dot {
+  box-shadow:
+    0 0 0 2px rgba(236, 72, 153, 0.6),
+    0 1px 3px rgba(0, 0, 0, 0.18);
+}
+.show-badges .marker-happyhour-active .marker-dot {
+  box-shadow:
+    0 0 0 2px rgba(236, 72, 153, 0.75),
+    0 0 14px rgba(236, 72, 153, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.15);
+}
+/* Rooftop + happy-hour combo — blend toward a pink-violet so both states read. */
+.marker-rooftop.marker-happyhour-active .marker-dot {
+  box-shadow:
+    0 0 0 2px rgba(196, 90, 200, 0.78),
+    0 0 14px rgba(196, 90, 200, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.marker-happyhour-active .marker-badge {
+  border-color: rgba(236, 72, 153, 0.45);
+}
+.marker-happyhour-active .marker-badge-icon {
+  background: rgba(236, 72, 153, 0.12);
+  color: #be185d;
+}
+
 /* Unconfirmed venues: hidden until zoom >= 17 */
 .marker-unconfirmed { display: none !important; }
 .show-badges .marker-unconfirmed { display: block !important; }
@@ -703,13 +733,48 @@ html, body {
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
 }
 .popup-btn-link:hover { color: #64748b; }
+/* Owner CTA — used to be tiny grey text. Now a small amber pill with an
+   icon, distinct enough to actually catch an owner's eye while still small
+   enough not to compete with the main action buttons. */
 .popup-claim-link {
-  font-size: 9px;
-  color: #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #b45309;
+  text-decoration: none;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 2px 8px 2px 6px;
+  border-radius: var(--r-full);
+  font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
+  transition: background 0.12s ease;
+}
+.popup-claim-link:hover { background: rgba(245, 158, 11, 0.18); }
+
+/* "Boka bord"-link — slim row between action buttons and the small footer
+   links. Calendar-ikon + text, fills the popup width so it reads as a
+   distinct call-to-action without competing with the main 3-button row. */
+.popup-book {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 0.5px solid rgba(15, 23, 42, 0.08);
+  border-radius: var(--r-sm);
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
   text-decoration: none;
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
+  transition: background 0.12s ease, color 0.12s ease;
 }
-.popup-claim-link:hover { color: #64748b; }
+.popup-book:hover {
+  background: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+}
 .popup-verified-tag {
   font-size: 9px;
   color: #16a34a;

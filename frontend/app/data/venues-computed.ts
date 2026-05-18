@@ -25,6 +25,11 @@ export interface ComputedVenue {
   servesAlcohol?: boolean;
   rating?: number;
   ratingCount?: number;
+  /** Google Places price-level: 1 ($) – 4 ($$$$). Populated by pipeline
+   *  step 07 — older JSON exports may omit it. */
+  priceLevel?: number;
+  /** OSM wheelchair tag: "yes" | "no" | "limited". */
+  wheelchair?: string;
   /** schedule[MM-DD][hour] = SunStatus */
   schedule: Record<string, Record<string, SunStatus>>;
 }

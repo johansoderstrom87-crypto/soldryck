@@ -58,6 +58,8 @@ interface HeaderProps {
   onToggleMetro: () => void;
   showRain: boolean;
   onToggleRain: () => void;
+  wheelchairOnly: boolean;
+  onWheelchairOnlyChange: (v: boolean) => void;
   metroStation: MetroStation | null;
   onMetroStationChange: (station: MetroStation | null) => void;
   servingFilter: boolean;
@@ -82,6 +84,7 @@ function SettingsButton({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
   metroStation, onMetroStationChange, showShadows, onToggleShadows, showMetro, onToggleMetro,
   showRain, onToggleRain,
+  wheelchairOnly, onWheelchairOnlyChange,
   servingFilter, onServingFilterChange, embedded,
 }: {
   filter: "all" | "sun" | "shade";
@@ -98,6 +101,8 @@ function SettingsButton({
   onToggleMetro: () => void;
   showRain: boolean;
   onToggleRain: () => void;
+  wheelchairOnly: boolean;
+  onWheelchairOnlyChange: (v: boolean) => void;
   servingFilter: boolean;
   onServingFilterChange: (v: boolean) => void;
   embedded?: boolean;
@@ -181,6 +186,8 @@ function SettingsButton({
     (metroStation ? 1 : 0) +
     (showShadows ? 1 : 0) +
     (showMetro ? 1 : 0) +
+    (showRain ? 1 : 0) +
+    (wheelchairOnly ? 1 : 0) +
     (servingFilter ? 1 : 0);
 
   return (
@@ -306,6 +313,34 @@ function SettingsButton({
             </span>
             <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${showRain ? "bg-white/30" : "bg-slate-200"}`}>
               <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${showRain ? "translate-x-3" : "translate-x-0"}`} />
+            </span>
+          </button>
+
+          {/* Wheelchair-only toggle.
+              Filters to venues tagged wheelchair=yes in OSM. Data fills in
+              after the pipeline regenerates with #42 — until then the
+              filter just hides everything, which is the correct behaviour
+              for accessibility tools (false positives are worse than no
+              results). */}
+          <button
+            onClick={() => onWheelchairOnlyChange(!wheelchairOnly)}
+            aria-pressed={wheelchairOnly}
+            aria-label={wheelchairOnly ? "Visa alla ställen" : "Visa bara tillgängliga ställen"}
+            className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
+              wheelchairOnly ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="4" r="2" />
+                <path d="M12 7v8l4 3" />
+                <path d="M10 11l-3 1" />
+                <circle cx="14" cy="18" r="4" />
+              </svg>
+              Tillgängligt
+            </span>
+            <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${wheelchairOnly ? "bg-white/30" : "bg-slate-200"}`}>
+              <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${wheelchairOnly ? "translate-x-3" : "translate-x-0"}`} />
             </span>
           </button>
 
@@ -455,6 +490,20 @@ function SettingsButton({
             Kom med förslag
           </button>
 
+          {/* För-ägare-länk — surfaces the /for-restaurants landing for
+              owners who arrive via word of mouth instead of clicking
+              "Äger du det här?" in a popup. */}
+          <a
+            href="/for-restaurants"
+            className="w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center gap-1.5 text-slate-600 hover:bg-slate-100 transition-all no-underline"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            För ägare
+          </a>
+
           {/* Privacy link */}
           <a
             href="/privacy"
@@ -547,6 +596,7 @@ function SettingsButton({
 export default function Header({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
   showShadows, onToggleShadows, showMetro, onToggleMetro, showRain, onToggleRain,
+  wheelchairOnly, onWheelchairOnlyChange,
   metroStation, onMetroStationChange, servingFilter, onServingFilterChange,
   openNowFilter, onOpenNowFilterChange,
   venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey,
@@ -599,6 +649,8 @@ export default function Header({
             onToggleMetro={onToggleMetro}
             showRain={showRain}
             onToggleRain={onToggleRain}
+            wheelchairOnly={wheelchairOnly}
+            onWheelchairOnlyChange={onWheelchairOnlyChange}
             servingFilter={servingFilter}
             onServingFilterChange={onServingFilterChange}
             embedded

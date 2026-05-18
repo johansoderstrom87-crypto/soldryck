@@ -33,6 +33,12 @@ interface ClaimedVenueData {
 // Module-level mutable: popups build lazily on open and read this directly.
 let claimedVenues: Record<string, ClaimedVenueData> = {};
 
+// Bumped whenever the claimed-venues map changes — SunMap subscribes via a
+// React state hook so the hour-update effect re-fires and repaints any
+// happy-hour glow.
+let claimedVersion = 0;
+const claimedListeners = new Set<() => void>();
+
 async function refreshClaimedVenues(): Promise<void> {
   try {
     const res = await fetch("/api/claimed-venues", { cache: "no-store" });
@@ -40,10 +46,20 @@ async function refreshClaimedVenues(): Promise<void> {
     const data = await res.json();
     if (data && typeof data.venues === "object") {
       claimedVenues = data.venues;
+      claimedVersion++;
+      for (const fn of claimedListeners) fn();
     }
   } catch {
     // Network/parse failure — keep whatever we already have (possibly empty).
   }
+}
+
+/** Is the venue in an actively-running happy hour at `hour`? */
+function isHappyHourActive(venueId: string | number, hour: number): boolean {
+  const claim = claimedVenues[String(venueId)];
+  if (!claim?.happyHour) return false;
+  const { start, end } = claim.happyHour;
+  return hour >= start && hour < end;
 }
 
 import { type WeatherData, getSymbolInfo } from "../lib/weather";
@@ -349,6 +365,7 @@ interface SunMapProps {
   servingFilter?: boolean;
   openNowFilter?: boolean;
   showRain?: boolean;
+  wheelchairOnly?: boolean;
 }
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
@@ -995,6 +1012,17 @@ function buildVenuePopupHtml(
       </span>`
     : "";
 
+  // Price level — Google Places 1-4 → $-$$$$. Hidden when unknown.
+  const priceHtml = typeof venue.priceLevel === "number" && venue.priceLevel >= 1
+    ? `<span title="Prisnivå enligt Google" style="margin-left:6px;color:#475569;font-weight:600;font-size:11px;letter-spacing:0.05em">${"$".repeat(Math.min(4, venue.priceLevel))}</span>`
+    : "";
+
+  // Wheelchair accessibility — OSM tag. Only show "yes" (positive signal);
+  // "no"/"limited" would clutter without serving a clear purpose.
+  const wheelchairHtml = venue.wheelchair === "yes"
+    ? `<span title="Tillgänglig enligt OpenStreetMap" style="display:inline-flex;align-items:center;margin-left:6px;padding:1px 5px;background:#eff6ff;border-radius:999px;color:#1d4ed8;font-size:10px;font-weight:700">♿</span>`
+    : "";
+
   // Sun confidence — shadow ray-cast × weather. Hidden when 0 (shade/night)
   // because all-grey markers are already visually clear about that.
   const wSymbol = weather?.hourly[hour]?.symbolCode;
@@ -1027,7 +1055,7 @@ function buildVenuePopupHtml(
         <strong style="font-size:17px;line-height:1.2;flex:1;margin-right:6px">${venue.name}</strong>
         <span style="font-size:20px;flex-shrink:0">${statusToEmoji(status)}</span>
       </div>
-      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}${confHtml}${walkHtml}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}${priceHtml}${wheelchairHtml}${confHtml}${walkHtml}</div>
       <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
       <div style="background:rgba(255,255,255,0.55);border-radius:8px;padding:5px 6px;margin-top:8px;border:0.5px solid rgba(255,255,255,0.7)">
         <div style="display:flex;gap:2px">${shadowTimeline}</div>
@@ -1057,6 +1085,22 @@ function buildVenuePopupHtml(
           data-venue-name="${venue.name}"
         >&#128279; Dela</button>
       </div>
+      <a
+        class="popup-book book-btn"
+        data-venue-id="${venue.id}"
+        href="https://www.thefork.se/sok?cityId=415144&searchText=${encodeURIComponent(venue.name)}"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span style="flex:1">Boka bord</span>
+        <span style="font-size:9px;color:#94a3b8;font-weight:500">via The Fork</span>
+      </a>
       <div class="popup-actions-row">
         <button
           class="popup-btn-link feedback-btn"
@@ -1064,14 +1108,17 @@ function buildVenuePopupHtml(
         >St&auml;mmer inte?</button>
         ${claimed
           ? `<span class="popup-verified-tag">&#10003; Verifierat st&auml;lle</span>`
-          : `<a href="mailto:johan.soderstrom.87@gmail.com?subject=${encodeURIComponent(`Soldryck – Claima: ${venue.name} (ID: ${venue.id})`)}&body=${encodeURIComponent(`Hej!\n\nJag är ägare till ${venue.name} och vill verifiera mitt ställe på Soldryck.\n\nNamn:\nTelefon:\nE-post till verksamheten:\nHemsida:\n\nVad jag vill lägga till:\n`)}" class="popup-claim-link" title="Äger du detta ställe?">Äger du det h&auml;r?</a>`
+          : `<a href="/for-restaurants?venue=${encodeURIComponent(String(venue.id))}" class="popup-claim-link" title="Är du ägare till stället? Verifiera och lägg till happy hour, bilder m.m.">
+              <span aria-hidden>☀️</span>
+              Äger du det h&auml;r?
+            </a>`
         }
       </div>
     </div>
   `;
 }
 
-export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, showRain = false, focusVenueId, onFocusHandled, metroStation, servingFilter, openNowFilter = false }: SunMapProps) {
+export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, showRain = false, focusVenueId, onFocusHandled, metroStation, servingFilter, openNowFilter = false, wheelchairOnly = false }: SunMapProps) {
   // Defer expensive map rebuild while the user is actively scrubbing the timeline
   const hour = useDeferredValue(hourProp);
 
@@ -1147,10 +1194,15 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const dateKey = useMemo(() => getDateKey(date), [date]);
 
   // Fetch claimed venues once on mount. Popups read the module-level
-  // `claimedVenues` lazily on open, so a one-shot load is enough — no
-  // need to rebuild markers or force re-renders.
+  // `claimedVenues` lazily on open. We also subscribe to claimedVersion so
+  // the hour-update effect can repaint the happy-hour glow ring when the
+  // async fetch finally lands.
+  const [claimedVer, setClaimedVer] = useState(0);
   useEffect(() => {
     refreshClaimedVenues();
+    const onChange = () => setClaimedVer(claimedVersion);
+    claimedListeners.add(onChange);
+    return () => { claimedListeners.delete(onChange); };
   }, []);
 
   // Initialize map
@@ -1642,6 +1694,13 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       // Filter by serving permit
       if (servingFilter && !venue.servesAlcohol) return;
 
+      // Filter by wheelchair-accessibility. OSM tag values: yes / no /
+      // limited / designated. We treat "yes" and "designated" as positive.
+      if (wheelchairOnly) {
+        const wc = venue.wheelchair;
+        if (wc !== "yes" && wc !== "designated") return;
+      }
+
       // Sun/shade filter intentionally NOT applied here — the update effect
       // below toggles visibility based on the live (hour, filter) pair so
       // scrubbing the timeline doesn't rebuild markers.
@@ -1725,6 +1784,14 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
         const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
         if (hoursContainer) renderVenueHours(hoursContainer, venue);
+
+        // Book-bord link — track click but let the anchor navigate normally
+        const bookBtn = document.querySelector(`.book-btn[data-venue-id="${venue.id}"]`);
+        if (bookBtn) {
+          (bookBtn as HTMLElement).onclick = () => {
+            track("book_clicked", { type: venue.type });
+          };
+        }
 
         // Share button
         const shareBtn = document.querySelector(`.share-btn[data-venue-id="${venue.id}"]`);
@@ -1816,7 +1883,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     return () => {
       map.off("zoomend moveend", handleViewportChange);
     };
-  }, [dateKey, typeFilter, sunRange, weather, metroStation, servingFilter]);
+  }, [dateKey, typeFilter, sunRange, weather, metroStation, servingFilter, wheelchairOnly]);
 
   // Hour & sun/shade-filter update — fast path. Retoggles `.marker-dot`'s
   // class and visibility on existing markers. Markers outside the viewport
@@ -1829,6 +1896,14 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         marker,
         computeMarkerState(venue, dateKey, hour, filter, weatherRef.current, openNowFilter),
       );
+      // Happy-hour glow — toggled on the marker root (sibling of marker-dot).
+      // Cheap: reads from a module-level Record and a fixed pair of ints, so
+      // hitting this once per marker per scrub is negligible.
+      const iconEl = (marker as L.Marker & { _icon?: HTMLElement })._icon;
+      if (iconEl) {
+        const active = isHappyHourActive(venue.id, hour);
+        iconEl.classList.toggle("marker-happyhour-active", active);
+      }
     }
 
     // When the sun/shade filter is active, visibility flips per hour. At
@@ -1836,7 +1911,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     if (filter !== "all" && mapRef.current.getZoom() >= 17) {
       resolveBadgeCollisions(mapRef.current, markersRef.current);
     }
-  }, [hour, dateKey, filter, openNowFilter]);
+    // claimedVer is in deps so this whole effect re-fires when the claimed-
+    // venues map arrives async from the API.
+    void claimedVer;
+  }, [hour, dateKey, filter, openNowFilter, claimedVer]);
 
   // Open-now hours fetcher — when the chip is on, fan out per-venue hours
   // requests for the ~50 nearest in-viewport venues that don't already have

@@ -94,14 +94,19 @@ def main():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         results = json.load(f)
 
-    # Load venues.geojson for level data
+    # Load venues.geojson for level + wheelchair data
     level_lookup = {}
+    wheelchair_lookup = {}
     if os.path.exists(VENUES_FILE):
         with open(VENUES_FILE, "r", encoding="utf-8") as f:
             geojson = json.load(f)
         for feat in geojson["features"]:
             props = feat["properties"]
-            level_lookup[str(props["id"])] = props.get("level", "")
+            vid = str(props["id"])
+            level_lookup[vid] = props.get("level", "")
+            wc = props.get("wheelchair", "")
+            if wc:
+                wheelchair_lookup[vid] = wc
 
     # Build alcohol lookup from verification files (covers all google-verified venues)
     alcohol_lookup = {}
@@ -152,6 +157,9 @@ def main():
             venue["rating"] = rating_entry["rating"]
         if rating_entry.get("rating_count") is not None:
             venue["ratingCount"] = rating_entry["rating_count"]
+        wc = wheelchair_lookup.get(venue_id)
+        if wc:
+            venue["wheelchair"] = wc
         venues.append(venue)
 
     print(f"  {rooftop_count} takbarer/takrestauranger")

@@ -61,6 +61,7 @@ export default function Home() {
   const [showShadows, setShowShadows] = useState(false);
   const [showMetro, setShowMetro] = useState(false);
   const [showRain, setShowRain] = useState(false);
+  const [wheelchairOnly, setWheelchairOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<Set<VenueType>>(new Set());
   const [sunRange, setSunRange] = useState<SunRange>(null);
   const [focusVenueId, setFocusVenueId] = useState<string | null>(initialVenue);
@@ -166,6 +167,8 @@ export default function Home() {
         onToggleMetro={() => setShowMetro((s) => !s)}
         showRain={showRain}
         onToggleRain={() => setShowRain((s) => !s)}
+        wheelchairOnly={wheelchairOnly}
+        onWheelchairOnlyChange={setWheelchairOnly}
         metroStation={metroStation}
         onMetroStationChange={setMetroStation}
         servingFilter={servingFilter}
@@ -180,7 +183,7 @@ export default function Home() {
         getClosestDateKey={getDateKey}
       />
 
-      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} showMetro={showMetro} showRain={showRain} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} servingFilter={servingFilter} openNowFilter={openNowFilter} />
+      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} showMetro={showMetro} showRain={showRain} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} servingFilter={servingFilter} openNowFilter={openNowFilter} wheelchairOnly={wheelchairOnly} />
 
       <TimeSlider
         hour={hour}
