@@ -1,15 +1,13 @@
 // Datadelen av denna fil flyttades till `public/data/venues-computed.json`
-// — den här filen exporterar bara typer, helpers och en liten mutable
-// store som datan fetchas in i. Bundle-storleken på huvud-JS-paketet sjönk
-// från ~6 MB till några KB; JSON-payloaden hämtas separat på client.
+// — den här filen exporterar bara typer + pure helpers (inga React-APIs!)
+// så att server-routes kan importera helpers utan att Turbopack drar in
+// client-only `useSyncExternalStore` i server-bundlen.
 //
-// Pipeline-genereraren `pipeline/04_export_frontend.py` skriver numera
-// JSON-filen direkt. Om du saknar den, kör pipelinen igen — eller
-// regenerera från en gammal `.ts.bak` med:
-//   awk 'NR==31{sub(/^export const venues = /,"");sub(/ as any.*$/,"");print}' \
-//     venues-computed.ts.bak > ../public/data/venues-computed.json
-
-import { useSyncExternalStore } from "react";
+// Den mutable store-delen (setVenues/getVenues/useVenues) lever i
+// venues-store.ts med "use client".
+//
+// Pipeline-genereraren `pipeline/04_export_frontend.py` skriver JSON-filen
+// direkt — den rör inte den här TS-filen.
 
 export type SunStatus = "s" | "d" | "p" | "n";
 // s = sol, d = skugga (darkness), p = delvis sol, n = natt
@@ -40,35 +38,6 @@ export const STATUS_LABELS: Record<SunStatus, string> = {
   p: "Delvis sol",
   n: "Natt",
 };
-
-// --- Store ------------------------------------------------------------------
-
-let venuesStore: ComputedVenue[] = [];
-const listeners = new Set<() => void>();
-
-/** Replace the entire venues store. Called by page.tsx once the JSON arrives. */
-export function setVenues(v: ComputedVenue[]): void {
-  venuesStore = v;
-  for (const fn of listeners) fn();
-}
-
-/** Synchronous snapshot — useful outside React (event handlers, refs). */
-export function getVenues(): ComputedVenue[] {
-  return venuesStore;
-}
-
-/** React hook — subscribes to store changes so consumers re-render when data
- *  arrives. Returns an empty array until `setVenues()` has been called. */
-export function useVenues(): ComputedVenue[] {
-  return useSyncExternalStore(
-    (fn) => {
-      listeners.add(fn);
-      return () => { listeners.delete(fn); };
-    },
-    () => venuesStore,
-    () => venuesStore,
-  );
-}
 
 // --- Helpers (pure, no data dependency) -------------------------------------
 

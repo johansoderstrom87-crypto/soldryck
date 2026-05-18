@@ -12,6 +12,7 @@ import L from "leaflet";
 import * as venuesModule from "../data/venues-computed";
 import * as mockVenuesModule from "../data/mock-venues";
 import type { ComputedVenue } from "../data/venues-computed";
+import { useVenues as useVenuesFromStore } from "../data/venues-store";
 import { useRainRadar } from "../hooks/useRainRadar";
 const venueModule: typeof venuesModule & { mockVenues?: unknown } = venuesModule;
 
@@ -1157,7 +1158,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // Read the venues store via hook so the build effect re-fires the moment
   // the JSON payload arrives (page.tsx calls setVenues() at that point).
   // Until then we fall back to the 8-venue mock so the map isn't blank.
-  const storeVenues = venueModule.useVenues();
+  const storeVenues = useVenuesFromStore();
   // Mock data uses a slightly different shape (uncompressed "sun"/"shade",
   // number-keyed hours) — the `unknown` cast acknowledges that runtime
   // boundary; the rest of SunMap reads venues through the wider

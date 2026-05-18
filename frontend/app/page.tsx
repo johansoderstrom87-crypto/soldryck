@@ -22,12 +22,11 @@ import type { MetroStation } from "./data/metro-stations";
 // (or if the fetch fails altogether).
 const mockData = require("./data/mock-venues");
 import {
-  setVenues,
-  getVenues,
   getClosestDateKey as computedGetDateKey,
   getVenueStatus as computedGetStatus,
   type ComputedVenue,
 } from "./data/venues-computed";
+import { setVenues, getVenues } from "./data/venues-store";
 
 const SunMap = dynamic(() => import("./components/SunMap"), {
   ssr: false,
