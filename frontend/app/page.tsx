@@ -61,11 +61,20 @@ export default function Home() {
   const [showMetro, setShowMetro] = useState(false);
   const [showRain, setShowRain] = useState(false);
   const [wheelchairOnly, setWheelchairOnly] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<Set<VenueType>>(new Set());
+  // Default selection — restauranger + barer + takbarer. Cafés döljs som
+  // standard eftersom de flesta öppnar Soldryck för att planera lunch /
+  // afterwork, inte fika. Användaren kan slå på café-chippet när det
+  // behövs.
+  const [typeFilter, setTypeFilter] = useState<Set<VenueType>>(
+    () => new Set<VenueType>(["restaurant", "bar", "rooftop"]),
+  );
   const [sunRange, setSunRange] = useState<SunRange>(null);
   const [focusVenueId, setFocusVenueId] = useState<string | null>(initialVenue);
   const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
-  const [servingFilter, setServingFilter] = useState(false);
+  // Tillstånd-filter på som standard — drar bort kaffeställen med
+  // formellt outdoor_seating men ingen alkohollicens, vilket matchar
+  // den primära afterwork-användningen.
+  const [servingFilter, setServingFilter] = useState(true);
   const [openNowFilter, setOpenNowFilter] = useState(false);
   // Splash is skipped for users who already added Soldryck to the home
   // screen — they saw it on first install. Initial state must be false so

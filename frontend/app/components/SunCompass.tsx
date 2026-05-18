@@ -66,7 +66,7 @@ export default function SunCompass({ hour, date }: SunCompassProps) {
           : `Klockan ${hour} är solen under horisonten`
       }
       style={{
-        position: "absolute",
+        position: "fixed",
         bottom: "calc(232px + var(--safe-bottom, 0px))",
         left: "calc(12px + var(--safe-left, 0px))",
         zIndex: 1001,

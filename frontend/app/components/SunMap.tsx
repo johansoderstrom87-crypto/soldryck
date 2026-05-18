@@ -1163,9 +1163,18 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // number-keyed hours) — the `unknown` cast acknowledges that runtime
   // boundary; the rest of SunMap reads venues through the wider
   // ComputedVenue interface to stay typesafe internally.
-  const allVenues: ComputedVenue[] = storeVenues.length > 0
-    ? storeVenues
-    : (mockVenuesModule.mockVenues as unknown as ComputedVenue[]);
+  //
+  // useMemo here is load-bearing: the build effect lists `allVenues` in its
+  // deps, so we need its reference to ONLY change when the underlying data
+  // actually changes (store fills in, or fallback flips). Without memo the
+  // array would be recomputed on every render — including hour scrubs —
+  // and the build effect would rebuild markers on every tick.
+  const allVenues: ComputedVenue[] = useMemo(() =>
+    storeVenues.length > 0
+      ? storeVenues
+      : (mockVenuesModule.mockVenues as unknown as ComputedVenue[]),
+    [storeVenues],
+  );
 
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
@@ -1923,7 +1932,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     return () => {
       map.off("zoomend moveend", handleViewportChange);
     };
-  }, [dateKey, typeFilter, sunRange, weather, metroStation, servingFilter, wheelchairOnly]);
+  }, [dateKey, typeFilter, sunRange, weather, metroStation, servingFilter, wheelchairOnly, allVenues]);
 
   // Hour & sun/shade-filter update — fast path. Retoggles `.marker-dot`'s
   // class and visibility on existing markers. Markers outside the viewport
@@ -2604,7 +2613,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           without disturbing the stack's right-edge alignment. */}
       <div
         style={{
-          position: "absolute",
+          position: "fixed",
           bottom: "calc(225px + var(--safe-bottom, 0px))",
           right: "calc(12px + var(--safe-right, 0px))",
           zIndex: 1001,
@@ -2912,7 +2921,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           updating rather than thinking the filter is broken. */}
       {openNowFilter && openNowFetching > 0 && (
         <div style={{
-          position: "absolute",
+          position: "fixed",
           top: "calc(160px + var(--safe-top, 0px))",
           left: "50%",
           transform: "translateX(-50%)",
@@ -2940,7 +2949,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       {/* "Sök i detta område" — appears below category filters after first pan (Google Maps pattern) */}
       {showSearchInArea && !areaSearchOpen && (
         <div style={{
-          position: "absolute", top: "calc(148px + var(--safe-top, 0px))", left: "50%",
+          position: "fixed", top: "calc(148px + var(--safe-top, 0px))", left: "50%",
           transform: "translateX(-50%)", zIndex: 1090, pointerEvents: "auto",
         }}>
           <button
