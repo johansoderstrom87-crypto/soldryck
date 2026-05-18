@@ -64,6 +64,22 @@ export default function AdminPage() {
           <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
         </svg>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0 }}>Soldryck — Admin</h1>
+        <a
+          href={key ? `/admin/suggestions?key=${encodeURIComponent(key)}` : "/admin/suggestions"}
+          style={{
+            marginLeft: "auto",
+            fontSize: 12,
+            color: "#f59e0b",
+            border: "1px solid #fde68a",
+            background: "#fffbeb",
+            padding: "5px 12px",
+            borderRadius: 8,
+            textDecoration: "none",
+            fontWeight: 500,
+          }}
+        >
+          Förslag →
+        </a>
       </div>
 
       {loading && <p style={{ color: "#64748b" }}>Laddar...</p>}

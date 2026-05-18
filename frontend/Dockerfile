@@ -17,6 +17,7 @@ RUN apk add --no-cache su-exec
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV SHADOW_DATA_PATH=/app/shadow-data
+ENV CLAIMED_DATA_PATH=/app/shadow-data
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
