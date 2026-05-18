@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getFavorites, saveFavorites } from "../lib/favorites";
 import { subscribeToPush, unsubscribeFromPush, getPushStatus } from "../lib/push";
+import WeeklyPlanner from "./WeeklyPlanner";
 
 type HoursResult = { openNow: boolean | null; closesAt: string | null } | null;
 
@@ -12,6 +13,9 @@ interface FavoritesPanelProps {
   hour: number;
   dateKey: string;
   getStatus: (venue: any, dateKey: string, hour: number) => string | undefined;
+  /** Pipeline snap helper, threaded down so the weekly planner can build
+      its own week without re-deriving it from `dateKey`. */
+  getClosestDateKey: (date: Date) => string;
   embedded?: boolean;
 }
 
@@ -22,8 +26,9 @@ function sunStyle(raw: string | undefined) {
   return { dot: "#cbd5e1", bg: "#f8fafc", text: "#94a3b8", label: "Natt" };
 }
 
-export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, getStatus, embedded }: FavoritesPanelProps) {
+export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey, embedded }: FavoritesPanelProps) {
   const [open, setOpen] = useState(false);
+  const [plannerOpen, setPlannerOpen] = useState(false);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -165,10 +170,26 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
           </div>
 
           {favoriteVenues.length === 0 ? (
-            <div className="text-xs text-slate-400 px-2 py-3 text-center">
-              Inga favoriter än.
-              <br />
-              Tryck på hjärtat i en popup för att spara.
+            <div className="px-3 py-5 text-center">
+              <div
+                style={{
+                  width: 56, height: 56, margin: "0 auto 10px",
+                  borderRadius: "50%",
+                  background: "linear-gradient(160deg, rgba(254,243,199,0.9), rgba(255,237,213,0.8))",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 26, lineHeight: 1,
+                  boxShadow: "0 4px 12px rgba(245,158,11,0.18)",
+                }}
+                aria-hidden
+              >
+                ☀️
+              </div>
+              <div className="text-[13px] font-semibold text-slate-700 mb-1">
+                Inga favoriter än
+              </div>
+              <div className="text-[11px] text-slate-500 leading-snug">
+                Tryck <span style={{ color: "#ef4444" }}>♡</span> i en popup för att spara ett ställe — så når du dem härifrån med ett klick.
+              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-0.5 max-h-[320px] overflow-y-auto">
@@ -231,6 +252,18 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
             <>
               <div className="border-t border-slate-200 my-1.5" />
               <button
+                onClick={() => { setOpen(false); setPlannerOpen(true); }}
+                className="w-full text-left px-2 py-1.5 rounded-lg text-xs flex items-center gap-2 text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                <span className="flex-1">Veckoplan — när är det sol?</span>
+              </button>
+              <button
                 onClick={handleTogglePush}
                 disabled={pushBusy}
                 className={`w-full text-left px-2 py-1.5 rounded-lg text-xs flex items-center gap-2 transition-colors ${
@@ -247,6 +280,16 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
             </>
           )}
         </div>
+      )}
+
+      {plannerOpen && (
+        <WeeklyPlanner
+          venues={favoriteVenues}
+          getStatus={getStatus}
+          getClosestDateKey={getClosestDateKey}
+          onClose={() => setPlannerOpen(false)}
+          onSelectVenue={(id) => { onSelectVenue(id); setPlannerOpen(false); }}
+        />
       )}
     </div>
   );

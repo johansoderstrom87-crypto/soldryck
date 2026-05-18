@@ -437,8 +437,23 @@ export default function AreaSearchPanel({
       {/* Venue list */}
       <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
         {displayed.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px 12px", color: "#94a3b8", fontSize: 12 }}>
-            Inga ställen i detta område
+          <div style={{ textAlign: "center", padding: "32px 16px" }}>
+            <div
+              style={{
+                width: 52, height: 52, margin: "0 auto 10px",
+                borderRadius: "50%",
+                background: "linear-gradient(160deg, rgba(241,245,249,0.9), rgba(226,232,240,0.7))",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 22, lineHeight: 1,
+              }}
+              aria-hidden
+            >🗺️</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", marginBottom: 3 }}>
+              Inga ställen här
+            </div>
+            <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, maxWidth: 220, margin: "0 auto" }}>
+              Pannar du utåt på kartan och söker igen hittar du fler — eller släpp filtren ovan.
+            </div>
           </div>
         ) : (
           <>

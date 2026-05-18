@@ -3,13 +3,28 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 
+const SESSION_KEY = "soldryck_splash_seen";
+
 export default function SplashScreen({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase("hold"), 400);
-    const t2 = setTimeout(() => setPhase("out"), 1800);
-    const t3 = setTimeout(() => onDone(), 2400);
+    // Returning visitors (within the same session) get a short 600 ms flash
+    // so the logo still anchors the brand without delaying interactivity.
+    // First-time visitors see the full 2.4 s reveal.
+    let returning = false;
+    try {
+      returning = sessionStorage.getItem(SESSION_KEY) === "1";
+      sessionStorage.setItem(SESSION_KEY, "1");
+    } catch {}
+
+    const inMs   = returning ? 120 : 400;
+    const outMs  = returning ? 420 : 1800;
+    const doneMs = returning ? 600 : 2400;
+
+    const t1 = setTimeout(() => setPhase("hold"), inMs);
+    const t2 = setTimeout(() => setPhase("out"), outMs);
+    const t3 = setTimeout(() => onDone(), doneMs);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onDone]);
 

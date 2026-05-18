@@ -22,13 +22,6 @@ function LineDots({ lines }: { lines: string[] }) {
   );
 }
 
-const TYPE_OPTIONS: { value: VenueType; label: string; icon: string }[] = [
-  { value: "restaurant", label: "Restaurang", icon: "🍽️" },
-  { value: "cafe", label: "Café", icon: "☕" },
-  { value: "bar", label: "Bar & Pub", icon: "🍸" },
-  { value: "rooftop", label: "Takbar", icon: "🏙️" },
-];
-
 const TYPE_BUTTONS: { type: VenueType; label: string; svg: string }[] = [
   {
     type: "restaurant",
@@ -67,11 +60,14 @@ interface HeaderProps {
   onMetroStationChange: (station: MetroStation | null) => void;
   servingFilter: boolean;
   onServingFilterChange: (v: boolean) => void;
+  openNowFilter: boolean;
+  onOpenNowFilterChange: (v: boolean) => void;
   venues: { id: string; name: string; type: string; address: string; lat: number; lng: number }[];
   onSelectVenue: (id: string) => void;
   hour: number;
   dateKey: string;
   getStatus: (venue: any, dateKey: string, hour: number) => string | undefined;
+  getClosestDateKey: (date: Date) => string;
 }
 
 const FILTER_OPTIONS: { value: "all" | "sun" | "shade"; label: string; icon: string; activeClass: string }[] = [
@@ -144,12 +140,6 @@ function SettingsButton({
     const result = await installPrompt.userChoice;
     if (result.outcome === "accepted") { setInstallPrompt(null); setOpen(false); }
   };
-
-  function toggleType(type: VenueType) {
-    const next = new Set(typeFilter);
-    if (next.has(type)) next.delete(type); else next.add(type);
-    onTypeFilterChange(next);
-  }
 
   async function submitSuggestion() {
     const message = suggestionText.trim();
@@ -295,49 +285,14 @@ function SettingsButton({
             </span>
           </button>
 
-          {/* Tillstånd toggle */}
-          <button
-            onClick={() => onServingFilterChange(!servingFilter)}
-            className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
-              servingFilter ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
-            }`}
-          >
-            <span className="flex items-center gap-1.5">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 11h1a4 4 0 0 1 0 8h-1"/>
-                <path d="M3 11h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9z"/>
-                <path d="M3 8a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3H3V8z"/>
-              </svg>
-              Tillstånd
-            </span>
-            <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${servingFilter ? "bg-white/30" : "bg-slate-200"}`}>
-              <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${servingFilter ? "translate-x-3" : "translate-x-0"}`} />
-            </span>
-          </button>
-
           <div className="border-t border-slate-200 my-1" />
 
-          {/* Type filter checkboxes */}
-          <div className="px-1.5 py-0.5">
-            <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide mb-1">Typ av ställe</div>
-            {TYPE_OPTIONS.map((t) => (
-              <label
-                key={t.value}
-                className="flex items-center gap-2 px-1.5 py-1 rounded-lg text-xs cursor-pointer hover:bg-slate-50 transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  checked={typeFilter.size === 0 || typeFilter.has(t.value)}
-                  onChange={() => toggleType(t.value)}
-                  className="rounded border-slate-300 text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
-                />
-                <span>{t.icon}</span>
-                <span className="text-slate-600">{t.label}</span>
-              </label>
-            ))}
-          </div>
-
-          <div className="border-t border-slate-200 my-1" />
+          {/* Note: type-filter chips and Tillstånd live in the filter row
+              (the visible row of pills below the logo card), not here — see
+              [Header.tsx filter row]. Duplicating them in this dropdown was
+              confusing because state from the row and the dropdown could
+              read different but render the same toggle. Settings now only
+              hosts toggles that don't have a dedicated chip. */}
 
           {/* Metro station filter — searchable picker */}
           <div className="px-1.5 py-0.5">
@@ -543,7 +498,8 @@ export default function Header({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
   showShadows, onToggleShadows, showMetro, onToggleMetro,
   metroStation, onMetroStationChange, servingFilter, onServingFilterChange,
-  venues, onSelectVenue, hour, dateKey, getStatus,
+  openNowFilter, onOpenNowFilterChange,
+  venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey,
 }: HeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(true);
 
@@ -605,7 +561,7 @@ export default function Header({
             style={{ objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(245,158,11,0.3))" }}
           />
 
-          <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} embedded />
+          <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} getClosestDateKey={getClosestDateKey} embedded />
         </div>
 
         {/* Filter row + collapse toggle */}
@@ -697,6 +653,42 @@ export default function Header({
               </svg>
               <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: servingFilter ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
                 Tillstånd
+              </span>
+            </button>
+
+            {/* Öppet nu-knapp — kräver att hours fetchas för viewport-venues,
+                så markörer kan dröja någon sekund innan stängda försvinner. */}
+            <button
+              onClick={() => onOpenNowFilterChange(!openNowFilter)}
+              title="Öppet just nu"
+              className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+              style={{
+                width: 40,
+                height: 40,
+                background: openNowFilter
+                  ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
+                  : "rgba(255,255,255,0.14)",
+                backdropFilter: "blur(16px) saturate(1.5)",
+                WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+                border: openNowFilter
+                  ? "1px solid rgba(251,146,60,0.75)"
+                  : "0.5px solid rgba(255,255,255,0.45)",
+                boxShadow: openNowFilter
+                  ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
+                  : "0 2px 8px rgba(0,0,0,0.06)",
+                color: openNowFilter ? "#0f172a" : "#888",
+                opacity: openNowFilter ? 1 : 0.65,
+                transform: "translateZ(0)",
+                isolation: "isolate",
+                flexShrink: 0,
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: openNowFilter ? "#0f172a" : "rgba(0,0,0,0.55)" }}>
+                Öppet
               </span>
             </button>
           </div>

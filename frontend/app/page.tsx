@@ -8,6 +8,7 @@ import FeedbackModal from "./components/FeedbackModal";
 import SplashScreen from "./components/SplashScreen";
 import Onboarding from "./components/Onboarding";
 import OffSeasonBanner from "./components/OffSeasonBanner";
+import IosInstallHint from "./components/IosInstallHint";
 import { fetchWeather, toLocalDateStr, type WeatherData } from "./lib/weather";
 import { isInSeason, snapToSeason } from "./lib/season";
 import type { FeedbackVenue } from "./components/SunMap";
@@ -56,6 +57,7 @@ export default function Home() {
   const [focusVenueId, setFocusVenueId] = useState<string | null>(initialVenue);
   const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
   const [servingFilter, setServingFilter] = useState(false);
+  const [openNowFilter, setOpenNowFilter] = useState(false);
   const [splashDone, setSplashDone] = useState(() =>
     typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches
   );
@@ -111,6 +113,7 @@ export default function Home() {
       {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
       <Onboarding ready={splashDone} />
       {offSeason && splashDone && <OffSeasonBanner snappedDate={initialDate} />}
+      {splashDone && <IosInstallHint />}
       <Header
         filter={filter}
         onFilterChange={setFilter}
@@ -126,14 +129,17 @@ export default function Home() {
         onMetroStationChange={setMetroStation}
         servingFilter={servingFilter}
         onServingFilterChange={setServingFilter}
+        openNowFilter={openNowFilter}
+        onOpenNowFilterChange={setOpenNowFilter}
         venues={allVenues}
         onSelectVenue={(id) => setFocusVenueId(id)}
         hour={hour}
         dateKey={dateKey}
         getStatus={getStatus}
+        getClosestDateKey={getDateKey}
       />
 
-      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} showMetro={showMetro} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} servingFilter={servingFilter} />
+      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} showMetro={showMetro} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} servingFilter={servingFilter} openNowFilter={openNowFilter} />
 
       <TimeSlider
         hour={hour}

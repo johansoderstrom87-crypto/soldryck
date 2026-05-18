@@ -345,6 +345,7 @@ interface SunMapProps {
   onFocusHandled?: () => void;
   metroStation?: MetroStation | null;
   servingFilter?: boolean;
+  openNowFilter?: boolean;
 }
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
@@ -616,6 +617,43 @@ type VenueHoursPayload = {
 const venuePhotoCache = new Map<string, string | null>();
 const venueHoursCache = new Map<string, VenueHoursPayload>();
 
+// User's current GPS position. Set by handleLocate's watchPosition callback,
+// read by buildVenuePopupHtml so popups can show walking time without going
+// through React (popups render to HTML strings inside Leaflet). null means
+// GPS is off / never enabled / permission denied.
+let userPosition: { lat: number; lng: number } | null = null;
+
+/** Haversine distance in metres. */
+function haversineM(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371_000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * Approximate walking time from user to a venue. Linear distance × 1.3 to
+ * roughly account for street routing detours, divided by 75 m/min (≈ 4.5 km/h
+ * comfortable pace). Returns a localised label or null if GPS is off / the
+ * user is unrealistically far away (>20 km — likely a stale GPS read).
+ */
+function walkingMinutes(venue: { lat: number; lng: number }): string | null {
+  if (!userPosition) return null;
+  const linearM = haversineM(userPosition, venue);
+  if (linearM > 20_000) return null;
+  const walkM = linearM * 1.3;
+  const minutes = walkM / 75;
+  if (minutes < 1) return "< 1 min";
+  if (minutes < 60) return `${Math.round(minutes)} min`;
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes - h * 60);
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
 async function fetchOpenNow(venue: any): Promise<boolean | null> {
   if (venueHoursCache.has(venue.id)) {
     return venueHoursCache.get(venue.id)?.openNow ?? null;
@@ -645,6 +683,7 @@ function computeMarkerState(
   hour: number,
   filter: "all" | "sun" | "shade",
   weather: WeatherData | null,
+  openNowFilter: boolean = false,
 ): { className: string; visible: boolean } {
   const status = normalize(getStatus(venue, dateKey, hour));
   const wSymbol = weather?.hourly[hour]?.symbolCode;
@@ -655,10 +694,19 @@ function computeMarkerState(
   else if (status === "sun") className = "marker-sun";
   else className = "marker-shade";
 
-  const visible =
+  let visible =
     filter === "all" ||
     (filter === "sun" && status === "sun") ||
     (filter === "shade" && (status === "shade" || status === "night"));
+
+  // Open-now filter — hide venues that we've confirmed are closed. Venues
+  // with unknown / unfetched hours stay visible (the fetcher loop will
+  // resolve them shortly; hiding them would make most markers vanish on
+  // first toggle, which is worse UX than showing a few false positives).
+  if (openNowFilter && visible) {
+    const hours = venueHoursCache.get(venue.id);
+    if (hours && hours.openNow === false) visible = false;
+  }
 
   return { className, visible };
 }
@@ -849,6 +897,42 @@ function buildVenuePopupHtml(
       </div>`
     : "";
 
+  // "Sol om X min" — only meaningful when the user is looking at the live
+  // current hour AND today's pipeline date-snap, and the venue is shaded.
+  // Looks 1–3 hours ahead for the next sun slot and shows minutes-until-
+  // arrival relative to wall-clock NOW. (For future hours / other days, the
+  // countdown would be nonsense — the user already sees that sun arrives at,
+  // say, 15:00 via the timeline.)
+  const sunArrivesLine = (() => {
+    const now = new Date();
+    // dateKey is "MM-DD" from getClosestDateKey(); compare against today.
+    const todayKey = `${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    // Treat any snap-key within ±7 days of today as "near-live". The pipeline
+    // snaps to 1st/15th, so e.g. on May 11 dateKey is "05-15" — still useful
+    // as a near-now estimate. Beyond that the countdown wouldn't apply.
+    const isLiveHour = hour === now.getHours() && dateKey === getDateKey(now);
+    if (!isLiveHour) return "";
+    void todayKey; // reserved for future precision check
+    if (status === "sun" || status === "partial") return "";
+    for (let lookahead = 1; lookahead <= 3; lookahead++) {
+      const h = hour + lookahead;
+      if (h > 22) break;
+      const s = normalize(getStatus(venue, dateKey, h));
+      if (s === "sun" || s === "partial") {
+        const minutesUntil = lookahead * 60 - now.getMinutes();
+        if (minutesUntil <= 0 || minutesUntil > 180) return "";
+        const label = minutesUntil < 60
+          ? `Sol om ~${minutesUntil} min`
+          : `Sol om ~${Math.round(minutesUntil / 60)} h`;
+        return `<div style="border-left:3px solid #38bdf8;padding:3px 8px;margin-top:6px;background:#f0f9ff;border-radius:0 6px 6px 0;display:flex;align-items:center;gap:5px">
+          <span style="font-size:12px">⏳</span>
+          <span style="font-size:11px;color:#075985;font-weight:500">${label}</span>
+        </div>`;
+      }
+    }
+    return "";
+  })();
+
   const claimed = claimedVenues[String(venue.id)];
   const happyHourHtml = claimed?.happyHour
     ? (() => {
@@ -875,6 +959,16 @@ function buildVenuePopupHtml(
     ? `&#11088; ${venue.rating.toFixed(1)}${venue.ratingCount != null ? `<span style="color:#b0bec5"> (${venue.ratingCount.toLocaleString("sv-SE")})</span>` : ""} &middot; `
     : "";
 
+  // Walking time — only present when the user has GPS on. Pinned next to
+  // the venue type as a subtle chip so it doesn't compete with the name.
+  const walkLabel = walkingMinutes(venue);
+  const walkHtml = walkLabel
+    ? `<span style="display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:1px 6px 1px 5px;background:#eff6ff;border-radius:999px;color:#1d4ed8;font-size:10px;font-weight:600">
+        <svg width="9" height="10" viewBox="0 0 12 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="7" cy="2" r="1.5"/><path d="M5 5l2 2v4l-1 2"/><path d="M7 7l2 1v3"/><path d="M5 9l-2 3"/></svg>
+        ${walkLabel}
+      </span>`
+    : "";
+
   const cachedPhoto = venuePhotoCache.get(venue.id);
   const photoContainerHtml = cachedPhoto === null
     ? ""
@@ -889,7 +983,7 @@ function buildVenuePopupHtml(
         <strong style="font-size:17px;line-height:1.2;flex:1;margin-right:6px">${venue.name}</strong>
         <span style="font-size:20px;flex-shrink:0">${statusToEmoji(status)}</span>
       </div>
-      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}${walkHtml}</div>
       <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
       <div style="background:rgba(255,255,255,0.55);border-radius:8px;padding:5px 6px;margin-top:8px;border:0.5px solid rgba(255,255,255,0.7)">
         <div style="display:flex;gap:2px">${shadowTimeline}</div>
@@ -897,6 +991,7 @@ function buildVenuePopupHtml(
         <div style="display:flex;gap:2px;margin-top:1px">${nowDots}</div>
         <div style="font-size:10px;color:#94a3b8;text-align:right;margin-top:2px">${sunHours} soltimmar</div>
       </div>
+      ${sunArrivesLine}
       ${bestHourLine}
       ${happyHourHtml}
       <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
@@ -935,7 +1030,7 @@ function buildVenuePopupHtml(
   `;
 }
 
-export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, focusVenueId, onFocusHandled, metroStation, servingFilter }: SunMapProps) {
+export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, focusVenueId, onFocusHandled, metroStation, servingFilter, openNowFilter = false }: SunMapProps) {
   // Defer expensive map rebuild while the user is actively scrubbing the timeline
   const hour = useDeferredValue(hourProp);
 
@@ -955,6 +1050,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // that re-enter the viewport without going through the hour-update effect.
   const filterRef = useRef<"all" | "sun" | "shade">("all");
   filterRef.current = filter;
+  // Same pattern for the open-now filter — read by cull-on-pan + the hours
+  // fetcher loop so toggling the chip applies without rebuilding markers.
+  const openNowFilterRef = useRef(false);
+  openNowFilterRef.current = openNowFilter;
   const unconfirmedMarkersRef = useRef<L.Marker[]>([]);
   const metroMarkersRef = useRef<L.Marker[]>([]);
   const metroNetworkRef = useRef<L.LayerGroup | null>(null);
@@ -973,6 +1072,19 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const [geoState, setGeoState] = useState<"idle" | "locating" | "located" | "error">("idle");
   const [findSunState, setFindSunState] = useState<"idle" | "locating" | "none" | "error">("idle");
   const [findSunMsg, setFindSunMsg] = useState<string | null>(null);
+  // First-time discovery pulse around the "Hitta solen" FAB. We only fire it
+  // once ever (localStorage flag) — the FAB is otherwise easy to miss in the
+  // right-side stack, especially once the GPS hint dismisses.
+  const [findSunPulse, setFindSunPulse] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem("soldryck_findsun_pulsed")) return;
+    const t = setTimeout(() => {
+      setFindSunPulse(true);
+      localStorage.setItem("soldryck_findsun_pulsed", "1");
+    }, 3500);
+    return () => clearTimeout(t);
+  }, []);
   const [showSearchInArea, setShowSearchInArea] = useState(false);
   const hasPannedRef = useRef(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1477,7 +1589,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       // Initial state seeded into the divIcon HTML — overwritten by
       // applyMarkerVisualState the moment the cull function adds this marker
       // to the map (or by the hour-update effect on subsequent ticks).
-      const initial = computeMarkerState(venue, dateKey, hour, filter, weather);
+      const initial = computeMarkerState(venue, dateKey, hour, filter, weather, openNowFilter);
       const markerClass = initial.className;
 
       const svgIcon = typeToSvgIcon(venue.type);
@@ -1606,7 +1718,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           // Newly-attached marker: paint its current (hour, filter, weather) state.
           applyMarkerVisualState(
             mk,
-            computeMarkerState(v, dateKey, hourRef.current, filterRef.current, weatherRef.current),
+            computeMarkerState(v, dateKey, hourRef.current, filterRef.current, weatherRef.current, openNowFilterRef.current),
           );
         } else if (!inside && onMap) {
           mk.remove();
@@ -1637,7 +1749,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     for (const { marker, venue } of markerVenuesRef.current) {
       applyMarkerVisualState(
         marker,
-        computeMarkerState(venue, dateKey, hour, filter, weatherRef.current),
+        computeMarkerState(venue, dateKey, hour, filter, weatherRef.current, openNowFilter),
       );
     }
 
@@ -1646,7 +1758,94 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     if (filter !== "all" && mapRef.current.getZoom() >= 17) {
       resolveBadgeCollisions(mapRef.current, markersRef.current);
     }
-  }, [hour, dateKey, filter]);
+  }, [hour, dateKey, filter, openNowFilter]);
+
+  // Open-now hours fetcher — when the chip is on, fan out per-venue hours
+  // requests for the ~50 nearest in-viewport venues that don't already have
+  // a cached answer. After each response we repaint that marker so confirmed-
+  // closed venues quietly drop off the map. Re-runs on viewport changes so
+  // panning fills in more data.
+  const [openNowFetching, setOpenNowFetching] = useState(0);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !openNowFilter) {
+      setOpenNowFetching(0);
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = 0;
+    const MAX_CONCURRENT = 6;
+    const MAX_BATCH = 50;
+
+    function scanAndFetch() {
+      if (cancelled || !openNowFilterRef.current || !mapRef.current) return;
+      const m = mapRef.current;
+      const center = m.getCenter();
+      const bounds = m.getBounds();
+      const cosLat = Math.cos((center.lat * Math.PI) / 180);
+
+      // Candidates: markers currently on the map whose hours haven't been
+      // fetched yet. We don't include all venues — only the ones the user
+      // could actually see — so we don't blow our Google Places budget.
+      const candidates: { venue: any; marker: L.Marker; d2: number }[] = [];
+      for (const { marker, venue } of markerVenuesRef.current) {
+        if (!((marker as any)._map)) continue;
+        if (venueHoursCache.has(venue.id)) continue;
+        if (!bounds.contains(marker.getLatLng())) continue;
+        const dlat = (venue.lat - center.lat) * 111_000;
+        const dlng = (venue.lng - center.lng) * 111_000 * cosLat;
+        candidates.push({ venue, marker, d2: dlat * dlat + dlng * dlng });
+      }
+      candidates.sort((a, b) => a.d2 - b.d2);
+      const batch = candidates.slice(0, MAX_BATCH);
+      if (batch.length === 0) return;
+
+      setOpenNowFetching((n) => n + batch.length);
+
+      // Simple promise pool — kick off MAX_CONCURRENT, drain as they resolve.
+      let cursor = 0;
+      function spawnNext() {
+        if (cancelled) return;
+        while (inFlight < MAX_CONCURRENT && cursor < batch.length) {
+          const item = batch[cursor++];
+          inFlight++;
+          const params = new URLSearchParams({
+            id: item.venue.id, name: item.venue.name,
+            lat: String(item.venue.lat), lng: String(item.venue.lng), type: item.venue.type,
+          });
+          fetch(`/api/venue-hours?${params}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data: VenueHoursPayload) => {
+              venueHoursCache.set(item.venue.id, data);
+              if (cancelled) return;
+              if (openNowFilterRef.current) {
+                applyMarkerVisualState(
+                  item.marker,
+                  computeMarkerState(item.venue, dateKey, hourRef.current, filterRef.current, weatherRef.current, true),
+                );
+              }
+            })
+            .catch(() => {
+              venueHoursCache.set(item.venue.id, null);
+            })
+            .finally(() => {
+              inFlight--;
+              if (!cancelled) setOpenNowFetching((n) => Math.max(0, n - 1));
+              spawnNext();
+            });
+        }
+      }
+      spawnNext();
+    }
+
+    scanAndFetch();
+    map.on("moveend zoomend", scanAndFetch);
+    return () => {
+      cancelled = true;
+      map.off("moveend zoomend", scanAndFetch);
+    };
+  }, [openNowFilter, dateKey]);
 
   // Pan to selected metro station — own effect so a station change actually
   // pans (the previous version was bundled into the rebuild-on-hour effect).
@@ -1679,7 +1878,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           found.marker.addTo(map);
           applyMarkerVisualState(
             found.marker,
-            computeMarkerState(found.venue, dateKey, hourRef.current, filterRef.current, weatherRef.current),
+            computeMarkerState(found.venue, dateKey, hourRef.current, filterRef.current, weatherRef.current, openNowFilterRef.current),
           );
         }
         setTimeout(() => found.marker.openPopup(), 500);
@@ -1861,6 +2060,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       userMarkerRef.current?.remove();
       userMarkerRef.current = null;
       hasCenteredRef.current = false;
+      userPosition = null;
       setGeoState("idle");
       return;
     }
@@ -1872,6 +2072,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         const { latitude, longitude } = pos.coords;
         const map = mapRef.current;
         if (!map) return;
+        // Expose user position to module-level so popup HTML (built outside
+        // React) can compute walking time.
+        userPosition = { lat: latitude, lng: longitude };
         setGeoState("located");
         if (!userMarkerRef.current) {
           const icon = L.divIcon({
@@ -1978,7 +2181,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
         if (sunnyVenues.length === 0) {
           setFindSunState("none");
-          setTimeout(() => setFindSunState("idle"), 3000);
+          setFindSunMsg("Inga uteserveringar har sol just nu — prova en annan timme.");
+          setTimeout(() => { setFindSunState("idle"); setFindSunMsg(null); }, 4500);
           return;
         }
 
@@ -2075,11 +2279,39 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     container.style.setProperty("--marker-dot-filter", `brightness(${markerBrightness}) saturate(${markerSaturate})`);
   }, [darkness, ambientColor]);
 
-  const [showTooltip, setShowTooltip] = useState(true);
+  // GPS hint tooltip — used to pop up immediately on mount, which felt
+  // pushy on first load (overlapping the onboarding spotlight). Now only
+  // appears after 10 s of map idleness (no pan, zoom, or popup), and only
+  // once per session. Any user interaction before that suppresses it.
+  const [showTooltip, setShowTooltip] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setShowTooltip(false), 4500);
-    return () => clearTimeout(t);
-  }, []);
+    if (typeof window === "undefined") return;
+    if (sessionStorage.getItem("soldryck_gps_hint_seen")) return;
+    if (geoState !== "idle") return;
+
+    let cancelled = false;
+    let timer = window.setTimeout(reveal, 10_000);
+
+    function reveal() {
+      if (cancelled) return;
+      setShowTooltip(true);
+      sessionStorage.setItem("soldryck_gps_hint_seen", "1");
+    }
+    function reset() {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(reveal, 10_000);
+    }
+
+    const map = mapRef.current;
+    map?.on("movestart zoomstart popupopen", reset);
+    window.addEventListener("pointerdown", reset);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      map?.off("movestart zoomstart popupopen", reset);
+      window.removeEventListener("pointerdown", reset);
+    };
+  }, [geoState]);
 
   const locateBtnColor = geoState === "located" ? "#3b82f6" : geoState === "error" ? "#ef4444" : "#1e293b";
   const glassStyle: React.CSSProperties = {
@@ -2211,13 +2443,18 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
                   bottom: "calc(100% + 8px)",
                   width: 280,
                   borderRadius: 14,
-                  padding: "10px 12px",
-                  fontSize: 12,
-                  color: "#64748b",
+                  padding: "16px 14px",
                   fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+                  textAlign: "center",
                 }}
               >
-                Inga ställen matchar &ldquo;{searchQuery}&rdquo;
+                <div style={{ fontSize: 24, lineHeight: 1, marginBottom: 6 }} aria-hidden>🔍</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", marginBottom: 3 }}>
+                  Inget träff på &ldquo;{searchQuery}&rdquo;
+                </div>
+                <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4 }}>
+                  Pröva med en del av namnet, eller bläddra på kartan.
+                </div>
               </div>
             )}
             <input
@@ -2276,8 +2513,54 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
       {/* Hitta solen FAB — orange round button, middle of right-side stack */}
       <div data-onboarding="locate-btn" style={{ position: "absolute", bottom: "calc(277px + var(--safe-bottom, 0px))", right: "calc(12px + var(--safe-right, 0px))", zIndex: 1001 }}>
+        {/* First-time-discovery pulse — fires three rings on first map view
+            then never again (localStorage flag). Sits behind the FAB and
+            ignores pointer events, so the button still receives clicks. */}
+        {findSunPulse && findSunState === "idle" && (
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: -2,
+              borderRadius: "50%",
+              border: "2px solid rgba(251,146,60,0.65)",
+              pointerEvents: "none",
+              animation: "find-sun-pulse 1.4s ease-out 3",
+            }}
+          />
+        )}
+
+        {/* Result toast — explains the "none" / "error" state in plain text.
+            Previously the user only saw the FAB icon change color, with the
+            actual reason buried in the title= attribute (invisible on mobile). */}
+        {(findSunState === "none" || findSunState === "error") && (
+          <div
+            role="status"
+            style={{
+              position: "absolute",
+              right: "calc(100% + 10px)",
+              top: "50%",
+              transform: "translateY(-50%)",
+              ...glassStyle,
+              padding: "8px 12px",
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: 500,
+              color: findSunState === "error" ? "#991b1b" : "#475569",
+              maxWidth: 200,
+              whiteSpace: "normal",
+              lineHeight: 1.35,
+              animation: "ios-install-in 0.25s ease-out",
+              pointerEvents: "none",
+            }}
+          >
+            {findSunState === "error"
+              ? (findSunMsg ?? "Kunde inte hämta position")
+              : (findSunMsg ?? "Inga öppna ställen med sol nära dig just nu — bläddra på kartan istället.")}
+          </div>
+        )}
         <button
-          onClick={handleFindSun}
+          onClick={() => { setFindSunPulse(false); handleFindSun(); }}
           disabled={findSunState === "locating"}
           title={
             findSunState === "locating" ? "Letar efter sol..." :
@@ -2380,6 +2663,36 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         </button>
       </div>
 
+      {/* "Hämtar öppettider..." — small status pill while the open-now
+          fetcher loop is in flight, so users know markers are still
+          updating rather than thinking the filter is broken. */}
+      {openNowFilter && openNowFetching > 0 && (
+        <div style={{
+          position: "absolute",
+          top: "calc(160px + var(--safe-top, 0px))",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 1085,
+          pointerEvents: "none",
+          ...glassStyle,
+          padding: "5px 12px",
+          borderRadius: 999,
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#475569",
+          fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+        }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: "spin 1s linear infinite" }}>
+            <circle cx="12" cy="12" r="9" strokeOpacity="0.3" />
+            <path d="M12 3a9 9 0 0 1 9 9" />
+          </svg>
+          Hämtar öppettider… ({openNowFetching})
+        </div>
+      )}
+
       {/* "Sök i detta område" — appears below category filters after first pan (Google Maps pattern) */}
       {showSearchInArea && !areaSearchOpen && (
         <div style={{
@@ -2428,6 +2741,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         @keyframes find-sun-idle {
           0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
           50% { transform: scale(1.15) rotate(15deg); opacity: 0.8; }
+        }
+        @keyframes find-sun-pulse {
+          0%   { transform: scale(1);   opacity: 0.85; }
+          100% { transform: scale(2.0); opacity: 0; }
         }
         @keyframes gps-tip {
           0%   { opacity: 0; transform: translateX(6px); }
