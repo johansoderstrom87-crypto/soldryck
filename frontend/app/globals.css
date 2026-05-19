@@ -127,6 +127,15 @@ html, body {
   overflow: hidden !important;
 }
 
+/* Hide Leaflet's default popup close button. Our popups close via map-tap
+   or via the in-popup actions; the default ✕ ended up floating below the
+   popup tip because of our custom-pane setup (it inherits absolute
+   positioning relative to the popup container that's mirrored into our
+   appPopupPane), which looked broken. */
+.leaflet-popup-close-button {
+  display: none !important;
+}
+
 .leaflet-popup-tip {
   background: rgba(255, 255, 255, 0.72) !important;
 }

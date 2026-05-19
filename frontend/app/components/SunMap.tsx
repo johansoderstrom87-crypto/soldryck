@@ -1338,11 +1338,28 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     syncPaneTransform();
     map.on("move zoom viewreset zoomanim", syncPaneTransform);
 
-    // Center marker on screen when its popup opens (user request: popup
-    // should be centered, not just brought into view by autoPan).
-    map.on("popupopen", (e: any) => {
+    // Pan so the marker sits in the lower-middle of the viewport when its
+    // popup opens. panTo() would centre the marker, but our popups can be
+    // 300-400 px tall — centring puts the top of the popup off-screen
+    // above the header. Putting the marker around 70 % of the viewport
+    // height instead leaves room for the popup to grow upward.
+    map.on("popupopen", (e: { popup?: L.Popup }) => {
       const latlng = e.popup?.getLatLng?.();
-      if (latlng) map.panTo(latlng, { animate: true, duration: 0.4 });
+      if (!latlng || !mapRef.current) return;
+      const m = mapRef.current;
+      const size = m.getSize();
+      const current = m.latLngToContainerPoint(latlng);
+      // Target Y as a fraction of viewport height. 0.7 keeps the marker
+      // visible (with its tip), and the popup floats above with breathing
+      // room above the time slider.
+      const target = L.point(size.x / 2, size.y * 0.7);
+      // panBy moves the map center by N pixels; content shifts by -N. We
+      // want the marker pixel to move from `current` to `target`, i.e. the
+      // content to shift by (target - current), so panBy(current - target).
+      m.panBy(
+        [current.x - target.x, current.y - target.y],
+        { animate: true, duration: 0.4 },
+      );
     });
 
     return () => {
