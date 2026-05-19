@@ -704,7 +704,7 @@ export default function Header({
                       boxShadow: active
                         ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
                         : "0 2px 8px rgba(0,0,0,0.06)",
-                      color: active ? "#0f172a" : "#888",
+                      color: active ? "#9a3412" : "#888",
                       opacity: active ? 1 : 0.65,
                       transform: "translateZ(0)",
                       isolation: "isolate",
@@ -712,50 +712,12 @@ export default function Header({
                     }}
                   >
                     <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#0f172a" : "rgba(0,0,0,0.65)" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#9a3412" : "rgba(0,0,0,0.65)" }}>
                       {label}
                     </span>
                   </button>
                 );
               })}
-
-            {/* T-bana-knapp — togglar metro-overlay */}
-            <button
-              onClick={() => onToggleMetro()}
-              title="Tunnelbana"
-              aria-label="Visa tunnelbanenät"
-              aria-pressed={showMetro}
-              className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
-              style={{
-                width: 40,
-                height: 40,
-                background: showMetro
-                  ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
-                  : "rgba(255,255,255,0.14)",
-                backdropFilter: "blur(16px) saturate(1.5)",
-                WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                border: showMetro
-                  ? "1px solid rgba(251,146,60,0.75)"
-                  : "0.5px solid rgba(255,255,255,0.45)",
-                boxShadow: showMetro
-                  ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
-                  : "0 2px 8px rgba(0,0,0,0.06)",
-                color: showMetro ? "#0f172a" : "#888",
-                opacity: showMetro ? 1 : 0.65,
-                transform: "translateZ(0)",
-                isolation: "isolate",
-                flexShrink: 0,
-              }}
-            >
-              <span style={{ display: "flex", alignItems: "center", gap: 2, lineHeight: 1 }}>
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#e3000b" }} />
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#00a14e" }} />
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#0065bd" }} />
-              </span>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: showMetro ? "#0f172a" : "rgba(0,0,0,0.65)" }}>
-                T-bana
-              </span>
-            </button>
 
             {/* Öppet nu-knapp — kräver att hours fetchas för viewport-venues,
                 så markörer kan dröja någon sekund innan stängda försvinner. */}
@@ -779,7 +741,7 @@ export default function Header({
                 boxShadow: openNowFilter
                   ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
                   : "0 2px 8px rgba(0,0,0,0.06)",
-                color: openNowFilter ? "#0f172a" : "#888",
+                color: openNowFilter ? "#9a3412" : "#888",
                 opacity: openNowFilter ? 1 : 0.65,
                 transform: "translateZ(0)",
                 isolation: "isolate",
@@ -790,8 +752,46 @@ export default function Header({
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7v5l3 2" />
               </svg>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: openNowFilter ? "#0f172a" : "rgba(0,0,0,0.65)" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: openNowFilter ? "#9a3412" : "rgba(0,0,0,0.65)" }}>
                 Öppet
+              </span>
+            </button>
+
+            {/* T-bana-knapp — togglar metro-overlay */}
+            <button
+              onClick={() => onToggleMetro()}
+              title="Tunnelbana"
+              aria-label="Visa tunnelbanenät"
+              aria-pressed={showMetro}
+              className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+              style={{
+                width: 40,
+                height: 40,
+                background: showMetro
+                  ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
+                  : "rgba(255,255,255,0.14)",
+                backdropFilter: "blur(16px) saturate(1.5)",
+                WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+                border: showMetro
+                  ? "1px solid rgba(251,146,60,0.75)"
+                  : "0.5px solid rgba(255,255,255,0.45)",
+                boxShadow: showMetro
+                  ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
+                  : "0 2px 8px rgba(0,0,0,0.06)",
+                color: showMetro ? "#9a3412" : "#888",
+                opacity: showMetro ? 1 : 0.65,
+                transform: "translateZ(0)",
+                isolation: "isolate",
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 2, lineHeight: 1 }}>
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#e3000b" }} />
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#00a14e" }} />
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#0065bd" }} />
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: showMetro ? "#9a3412" : "rgba(0,0,0,0.65)" }}>
+                T-bana
               </span>
             </button>
           </div>
