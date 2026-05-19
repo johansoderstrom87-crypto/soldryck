@@ -810,6 +810,118 @@ html, body {
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
 }
 
+/* Weather effects overlay — animerade regn-/snö-/åskeffekter ovanpå kartan.
+   Drivs av `data-fx`-attributet på .weather-fx (sätts från SunMap baserat på
+   SMHI-symbolen för vald timme). Effekten renderas som upprepade CSS-bakgrunder
+   på pseudoelement i stället för hundratals DOM-noder — billigt och låter
+   varje effekt fada in/ut mjukt när vädret växlar.
+
+   Lagret ligger som syskon till leaflet-containern, har pointer-events: none
+   så kartan reagerar normalt på pan/zoom, och z-index < right-side button
+   stacken (1001) så knapparna alltid är klickbara. */
+.weather-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 500;
+}
+.weather-fx::before,
+.weather-fx::after {
+  content: "";
+  position: absolute;
+  inset: -10%;                  /* lite overshoot så roterade streck täcker kanterna */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+/* Regn — bleka, snabba streck med svag lutning */
+.weather-fx[data-fx="rain"]::before,
+.weather-fx[data-fx="rain-heavy"]::before,
+.weather-fx[data-fx="thunder"]::before {
+  background-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    transparent 65%,
+    rgba(170, 200, 230, 0.55) 75%,
+    rgba(190, 215, 240, 0.85) 92%,
+    transparent 100%
+  );
+  background-size: 2px 26px;
+  background-repeat: repeat;
+  animation: rain-fall 0.45s linear infinite;
+  opacity: 0.55;
+  transform: rotate(8deg);
+  transform-origin: center;
+}
+.weather-fx[data-fx="rain-heavy"]::before {
+  background-size: 2px 20px;
+  animation-duration: 0.32s;
+  opacity: 0.75;
+}
+.weather-fx[data-fx="thunder"]::before {
+  animation-duration: 0.30s;
+  opacity: 0.75;
+}
+
+/* Åska — periodisk vit blixt ovanpå regnstrecken */
+.weather-fx[data-fx="thunder"]::after {
+  background: rgba(220, 230, 255, 0.55);
+  mix-blend-mode: screen;
+  animation: thunder-flash 7s ease-in-out infinite;
+}
+
+/* Snö — mjuka, drivande prickar i två olika storlekar/farter */
+.weather-fx[data-fx="snow"]::before,
+.weather-fx[data-fx="snow-heavy"]::before {
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,0.95) 1.4px, transparent 1.8px),
+    radial-gradient(circle, rgba(255,255,255,0.75) 1.0px, transparent 1.4px);
+  background-size: 180px 180px, 90px 90px;
+  background-position: 0 0, 45px 30px;
+  background-repeat: repeat;
+  animation: snow-fall 12s linear infinite;
+  opacity: 0.7;
+}
+.weather-fx[data-fx="snow-heavy"]::before {
+  background-size: 130px 130px, 70px 70px;
+  animation-duration: 9s;
+  opacity: 0.85;
+}
+
+@keyframes rain-fall {
+  from { background-position: 0 0; }
+  to   { background-position: 0 26px; }
+}
+@keyframes snow-fall {
+  from { background-position: 0 -180px, 45px -150px; }
+  to   { background-position: 60px 180px, 105px 210px; }
+}
+@keyframes thunder-flash {
+  0%, 92%, 100% { opacity: 0; }
+  93%, 93.7%     { opacity: 1; }
+  94%            { opacity: 0; }
+  95%, 95.5%     { opacity: 0.8; }
+  96%            { opacity: 0; }
+}
+
+/* Respect reduced motion — släck animationerna men låt en svag prick-/streck-
+   textur ligga kvar som indikation på att det regnar/snöar. */
+@media (prefers-reduced-motion: reduce) {
+  .weather-fx::before,
+  .weather-fx::after {
+    animation: none !important;
+    opacity: 0.18 !important;
+  }
+  .weather-fx[data-fx=""]::before,
+  .weather-fx[data-fx=""]::after,
+  .weather-fx:not([data-fx])::before,
+  .weather-fx:not([data-fx])::after {
+    opacity: 0 !important;
+  }
+}
+
 @keyframes onb-pulse {
   0%, 100% { box-shadow: 0 0 0 100vmax rgba(0,0,0,0.52); }
   50%       { box-shadow: 0 0 0 100vmax rgba(0,0,0,0.52), 0 0 0 7px rgba(251,146,60,0.32); }

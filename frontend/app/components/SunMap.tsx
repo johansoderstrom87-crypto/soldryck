@@ -570,11 +570,42 @@ function getSunTimes(date: Date): { sunrise: number; sunset: number } {
 }
 
 /**
+ * Map every WeatherBar icon to a single darkness value. SMHI's 27 symbol
+ * codes collapse into ~11 emoji, so keying off the code (the old approach)
+ * meant two hours showing the same ☁️ could darken the map by very
+ * different amounts — the bug that made scrubbing through cloudy hours look
+ * inconsistent. Quantising by the rendered icon guarantees same-icon =
+ * same-darkness.
+ */
+const ICON_DARKNESS: Record<string, number> = {
+  "☀️": 0.00,       // ☀️  Klart
+  "🌤️": 0.02, // 🌤️  Nästan klart
+  "⛅": 0.05,             // ⛅  Halvklart
+  "🌥️": 0.10, // 🌥️  Molnigt
+  "☁️": 0.22,       // ☁️  Mulet
+  "🌫️": 0.20, // 🌫️  Dimma
+  "🌦️": 0.24, // 🌦️  Lätta regnskurar
+  "🌧️": 0.30, // 🌧️  Regn (alla styrkor)
+  "⛈️": 0.36,       // ⛈️  Åska
+  "🌨️": 0.24, // 🌨️  Snöblandat / lätt snö
+  "❄️": 0.28,       // ❄️  Snöfall
+};
+
+function quantizedWeatherDark(symbolCode: number | undefined): number {
+  if (symbolCode === undefined) return 0;
+  return ICON_DARKNESS[getSymbolInfo(symbolCode).icon] ?? 0;
+}
+
+/**
  * Calculate ambient darkness (0 = bright daylight, 1 = dark night).
  * Follows the actual sunrise/sunset for the selected date, and adds extra
  * darkening for overcast/rainy weather.
+ *
+ * Weather darkness is smoothed against neighbour hours (15% weight each)
+ * so the brightness gradient still glides while scrubbing the slider, even
+ * when two adjacent hours fall in different weather tiers.
  */
-function getAmbientDarkness(hour: number, date: Date, weatherSymbol?: number): number {
+function getAmbientDarkness(hour: number, date: Date, weather: WeatherData | null): number {
   const { sunrise, sunset } = getSunTimes(date);
 
   // Twilight curve anchored to sunrise/sunset.
@@ -589,24 +620,10 @@ function getAmbientDarkness(hour: number, date: Date, weatherSymbol?: number): n
   else if (hour <= sunset + 1.5) timeDark = 0.20 + ((hour - (sunset + 0.25)) / 1.25) * 0.35;
   else timeDark = 0.55;
 
-  // Weather-based adjustment. Clear sky adds a tiny warm overlay (tinted below),
-  // while overcast/rain/thunder layers on substantial darkness.
-  let weatherDark = 0;
-  if (weatherSymbol !== undefined) {
-    if (weatherSymbol === 1) weatherDark = 0.03;
-    else if (weatherSymbol === 2) weatherDark = 0.02;
-    else if (weatherSymbol === 3) weatherDark = 0.05;
-    else if (weatherSymbol === 4) weatherDark = 0.11;
-    else if (weatherSymbol === 5) weatherDark = 0.18;
-    else if (weatherSymbol === 6) weatherDark = 0.26;
-    else if (weatherSymbol === 7) weatherDark = 0.20;
-    else if (weatherSymbol >= 8 && weatherSymbol <= 10) weatherDark = 0.20 + (weatherSymbol - 8) * 0.05;
-    else if (weatherSymbol === 11 || weatherSymbol === 21) weatherDark = 0.34;
-    else if (weatherSymbol >= 12 && weatherSymbol <= 17) weatherDark = 0.20;
-    else if (weatherSymbol >= 18 && weatherSymbol <= 20) weatherDark = 0.24 + (weatherSymbol - 18) * 0.05;
-    else if (weatherSymbol >= 22 && weatherSymbol <= 24) weatherDark = 0.22;
-    else if (weatherSymbol >= 25 && weatherSymbol <= 27) weatherDark = 0.26;
-  }
+  const curr = quantizedWeatherDark(weather?.hourly[hour]?.symbolCode);
+  const prev = quantizedWeatherDark(weather?.hourly[hour - 1]?.symbolCode);
+  const next = quantizedWeatherDark(weather?.hourly[hour + 1]?.symbolCode);
+  const weatherDark = curr * 0.7 + prev * 0.15 + next * 0.15;
 
   return Math.max(0, Math.min(timeDark + weatherDark, 0.65));
 }
@@ -2469,8 +2486,24 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   }
 
   const currentWeatherSymbol = weather?.hourly[hour]?.symbolCode;
-  const darkness = getAmbientDarkness(hour, date, currentWeatherSymbol);
+  const darkness = getAmbientDarkness(hour, date, weather ?? null);
   const ambientColor = getAmbientColor(hour, date, currentWeatherSymbol);
+  const weatherFx = useMemo(() => {
+    if (currentWeatherSymbol === undefined) return "";
+    const info = getSymbolInfo(currentWeatherSymbol);
+    if (info.category === "thunder") return "thunder";
+    if (info.category === "rain") {
+      // 10 = "Kraftiga regnskurar", 20 = "Kraftigt regn" → tätare droppar
+      return currentWeatherSymbol === 10 || currentWeatherSymbol === 20 ? "rain-heavy" : "rain";
+    }
+    if (info.category === "snow") {
+      // 14, 17, 24, 27 = "Kraftiga…"-varianter
+      return currentWeatherSymbol === 14 || currentWeatherSymbol === 17 || currentWeatherSymbol === 24 || currentWeatherSymbol === 27
+        ? "snow-heavy"
+        : "snow";
+    }
+    return "";
+  }, [currentWeatherSymbol]);
 
   // Darken the map via CSS filter on Leaflet's tile + overlay panes — this is
   // the only reliable way to avoid affecting popups, because leaflet-map-pane
@@ -2614,6 +2647,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   return (
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
+      {/* Animerade regn-/snö-/åskeffekter ovanpå kartan. Drivs av SMHI-koden
+          för vald timme. Effekten är pointer-events: none så kartan går att
+          panorera/zooma normalt. Stilar i globals.css. */}
+      <div className="weather-fx" data-fx={weatherFx} aria-hidden />
 
       {/* Right-side button stack.
           Single flex column anchored at bottom + right (safe-area aware).
