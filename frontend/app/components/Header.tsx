@@ -50,6 +50,14 @@ const MODIFIER_BUTTON: { type: VenueType; label: string; svg: string } = {
   svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
 };
 
+// Aktiv-stil för "snäva in"-knappar (Glas, Öppet, T-bana). Använder en
+// ljusblå palett i stället för huvudkategoriernas orange, så användaren
+// uppfattar att de filtrerar/överlägger på andra premisser.
+const BLUE_ACTIVE_BG = "linear-gradient(160deg, rgba(96,165,250,0.45) 0%, rgba(59,130,246,0.28) 60%, rgba(255,255,255,0.12) 100%)";
+const BLUE_ACTIVE_BORDER = "1px solid rgba(59,130,246,0.75)";
+const BLUE_ACTIVE_SHADOW = "0 0 0 1px rgba(59,130,246,0.35), 0 0 14px rgba(96,165,250,0.6), 0 0 28px rgba(96,165,250,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)";
+const BLUE_ACTIVE_TEXT = "#1e40af";
+
 interface HeaderProps {
   filter: "all" | "sun" | "shade";
   onFilterChange: (filter: "all" | "sun" | "shade") => void;
@@ -760,18 +768,12 @@ export default function Header({
                   style={{
                     width: 40,
                     height: 40,
-                    background: active
-                      ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
-                      : "rgba(255,255,255,0.14)",
+                    background: active ? BLUE_ACTIVE_BG : "rgba(255,255,255,0.14)",
                     backdropFilter: "blur(16px) saturate(1.5)",
                     WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                    border: active
-                      ? "1px solid rgba(251,146,60,0.75)"
-                      : "0.5px solid rgba(255,255,255,0.45)",
-                    boxShadow: active
-                      ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
-                      : "0 2px 8px rgba(0,0,0,0.06)",
-                    color: active ? "#9a3412" : "#888",
+                    border: active ? BLUE_ACTIVE_BORDER : "0.5px solid rgba(255,255,255,0.45)",
+                    boxShadow: active ? BLUE_ACTIVE_SHADOW : "0 2px 8px rgba(0,0,0,0.06)",
+                    color: active ? BLUE_ACTIVE_TEXT : "#888",
                     opacity: active ? 1 : 0.65,
                     transform: "translateZ(0)",
                     isolation: "isolate",
@@ -779,7 +781,7 @@ export default function Header({
                   }}
                 >
                   <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#9a3412" : "rgba(0,0,0,0.65)" }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? BLUE_ACTIVE_TEXT : "rgba(0,0,0,0.65)" }}>
                     {label}
                   </span>
                 </button>
@@ -797,18 +799,12 @@ export default function Header({
               style={{
                 width: 40,
                 height: 40,
-                background: openNowFilter
-                  ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
-                  : "rgba(255,255,255,0.14)",
+                background: openNowFilter ? BLUE_ACTIVE_BG : "rgba(255,255,255,0.14)",
                 backdropFilter: "blur(16px) saturate(1.5)",
                 WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                border: openNowFilter
-                  ? "1px solid rgba(251,146,60,0.75)"
-                  : "0.5px solid rgba(255,255,255,0.45)",
-                boxShadow: openNowFilter
-                  ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
-                  : "0 2px 8px rgba(0,0,0,0.06)",
-                color: openNowFilter ? "#9a3412" : "#888",
+                border: openNowFilter ? BLUE_ACTIVE_BORDER : "0.5px solid rgba(255,255,255,0.45)",
+                boxShadow: openNowFilter ? BLUE_ACTIVE_SHADOW : "0 2px 8px rgba(0,0,0,0.06)",
+                color: openNowFilter ? BLUE_ACTIVE_TEXT : "#888",
                 opacity: openNowFilter ? 1 : 0.65,
                 transform: "translateZ(0)",
                 isolation: "isolate",
@@ -819,7 +815,7 @@ export default function Header({
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7v5l3 2" />
               </svg>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: openNowFilter ? "#9a3412" : "rgba(0,0,0,0.65)" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: openNowFilter ? BLUE_ACTIVE_TEXT : "rgba(0,0,0,0.65)" }}>
                 Öppet
               </span>
             </button>
@@ -834,18 +830,12 @@ export default function Header({
               style={{
                 width: 40,
                 height: 40,
-                background: showMetro
-                  ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
-                  : "rgba(255,255,255,0.14)",
+                background: showMetro ? BLUE_ACTIVE_BG : "rgba(255,255,255,0.14)",
                 backdropFilter: "blur(16px) saturate(1.5)",
                 WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                border: showMetro
-                  ? "1px solid rgba(251,146,60,0.75)"
-                  : "0.5px solid rgba(255,255,255,0.45)",
-                boxShadow: showMetro
-                  ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
-                  : "0 2px 8px rgba(0,0,0,0.06)",
-                color: showMetro ? "#9a3412" : "#888",
+                border: showMetro ? BLUE_ACTIVE_BORDER : "0.5px solid rgba(255,255,255,0.45)",
+                boxShadow: showMetro ? BLUE_ACTIVE_SHADOW : "0 2px 8px rgba(0,0,0,0.06)",
+                color: showMetro ? BLUE_ACTIVE_TEXT : "#888",
                 opacity: showMetro ? 1 : 0.65,
                 transform: "translateZ(0)",
                 isolation: "isolate",
@@ -857,7 +847,7 @@ export default function Header({
                 <span style={{ width: 5, height: 5, borderRadius: 999, background: "#00a14e" }} />
                 <span style={{ width: 5, height: 5, borderRadius: 999, background: "#0065bd" }} />
               </span>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: showMetro ? "#9a3412" : "rgba(0,0,0,0.65)" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: showMetro ? BLUE_ACTIVE_TEXT : "rgba(0,0,0,0.65)" }}>
                 T-bana
               </span>
             </button>
