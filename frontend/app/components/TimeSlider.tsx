@@ -418,13 +418,12 @@ export default function TimeSlider({
       <div
         ref={panelRef}
         data-onboarding="time-slider"
-        className="pointer-events-auto max-w-md mx-auto rounded-2xl"
+        className="theme-surface pointer-events-auto max-w-md mx-auto rounded-2xl"
         style={{
-          background: "rgba(255, 255, 255, 0.3)",
           backdropFilter: "blur(14px) saturate(1.3)",
           WebkitBackdropFilter: "blur(14px) saturate(1.3)",
-          border: "0.5px solid rgba(255, 255, 255, 0.45)",
-          boxShadow: "0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)",
+          borderWidth: "0.5px",
+          borderStyle: "solid",
           overflow: "visible",
           transform: "translateZ(0)",
           isolation: "isolate",

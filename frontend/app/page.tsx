@@ -12,6 +12,7 @@ import IosInstallHint from "./components/IosInstallHint";
 import VenuesLoadingPill from "./components/VenuesLoadingPill";
 import { fetchWeather, toLocalDateStr, type WeatherData } from "./lib/weather";
 import { isInSeason, snapToSeason } from "./lib/season";
+import { getTimeTheme, applyTimeTheme } from "./lib/timeTheme";
 import { track, installGlobalErrorHandlers } from "./lib/analytics";
 import type { FeedbackVenue } from "./components/SunMap";
 import type { VenueType, SunRange } from "./components/SunMap";
@@ -150,6 +151,14 @@ export default function Home() {
       .then((data) => setWeather(data))
       .finally(() => setWeatherLoading(false));
   }, []);
+
+  // Time-travel UI — när användaren scrubbar tidslinjen skiftar hela
+  // chrome:t (Header-card, TimeSlider, WeatherBar) och kartans tonade
+  // overlay mellan dagsljus, gyllene timme och dark mode. Skriver CSS-
+  // vars på :root så komponenterna bara läser dem via `var(--theme-…)`.
+  useEffect(() => {
+    applyTimeTheme(getTimeTheme(hour, date));
+  }, [hour, date]);
 
   return (
     <div className="h-full relative">

@@ -11,7 +11,7 @@ interface WeatherBarProps {
 export default function WeatherBar({ weather, hour, loading }: WeatherBarProps) {
   if (loading) {
     return (
-      <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg px-4 py-2.5 animate-pulse">
+      <div className="theme-surface rounded-2xl px-4 py-2.5 animate-pulse" style={{ borderWidth: "0.5px", borderStyle: "solid", backdropFilter: "blur(12px) saturate(1.2)", WebkitBackdropFilter: "blur(12px) saturate(1.2)" }}>
         <div className="h-4 w-32 bg-slate-200 rounded" />
       </div>
     );
@@ -28,15 +28,15 @@ export default function WeatherBar({ weather, hour, loading }: WeatherBarProps) 
   const forecastHours = Array.from({ length: 16 }, (_, i) => i + 7);
 
   return (
-    <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-lg px-4 py-2.5">
+    <div className="theme-surface rounded-2xl px-4 py-2.5" style={{ borderWidth: "0.5px", borderStyle: "solid", backdropFilter: "blur(12px) saturate(1.2)", WebkitBackdropFilter: "blur(12px) saturate(1.2)" }}>
       {/* Current weather */}
       <div className="flex items-center gap-2 mb-2">
         <span className="text-xl">{symbol.icon}</span>
         <div>
-          <div className="text-sm font-semibold text-slate-800">
+          <div className="text-sm font-semibold" style={{ color: "var(--theme-text-primary)" }}>
             {symbol.label}, {Math.round(current.temperature)}°C
           </div>
-          <div className="text-[10px] text-slate-400">
+          <div className="text-[10px]" style={{ color: "var(--theme-text-muted)" }}>
             Vind {current.windSpeed} m/s
             {current.precipMm > 0 ? ` · ${current.precipMm} mm` : ""}
           </div>

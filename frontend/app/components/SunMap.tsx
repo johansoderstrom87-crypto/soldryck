@@ -659,40 +659,6 @@ function getAmbientDarkness(hour: number, date: Date, weather: WeatherData | nul
   return Math.max(0, Math.min(timeDark + weatherDark, 0.65));
 }
 
-/** Get warm/cool tint color based on time of day and weather */
-function getAmbientColor(hour: number, date: Date, weatherSymbol?: number): string {
-  const { sunrise, sunset } = getSunTimes(date);
-
-  // Rain/thunder — deep cold grey-blue
-  if (
-    weatherSymbol &&
-    (weatherSymbol === 11 ||
-      weatherSymbol === 21 ||
-      (weatherSymbol >= 8 && weatherSymbol <= 10) ||
-      (weatherSymbol >= 18 && weatherSymbol <= 20))
-  ) {
-    return "35, 42, 58";
-  }
-
-  // Overcast / fog — flat grey
-  if (weatherSymbol === 5 || weatherSymbol === 6 || weatherSymbol === 7) {
-    return "60, 65, 78";
-  }
-
-  // Clear / nearly clear during daytime — warm golden overlay so slight alpha reads as sunlit
-  if (weatherSymbol !== undefined && weatherSymbol <= 2 && hour > sunrise && hour < sunset) {
-    return "255, 210, 140";
-  }
-
-  // Golden hour around sunset — warm orange
-  if (hour >= sunset - 0.5 && hour <= sunset + 1) return "60, 30, 15";
-
-  // Pre-dawn / late evening — cool blue-purple
-  if (hour <= sunrise + 0.5 || hour >= sunset + 1) return "30, 25, 55";
-
-  return "15, 23, 42"; // neutral slate
-}
-
 // Cache for loaded shadow GeoJSON
 const shadowCache = new Map<string, any>();
 
@@ -1127,6 +1093,16 @@ function buildVenuePopupHtml(
   // ground who actually want to walk there, not browse the venue listing.
   const mapUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}&destination_place_id=&travelmode=walking`;
 
+  // Booking link — TheFork only covers ~439 Stockholm restaurants out of our
+  // ~2 843 venues. priceLevel >= 2 (from Google Places) is a decent proxy for
+  // sit-down restaurants likely on TheFork; everything else falls back to a
+  // Google search which always returns something useful.
+  const onTheFork = typeof venue.priceLevel === "number" && venue.priceLevel >= 2;
+  const bookUrl = onTheFork
+    ? `https://www.thefork.com/search?cityId=528294&searchText=${encodeURIComponent(venue.name)}`
+    : `https://www.google.com/search?q=${encodeURIComponent(`${venue.name} stockholm boka bord`)}`;
+  const bookSource = onTheFork ? "via The Fork" : "via Google";
+
   return `
     <div style="min-width:260px">
       ${photoContainerHtml}
@@ -1167,7 +1143,7 @@ function buildVenuePopupHtml(
       <a
         class="popup-book book-btn"
         data-venue-id="${venue.id}"
-        href="https://www.thefork.se/sok?cityId=415144&searchText=${encodeURIComponent(venue.name)}"
+        href="${bookUrl}"
         target="_blank"
         rel="noopener noreferrer"
       >
@@ -1178,7 +1154,7 @@ function buildVenuePopupHtml(
           <line x1="3" y1="10" x2="21" y2="10"/>
         </svg>
         <span style="flex:1">Boka bord</span>
-        <span style="font-size:9px;color:#94a3b8;font-weight:500">via The Fork</span>
+        <span style="font-size:9px;color:#94a3b8;font-weight:500">${bookSource}</span>
       </a>
       <div class="popup-actions-row">
         <button
@@ -2518,7 +2494,6 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
   const currentWeatherSymbol = weather?.hourly[hour]?.symbolCode;
   const darkness = getAmbientDarkness(hour, date, weather ?? null);
-  const ambientColor = getAmbientColor(hour, date, currentWeatherSymbol);
   const weatherFx = useMemo(() => {
     if (currentWeatherSymbol === undefined) return "";
     const info = getSymbolInfo(currentWeatherSymbol);
@@ -2559,14 +2534,15 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     const darkPane = mapRef.current?.getPane("darkTiles");
     if (darkPane) darkPane.style.opacity = String(darkBlend);
 
+    // Färgton hanteras nu separat av .map-ambient-overlayen (driftar med
+    // vald timme via lib/timeTheme.ts). Här gör vi bara mörker — en
+    // brightness-sänkning på de ljusa plattorna tills mörka tilesetet
+    // tagit över via darkBlend.
     const effectiveDarkness = darkness * (1 - darkBlend * 0.85);
     const brightness = Math.max(0.35, 1 - effectiveDarkness * 0.9);
-    const [r, , b] = ambientColor.split(",").map((n) => Number(n.trim()));
-    const warmBias = (r - b) / 255;
-    const hueRotate = -warmBias * 12 * effectiveDarkness;
     const saturate = 1 - effectiveDarkness * 0.25;
 
-    const tileFilter = `brightness(${brightness}) saturate(${saturate}) hue-rotate(${hueRotate}deg)`;
+    const tileFilter = `brightness(${brightness}) saturate(${saturate})`;
     tilePane.style.filter = tileFilter;
     tilePane.style.transition = "filter 0.8s ease";
     overlayPane.style.filter = tileFilter;
@@ -2575,7 +2551,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     const markerBrightness = Math.max(0.55, 1 - darkness * 0.55);
     const markerSaturate = 1 - darkness * 0.2;
     container.style.setProperty("--marker-dot-filter", `brightness(${markerBrightness}) saturate(${markerSaturate})`);
-  }, [darkness, ambientColor]);
+  }, [darkness]);
 
   // GPS hint tooltip — used to pop up immediately on mount, which felt
   // pushy on first load (overlapping the onboarding spotlight). Now only
@@ -2678,6 +2654,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   return (
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
+      {/* Tonad time-of-day-overlay — färgen sätts via CSS-var i
+          lib/timeTheme.ts (morgon-glow, golden hour, skymning, natt). Mix-
+          blendar mot kartans plattor så även neutrala CARTO-tiles får en
+          varm/kall ton beroende på vald timme. */}
+      <div className="map-ambient" aria-hidden />
       {/* Animerade regn-/snö-/åskeffekter ovanpå kartan. Drivs av SMHI-koden
           för vald timme. Effekten är pointer-events: none så kartan går att
           panorera/zooma normalt. Stilar i globals.css. */}

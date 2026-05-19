@@ -625,19 +625,20 @@ export default function Header({
           + viewportFit=cover would otherwise overlap it). */}
       <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto select-none" style={{ top: "var(--safe-top, 0px)" }}>
 
-        {/* Top card: settings on left, logo centered, favorites on right */}
+        {/* Top card: settings on left, logo centered, favorites on right.
+            Bakgrund/border/skuga reagerar på vald timme via .theme-surface
+            (vars sätts från lib/timeTheme.ts varje gång hour ändras). */}
         <div
-          className="flex items-center justify-center gap-2.5 px-3 pt-1 pb-1"
+          className="theme-surface flex items-center justify-center gap-2.5 px-3 pt-1 pb-1"
           style={{
             position: "relative",
             zIndex: 20,
             borderRadius: "0 0 18px 18px",
-            background: "rgba(255,255,255,0.3)",
             backdropFilter: "blur(14px) saturate(1.3)",
             WebkitBackdropFilter: "blur(14px) saturate(1.3)",
-            border: "0.5px solid rgba(255,255,255,0.55)",
+            borderWidth: "0.5px",
+            borderStyle: "solid",
             borderTop: "none",
-            boxShadow: "0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)",
             transform: "translateZ(0)",
             isolation: "isolate",
           }}
