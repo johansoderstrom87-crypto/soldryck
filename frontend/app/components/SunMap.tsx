@@ -339,12 +339,12 @@ export interface FeedbackVenue {
 export const VENUE_TYPES = ["restaurant", "cafe", "bar", "rooftop"] as const;
 export type VenueType = (typeof VENUE_TYPES)[number];
 
-/** Check if a venue passes the typeFilter. "bar" matches bar+pub, "rooftop" uses pipeline-computed flag. */
-function matchesTypeFilter(venue: { type: string; rooftop?: boolean }, typeFilter: Set<VenueType>): boolean {
+/** Check if a venue passes the typeFilter. "bar" ("Glas") matches bar+pub eller venues som serverar alkohol, "rooftop" uses pipeline-computed flag. */
+function matchesTypeFilter(venue: { type: string; rooftop?: boolean; servesAlcohol?: boolean }, typeFilter: Set<VenueType>): boolean {
   if (typeFilter.size === 0) return true;
   if (typeFilter.has("restaurant") && venue.type === "restaurant") return true;
   if (typeFilter.has("cafe") && venue.type === "cafe") return true;
-  if (typeFilter.has("bar") && (venue.type === "bar" || venue.type === "pub")) return true;
+  if (typeFilter.has("bar") && (venue.type === "bar" || venue.type === "pub" || venue.servesAlcohol)) return true;
   if (typeFilter.has("rooftop") && venue.rooftop) return true;
   return false;
 }
@@ -364,7 +364,6 @@ interface SunMapProps {
   focusVenueId?: string | null;
   onFocusHandled?: () => void;
   metroStation?: MetroStation | null;
-  servingFilter?: boolean;
   openNowFilter?: boolean;
   showRain?: boolean;
   wheelchairOnly?: boolean;
@@ -1150,7 +1149,7 @@ function buildVenuePopupHtml(
   `;
 }
 
-export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, showRain = false, focusVenueId, onFocusHandled, metroStation, servingFilter, openNowFilter = false, wheelchairOnly = false }: SunMapProps) {
+export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, showRain = false, focusVenueId, onFocusHandled, metroStation, openNowFilter = false, wheelchairOnly = false }: SunMapProps) {
   // Defer expensive map rebuild while the user is actively scrubbing the timeline
   const hour = useDeferredValue(hourProp);
 
@@ -1753,9 +1752,6 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       // Filter by type
       if (!matchesTypeFilter(venue, typeFilter)) return;
 
-      // Filter by serving permit
-      if (servingFilter && !venue.servesAlcohol) return;
-
       // Filter by wheelchair-accessibility. OSM tag values: yes / no /
       // limited / designated. We treat "yes" and "designated" as positive.
       if (wheelchairOnly) {
@@ -1948,7 +1944,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     return () => {
       map.off("zoomend moveend", handleViewportChange);
     };
-  }, [dateKey, typeFilter, sunRange, weather, metroStation, servingFilter, wheelchairOnly, allVenues]);
+  }, [dateKey, typeFilter, sunRange, weather, metroStation, wheelchairOnly, allVenues]);
 
   // Hour & sun/shade-filter update — fast path. Retoggles `.marker-dot`'s
   // class and visibility on existing markers. Markers outside the viewport
@@ -2138,7 +2134,6 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           if (dist > STATION_RADIUS_M) continue;
         }
         if (!matchesTypeFilter(venue, typeFilter)) continue;
-        if (servingFilter) continue; // unconfirmed venues have no alcohol data
 
         const icon = L.divIcon({
           className: "marker-root marker-unconfirmed",
@@ -2223,7 +2218,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       unconfirmedMarkersRef.current.forEach((mk) => mk.remove());
       unconfirmedMarkersRef.current = [];
     };
-  }, [metroStation, typeFilter, servingFilter]);
+  }, [metroStation, typeFilter]);
 
   // Rain radar overlay — RainViewer's free public tile service. Extracted
   // to a hook so SunMap can incrementally shrink (#49). Same pattern fits

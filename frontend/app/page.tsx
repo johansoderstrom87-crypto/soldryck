@@ -71,10 +71,6 @@ export default function Home() {
   const [sunRange, setSunRange] = useState<SunRange>(null);
   const [focusVenueId, setFocusVenueId] = useState<string | null>(initialVenue);
   const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
-  // Tillstånd-filter på som standard — drar bort kaffeställen med
-  // formellt outdoor_seating men ingen alkohollicens, vilket matchar
-  // den primära afterwork-användningen.
-  const [servingFilter, setServingFilter] = useState(true);
   const [openNowFilter, setOpenNowFilter] = useState(false);
   // Splash is skipped for users who already added Soldryck to the home
   // screen — they saw it on first install. Initial state must be false so
@@ -179,8 +175,6 @@ export default function Home() {
         onWheelchairOnlyChange={setWheelchairOnly}
         metroStation={metroStation}
         onMetroStationChange={setMetroStation}
-        servingFilter={servingFilter}
-        onServingFilterChange={setServingFilter}
         openNowFilter={openNowFilter}
         onOpenNowFilterChange={setOpenNowFilter}
         venues={allVenues}
@@ -191,7 +185,7 @@ export default function Home() {
         getClosestDateKey={getDateKey}
       />
 
-      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} showMetro={showMetro} showRain={showRain} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} servingFilter={servingFilter} openNowFilter={openNowFilter} wheelchairOnly={wheelchairOnly} />
+      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} showMetro={showMetro} showRain={showRain} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} openNowFilter={openNowFilter} wheelchairOnly={wheelchairOnly} />
 
       <TimeSlider
         hour={hour}

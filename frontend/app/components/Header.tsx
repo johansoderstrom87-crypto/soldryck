@@ -25,17 +25,17 @@ function LineDots({ lines }: { lines: string[] }) {
 const TYPE_BUTTONS: { type: VenueType; label: string; svg: string }[] = [
   {
     type: "restaurant",
-    label: "Mat",
+    label: "Äta",
     svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>`,
   },
   {
     type: "cafe",
-    label: "Café",
+    label: "Fika",
     svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>`,
   },
   {
     type: "bar",
-    label: "Bar & Pub",
+    label: "Glas",
     svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
   },
   {
@@ -62,8 +62,6 @@ interface HeaderProps {
   onWheelchairOnlyChange: (v: boolean) => void;
   metroStation: MetroStation | null;
   onMetroStationChange: (station: MetroStation | null) => void;
-  servingFilter: boolean;
-  onServingFilterChange: (v: boolean) => void;
   openNowFilter: boolean;
   onOpenNowFilterChange: (v: boolean) => void;
   venues: { id: string; name: string; type: string; address: string; lat: number; lng: number }[];
@@ -85,7 +83,7 @@ function SettingsButton({
   metroStation, onMetroStationChange, showShadows, onToggleShadows, showMetro, onToggleMetro,
   showRain, onToggleRain,
   wheelchairOnly, onWheelchairOnlyChange,
-  servingFilter, onServingFilterChange, embedded,
+  embedded,
 }: {
   filter: "all" | "sun" | "shade";
   onFilterChange: (f: "all" | "sun" | "shade") => void;
@@ -103,8 +101,6 @@ function SettingsButton({
   onToggleRain: () => void;
   wheelchairOnly: boolean;
   onWheelchairOnlyChange: (v: boolean) => void;
-  servingFilter: boolean;
-  onServingFilterChange: (v: boolean) => void;
   embedded?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -187,8 +183,7 @@ function SettingsButton({
     (showShadows ? 1 : 0) +
     (showMetro ? 1 : 0) +
     (showRain ? 1 : 0) +
-    (wheelchairOnly ? 1 : 0) +
-    (servingFilter ? 1 : 0);
+    (wheelchairOnly ? 1 : 0);
 
   return (
     <div ref={ref} className="relative">
@@ -597,7 +592,7 @@ export default function Header({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
   showShadows, onToggleShadows, showMetro, onToggleMetro, showRain, onToggleRain,
   wheelchairOnly, onWheelchairOnlyChange,
-  metroStation, onMetroStationChange, servingFilter, onServingFilterChange,
+  metroStation, onMetroStationChange,
   openNowFilter, onOpenNowFilterChange,
   venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey,
 }: HeaderProps) {
@@ -651,8 +646,6 @@ export default function Header({
             onToggleRain={onToggleRain}
             wheelchairOnly={wheelchairOnly}
             onWheelchairOnlyChange={onWheelchairOnlyChange}
-            servingFilter={servingFilter}
-            onServingFilterChange={onServingFilterChange}
             embedded
           />
 
@@ -720,47 +713,47 @@ export default function Header({
                   >
                     <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
                     <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#0f172a" : "rgba(0,0,0,0.65)" }}>
-                      {label === "Bar & Pub" ? "Bar" : label}
+                      {label}
                     </span>
                   </button>
                 );
               })}
 
-            {/* Tillstånd-knapp */}
+            {/* T-bana-knapp — togglar metro-overlay */}
             <button
-              onClick={() => onServingFilterChange(!servingFilter)}
-              title="Tillstånd"
-              aria-label="Filter Tillstånd — bara serveringsställen"
-              aria-pressed={servingFilter}
+              onClick={() => onToggleMetro()}
+              title="Tunnelbana"
+              aria-label="Visa tunnelbanenät"
+              aria-pressed={showMetro}
               className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
               style={{
                 width: 40,
                 height: 40,
-                background: servingFilter
+                background: showMetro
                   ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
                   : "rgba(255,255,255,0.14)",
                 backdropFilter: "blur(16px) saturate(1.5)",
                 WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                border: servingFilter
+                border: showMetro
                   ? "1px solid rgba(251,146,60,0.75)"
                   : "0.5px solid rgba(255,255,255,0.45)",
-                boxShadow: servingFilter
+                boxShadow: showMetro
                   ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
                   : "0 2px 8px rgba(0,0,0,0.06)",
-                color: servingFilter ? "#0f172a" : "#888",
-                opacity: servingFilter ? 1 : 0.65,
+                color: showMetro ? "#0f172a" : "#888",
+                opacity: showMetro ? 1 : 0.65,
                 transform: "translateZ(0)",
                 isolation: "isolate",
                 flexShrink: 0,
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 11h1a4 4 0 0 1 0 8h-1"/>
-                <path d="M3 11h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9z"/>
-                <path d="M3 8a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3H3V8z"/>
-              </svg>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: servingFilter ? "#0f172a" : "rgba(0,0,0,0.65)" }}>
-                Tillstånd
+              <span style={{ display: "flex", alignItems: "center", gap: 2, lineHeight: 1 }}>
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#e3000b" }} />
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#00a14e" }} />
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#0065bd" }} />
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: showMetro ? "#0f172a" : "rgba(0,0,0,0.65)" }}>
+                T-bana
               </span>
             </button>
 
