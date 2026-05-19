@@ -22,6 +22,7 @@ function LineDots({ lines }: { lines: string[] }) {
   );
 }
 
+// Huvudkategorier (OR-logik). Renderas före "Glas" som är en AND-modifier.
 const TYPE_BUTTONS: { type: VenueType; label: string; svg: string }[] = [
   {
     type: "restaurant",
@@ -34,16 +35,20 @@ const TYPE_BUTTONS: { type: VenueType; label: string; svg: string }[] = [
     svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>`,
   },
   {
-    type: "bar",
-    label: "Glas",
-    svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
-  },
-  {
     type: "rooftop",
     label: "Takbar",
     svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><line x1="3" y1="7" x2="7" y2="7"/><line x1="17" y1="7" x2="21" y2="7"/></svg>`,
   },
 ];
+
+// Modifier (AND tillsammans med huvudkategori, OR ensam). Egen knapp med
+// avskiljande divider före i filterraden så det visuellt är klart att den
+// snävar in resten av urvalet snarare än att lägga till.
+const MODIFIER_BUTTON: { type: VenueType; label: string; svg: string } = {
+  type: "bar",
+  label: "Glas",
+  svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
+};
 
 interface HeaderProps {
   filter: "all" | "sun" | "shade";
@@ -718,6 +723,68 @@ export default function Header({
                   </button>
                 );
               })}
+
+            {/* Divider — signalerar att nästa knapp (Glas) är en modifier
+                snarare än en till huvudkategori. Tunn vertikal linje med
+                lite marginal så filterraden inte ser uppdelad ut, bara
+                grupperad. */}
+            <div
+              aria-hidden
+              style={{
+                width: 1,
+                alignSelf: "stretch",
+                marginInline: 2,
+                background: "rgba(15,23,42,0.18)",
+              }}
+            />
+
+            {/* Glas — AND-modifier. Tillsammans med en huvudkategori snävas
+                den in till "den kategorin SOM ÄVEN serverar alkohol". Ensam
+                fungerar den som en huvudkategori (alla med alkohol). Samma
+                visuella stil som övriga så användaren snabbt fattar att det
+                är en filterknapp, men separerad av divider:n ovan. */}
+            {(() => {
+              const { type, label, svg } = MODIFIER_BUTTON;
+              const active = typeFilter.size === 0 || typeFilter.has(type);
+              const isModifying =
+                typeFilter.has(type) &&
+                (typeFilter.has("restaurant") || typeFilter.has("cafe") || typeFilter.has("rooftop"));
+              return (
+                <button
+                  key={type}
+                  onClick={() => toggleType(type)}
+                  title={isModifying ? `${label} — kräver alkoholservering` : label}
+                  aria-label={`Filter ${label}`}
+                  aria-pressed={typeFilter.has(type)}
+                  className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    background: active
+                      ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
+                      : "rgba(255,255,255,0.14)",
+                    backdropFilter: "blur(16px) saturate(1.5)",
+                    WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+                    border: active
+                      ? "1px solid rgba(251,146,60,0.75)"
+                      : "0.5px solid rgba(255,255,255,0.45)",
+                    boxShadow: active
+                      ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
+                      : "0 2px 8px rgba(0,0,0,0.06)",
+                    color: active ? "#9a3412" : "#888",
+                    opacity: active ? 1 : 0.65,
+                    transform: "translateZ(0)",
+                    isolation: "isolate",
+                    flexShrink: 0,
+                  }}
+                >
+                  <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#9a3412" : "rgba(0,0,0,0.65)" }}>
+                    {label}
+                  </span>
+                </button>
+              );
+            })()}
 
             {/* Öppet nu-knapp — kräver att hours fetchas för viewport-venues,
                 så markörer kan dröja någon sekund innan stängda försvinner. */}

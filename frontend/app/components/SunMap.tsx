@@ -339,14 +339,45 @@ export interface FeedbackVenue {
 export const VENUE_TYPES = ["restaurant", "cafe", "bar", "rooftop"] as const;
 export type VenueType = (typeof VENUE_TYPES)[number];
 
-/** Check if a venue passes the typeFilter. "bar" ("Glas") matches bar+pub eller venues som serverar alkohol, "rooftop" uses pipeline-computed flag. */
+/**
+ * Filterlogik:
+ *   • Huvudkategorierna (Äta / Fika / Takbar) → OR. Trycker du flera ser du
+ *     unionen av dem.
+ *   • Glas (bar) → modifier:
+ *       – Tillsammans med minst en huvudkategori: AND. Snävar in valda
+ *         kategorier till de som även serverar alkohol.
+ *       – Ensam: behandlas som en huvudkategori (alla platser med
+ *         servesAlcohol = sant) — så "tryck bara Glas" känns naturligt.
+ *
+ *   `servesAlcohol` är en separat tagg i datan: sätts av pipeline för
+ *   bar/pub/biergarten, och för Google-bekräftade platser med
+ *   serveringstillstånd. Det är alltså orthogonal mot venue.type, vilket
+ *   är det som låter modifier-modellen fungera.
+ */
 function matchesTypeFilter(venue: { type: string; rooftop?: boolean; servesAlcohol?: boolean }, typeFilter: Set<VenueType>): boolean {
   if (typeFilter.size === 0) return true;
-  if (typeFilter.has("restaurant") && venue.type === "restaurant") return true;
-  if (typeFilter.has("cafe") && venue.type === "cafe") return true;
-  if (typeFilter.has("bar") && (venue.type === "bar" || venue.type === "pub" || venue.servesAlcohol)) return true;
-  if (typeFilter.has("rooftop") && venue.rooftop) return true;
-  return false;
+
+  const wantsAlcohol = typeFilter.has("bar");
+  const hasMainSelection =
+    typeFilter.has("restaurant") || typeFilter.has("cafe") || typeFilter.has("rooftop");
+
+  // Glas ensam → visa allt med alkohol (inkl. rena barer/pubar).
+  if (wantsAlcohol && !hasMainSelection) {
+    return venue.type === "bar" || venue.type === "pub" || !!venue.servesAlcohol;
+  }
+
+  // OR mellan huvudkategorierna.
+  let matchesAnyMain = false;
+  if (typeFilter.has("restaurant") && venue.type === "restaurant") matchesAnyMain = true;
+  else if (typeFilter.has("cafe") && venue.type === "cafe") matchesAnyMain = true;
+  else if (typeFilter.has("rooftop") && venue.rooftop) matchesAnyMain = true;
+
+  if (!matchesAnyMain) return false;
+
+  // AND: om Glas är aktivt måste platsen även servera alkohol.
+  if (wantsAlcohol && !venue.servesAlcohol) return false;
+
+  return true;
 }
 
 export type SunRange = { from: number; to: number } | null;
