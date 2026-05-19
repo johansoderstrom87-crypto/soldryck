@@ -30,15 +30,26 @@ html {
 }
 
 /* viewportFit=cover means the app paints under the iPhone notch and home
-   indicator. Use 100dvh (not 100vh — Safari's 100vh includes the URL bar
-   and jumps when it hides) so the map fills the full visible viewport, and
-   expose the safe-area insets as CSS vars that fixed UI can pad against. */
+   indicator. We need three things to keep the page itself unscrollable on
+   mobile:
+     1. html + body both `overflow: hidden` — without html-level overflow,
+        iOS Safari happily scrolls html even when body has hidden, which is
+        what made a scroll-bar appear on the side on the home view.
+     2. `height: 100svh` (small viewport height) — always the SMALLER of
+        the two viewport sizes, so the body never extends beyond the
+        currently-visible viewport (avoids the case where 100dvh > visible
+        viewport during URL-bar transitions and content overflows).
+     3. `overscroll-behavior: none` (set on body/html below) kills the iOS
+        rubber-band so absolute children look pinned.
+   Inner scrollable views (/privacy, /for-restaurants) opt back in via
+   their own `<main style={{ overflowY: auto }}>` wrapper. */
 html, body {
   height: 100%;
+  overflow: hidden;
 }
-@supports (height: 100dvh) {
+@supports (height: 100svh) {
   html, body {
-    height: 100dvh;
+    height: 100svh;
   }
 }
 :root {
