@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useMemo, useDeferredValue, useState } from "react";
 import AreaSearchPanel from "./AreaSearchPanel";
-import SunCompass from "./SunCompass";
 import L from "leaflet";
 
 // Helpers come from the venues-computed module (always present, even before
@@ -3005,8 +3004,6 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           getSunHours={getSunHrs}
         />
       )}
-
-      <SunCompass hour={hourProp} date={date} />
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
