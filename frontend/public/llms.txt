@@ -6,9 +6,9 @@ Soldryck täcker cirka 2 843 verifierade uteserveringar i Stockholm. Soldata ber
 
 ## Sidor
 
-- [Startsida](https://soldryck-web-production.up.railway.app/): Interaktiv karta med ~2 843 uteserveringar — orange = sol enligt geometri, blå = skugga, grå = regn. Tidsreglage för timme och månad. Filter på takbarer, tunnelbanestation, öppettider och tillgänglighet.
-- [För restauranger](https://soldryck-web-production.up.railway.app/for-restaurants): Information för restaurangägare som vill verifiera eller uppdatera sitt ställe.
-- [Integritetspolicy](https://soldryck-web-production.up.railway.app/privacy): Hur Soldryck hanterar användardata (sammanfattning: inga konton, ingen tracking utöver anonyma använda-händelser).
+- [Startsida](https://soldryck.se/): Interaktiv karta med ~2 843 uteserveringar — orange = sol enligt geometri, blå = skugga, grå = regn. Tidsreglage för timme och månad. Filter på takbarer, tunnelbanestation, öppettider och tillgänglighet.
+- [För restauranger](https://soldryck.se/for-restaurants): Information för restaurangägare som vill verifiera eller uppdatera sitt ställe.
+- [Integritetspolicy](https://soldryck.se/privacy): Hur Soldryck hanterar användardata (sammanfattning: inga konton, ingen tracking utöver anonyma använda-händelser).
 
 ## Metodologi
 

@@ -23,7 +23,7 @@ const outfit = Outfit({
   weight: ["400", "500", "600", "700", "800", "900"],
 });
 
-const SITE_URL = "https://soldryck-web-production.up.railway.app";
+const SITE_URL = "https://soldryck.se";
 const TITLE = "Soldryck — Hitta solen i Stockholm";
 const DESCRIPTION =
   "Se vilka uteserveringar i Stockholm som har sol just nu, timme för timme. " +

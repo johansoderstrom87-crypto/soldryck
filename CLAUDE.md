@@ -2,7 +2,7 @@
 
 Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för timme, baserat på riktiga 3D-byggnadsmodeller och solpositionsberäkningar.
 
-**Live:** https://soldryck-web-production.up.railway.app
+**Live:** https://soldryck.se
 **GitHub:** https://github.com/johansoderstrom87-crypto/soldryck
 **Railway:** Projekt "pacific-friendship", service "soldryck-web"
 
@@ -173,7 +173,7 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
 ## Deploy
 
 - **Frontend:** Railway via Dockerfile (multi-stage Node.js 20 Alpine, standalone Next.js output)
-- **Domän:** `soldryck-web-production.up.railway.app`
+- **Domän:** `soldryck.se` (custom domain på Railway, pekar på samma service som `soldryck-web-production.up.railway.app`)
 - **Deploy-kommando:** `railway up --service soldryck-web` från projektrot
 - **CI:** Manuell deploy (ingen auto-deploy från GitHub)
 - **Image-storlek:** ~50 MB (shadow-data exkluderat — se nedan)

@@ -181,7 +181,7 @@ export default function PrivacyPage() {
           eller radera &quot;just din&quot; information på begäran. Det du kan göra:
         </p>
         <ul>
-          <li>Rensa webbplatsdata för soldryck-web-production.up.railway.app i webbläsaren → favoriter, cache och onboarding försvinner.</li>
+          <li>Rensa webbplatsdata för soldryck.se i webbläsaren → favoriter, cache och onboarding försvinner.</li>
           <li>Stänga av push-notiser i favorit-panelen → endpoint raderas direkt.</li>
           <li>Maila <a href="mailto:johan.soderstrom.87@gmail.com" style={{ color: "#b45309" }}>johan.soderstrom.87@gmail.com</a> om något feedbackmeddelande du skickat ska raderas.</li>
         </ul>
