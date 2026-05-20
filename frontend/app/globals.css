@@ -881,33 +881,52 @@ html, body {
   transition: opacity 0.9s ease;
 }
 
-/* Regn — bleka, snabba streck med svag lutning */
+/* Regn — tre lager av korta droppar på olika djup. Strecken är mycket
+   kortare än varje "kolumns" repeat-period så det bildas distinkta
+   droppar i stället för kontinuerliga linjer. Lagren har olika x-offset,
+   olika sparseness och olika rörelsesträcka (samma animation = olika
+   uppfattad fart), vilket bryter upp kolumnschemat och ger en lätt
+   parallax-känsla. */
 .weather-fx[data-fx="rain"]::before,
 .weather-fx[data-fx="rain-heavy"]::before,
 .weather-fx[data-fx="thunder"]::before {
-  background-image: linear-gradient(
-    180deg,
-    transparent 0%,
-    transparent 65%,
-    rgba(170, 200, 230, 0.55) 75%,
-    rgba(190, 215, 240, 0.85) 92%,
-    transparent 100%
-  );
-  background-size: 2px 26px;
+  background-image:
+    /* Layer 1 — nära, längst, ljusast */
+    linear-gradient(180deg, transparent 82%, rgba(215,228,245,0.95) 96%, rgba(230,240,252,1) 100%),
+    /* Layer 2 — mid */
+    linear-gradient(180deg, transparent 86%, rgba(195,215,235,0.78) 97%, rgba(215,228,248,0.95) 100%),
+    /* Layer 3 — fjärran, kortast, dovast */
+    linear-gradient(180deg, transparent 88%, rgba(175,200,225,0.58) 100%);
+  background-size:
+    7px 110px,
+    9px 75px,
+    13px 50px;
+  background-position:
+    3px 0,
+    18px 14px,
+    47px 33px;
   background-repeat: repeat;
-  animation: rain-fall 0.45s linear infinite;
-  opacity: 0.55;
-  transform: rotate(8deg);
+  animation: rain-fall 0.7s linear infinite;
+  opacity: 0.78;
+  transform: rotate(11deg) scale(1.3);
   transform-origin: center;
+  filter: drop-shadow(0 0 0.5px rgba(220, 235, 250, 0.4));
 }
 .weather-fx[data-fx="rain-heavy"]::before {
-  background-size: 2px 20px;
-  animation-duration: 0.32s;
-  opacity: 0.75;
+  background-size:
+    5px 80px,
+    6px 55px,
+    9px 38px;
+  background-position:
+    2px 0,
+    12px 9px,
+    33px 21px;
+  animation: rain-fall-heavy 0.5s linear infinite;
+  opacity: 0.9;
 }
 .weather-fx[data-fx="thunder"]::before {
-  animation-duration: 0.30s;
-  opacity: 0.75;
+  animation-duration: 0.45s;
+  opacity: 0.88;
 }
 
 /* Åska — periodisk vit blixt ovanpå regnstrecken */
@@ -935,9 +954,16 @@ html, body {
   opacity: 0.85;
 }
 
+/* Varje lager travelar exakt sin egen tile-höjd så loopen blir sömlös
+   (lager 1: 110px, lager 2: 75px, lager 3: 50px). Olika sträckor i
+   samma animationsperiod ger uppfattad parallax. */
 @keyframes rain-fall {
-  from { background-position: 0 0; }
-  to   { background-position: 0 26px; }
+  from { background-position: 3px 0,     18px 14px,  47px 33px; }
+  to   { background-position: 3px 110px, 18px 89px,  47px 83px; }
+}
+@keyframes rain-fall-heavy {
+  from { background-position: 2px 0,    12px 9px,   33px 21px; }
+  to   { background-position: 2px 80px, 12px 64px,  33px 59px; }
 }
 @keyframes snow-fall {
   from { background-position: 0 -180px, 45px -150px; }
