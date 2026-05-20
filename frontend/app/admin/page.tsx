@@ -4,17 +4,19 @@ import { useState } from "react";
 import FeedbackTab from "./_components/feedback-tab";
 import SuggestionsTab from "./_components/suggestions-tab";
 import ClaimsTab from "./_components/claims-tab";
+import StatsTab from "./_components/stats-tab";
 
-type Tab = "feedback" | "suggestions" | "claims";
+type Tab = "stats" | "feedback" | "suggestions" | "claims";
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "stats", label: "Statistik" },
   { id: "feedback", label: "Rapporter" },
   { id: "suggestions", label: "Förslag" },
   { id: "claims", label: "Verifieringar" },
 ];
 
 export default function AdminPage() {
-  const [active, setActive] = useState<Tab>("feedback");
+  const [active, setActive] = useState<Tab>("stats");
 
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
@@ -54,6 +56,7 @@ export default function AdminPage() {
         })}
       </div>
 
+      {active === "stats" && <StatsTab />}
       {active === "feedback" && <FeedbackTab />}
       {active === "suggestions" && <SuggestionsTab />}
       {active === "claims" && <ClaimsTab />}
