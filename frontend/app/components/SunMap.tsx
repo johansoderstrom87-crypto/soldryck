@@ -1121,11 +1121,20 @@ function buildVenuePopupHtml(
           title="Öppna i Google Maps"
           class="popup-btn popup-btn-icon"
         ><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></a>
+        ${venue.website ? `<a
+          href="${venue.website}"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Hemsida"
+          class="popup-btn popup-btn-icon popup-btn-web"
+          data-venue-id="${venue.id}"
+        ><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg></a>` : ""}
         <button
-          class="popup-btn popup-btn-primary share-btn"
+          class="popup-btn popup-btn-icon popup-btn-share share-btn"
           data-venue-id="${venue.id}"
           data-venue-name="${venue.name}"
-        >&#128279; Dela</button>
+          title="Dela"
+        >&#128279;</button>
       </div>
       <a
         class="popup-book book-btn"
@@ -1897,6 +1906,15 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         if (bookBtn) {
           (bookBtn as HTMLElement).onclick = () => {
             track("book_clicked", { type: venue.type });
+          };
+        }
+
+        // Hemsida-länk — same anchor-navigates-normally pattern. Trackad så vi
+        // ser hur ofta folk klickar sig vidare till venuens egen sajt.
+        const webBtn = document.querySelector(`.popup-btn-web[data-venue-id="${venue.id}"]`);
+        if (webBtn) {
+          (webBtn as HTMLElement).onclick = () => {
+            track("website_clicked", { type: venue.type });
           };
         }
 

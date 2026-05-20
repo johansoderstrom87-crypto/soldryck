@@ -44,7 +44,7 @@ def search_place(name: str, lat: float, lng: float) -> dict | None:
         headers={
             "Content-Type": "application/json",
             "X-Goog-Api-Key": API_KEY,
-            "X-Goog-FieldMask": "places.id,places.displayName,places.outdoorSeating,places.dineIn,places.location,places.servesBeer,places.servesWine,places.servesCocktails",
+            "X-Goog-FieldMask": "places.id,places.displayName,places.outdoorSeating,places.dineIn,places.location,places.servesBeer,places.servesWine,places.servesCocktails,places.websiteUri",
         },
     )
 
@@ -150,6 +150,7 @@ def main():
                 "serves_alcohol": serves_alcohol,
                 "google_id": place.get("id"),
                 "google_name": place.get("displayName", {}).get("text"),
+                "website": place.get("websiteUri") or "",
             }
             if outdoor is True:
                 confirmed_count += 1

@@ -752,6 +752,18 @@ html, body {
   color: #fff;
 }
 .popup-btn-primary:hover { background: #d97706; }
+/* Website + share = ikon-only knappar med samma 32px-storlek som maps-ikonen.
+   Share tonas ner till neutral grå (vit + ikongrå) eftersom det inte längre
+   är den primära CTA:n — boka bord/website tar den platsen istället. */
+.popup-btn-web {
+  color: #1d4ed8;
+}
+.popup-btn-web:hover { background: #eff6ff; }
+.popup-btn-share {
+  font-size: 14px;
+  color: #475569;
+}
+.popup-btn-share:hover { background: #f8fafc; }
 .popup-btn-seating {
   flex: 1;
   min-width: 0;

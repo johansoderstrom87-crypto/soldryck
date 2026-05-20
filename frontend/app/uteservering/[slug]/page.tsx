@@ -147,6 +147,10 @@ function venueToJsonLd(venue: ComputedVenue, summary: SunSummary): Record<string
     jsonLd.priceRange = "$".repeat(Math.min(4, venue.priceLevel));
   }
 
+  if (venue.website) {
+    jsonLd.sameAs = [venue.website];
+  }
+
   if (summary.bestHour !== null) {
     jsonLd.description =
       `${venue.name} har som mest sol kring kl ${summary.bestHour}:00. ` +
@@ -249,6 +253,9 @@ export default async function VenuePage({
   }
   if (typeof venue.priceLevel === "number" && venue.priceLevel > 0) {
     factRows.push({ label: "Prisnivå", value: "$".repeat(Math.min(4, venue.priceLevel)) });
+  }
+  if (venue.website) {
+    factRows.push({ label: "Hemsida", value: venue.website });
   }
 
   const monthsSorted = Object.entries(summary.monthlySunPerDay).sort(([a], [b]) => a.localeCompare(b));
@@ -385,7 +392,20 @@ export default async function VenuePage({
                   }}
                 >
                   <dt style={{ color: "#64748b" }}>{row.label}</dt>
-                  <dd style={{ margin: 0 }}>{row.value}</dd>
+                  <dd style={{ margin: 0, overflowWrap: "anywhere" }}>
+                    {row.label === "Hemsida" ? (
+                      <a
+                        href={row.value}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        style={{ color: "#1d4ed8", textDecoration: "underline" }}
+                      >
+                        {row.value.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                      </a>
+                    ) : (
+                      row.value
+                    )}
+                  </dd>
                 </div>
               ))}
             </dl>

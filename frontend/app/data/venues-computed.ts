@@ -28,6 +28,9 @@ export interface ComputedVenue {
   priceLevel?: number;
   /** OSM wheelchair tag: "yes" | "no" | "limited". */
   wheelchair?: string;
+  /** Hemsida — primärt från OSM `website`-tagg, annars Google Places
+   *  `websiteUri`. Normaliserad med `https://`-prefix. */
+  website?: string;
   /** schedule[MM-DD][hour] = SunStatus */
   schedule: Record<string, Record<string, SunStatus>>;
 }

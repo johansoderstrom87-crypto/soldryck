@@ -83,13 +83,15 @@ def main():
 
         if outdoor is True:
             # Add to main venue list for shadow computation
+            osm_site = tags.get("website", tags.get("contact:website", ""))
             props = {
                 "id": osm_id,
                 "name": name,
                 "amenity": amenity,
                 "cuisine": tags.get("cuisine", ""),
                 "opening_hours": tags.get("opening_hours", ""),
-                "website": tags.get("website", tags.get("contact:website", "")),
+                # Google's websiteUri används som fallback när OSM saknar.
+                "website": osm_site or result.get("website", "") or "",
                 "phone": tags.get("phone", tags.get("contact:phone", "")),
                 "addr_street": tags.get("addr:street", ""),
                 "addr_housenumber": tags.get("addr:housenumber", ""),
@@ -166,13 +168,14 @@ def main():
                 # Override OSM — lägg till på kartan
                 el = neg_elem_lookup.get(osm_id)
                 tags = el.get("tags", {}) if el else {}
+                osm_site = tags.get("website", tags.get("contact:website", ""))
                 neg_props = {
                     "id": osm_id,
                     "name": name,
                     "amenity": amenity,
                     "cuisine": tags.get("cuisine", ""),
                     "opening_hours": tags.get("opening_hours", ""),
-                    "website": tags.get("website", tags.get("contact:website", "")),
+                    "website": osm_site or result.get("website", "") or "",
                     "phone": tags.get("phone", tags.get("contact:phone", "")),
                     "addr_street": tags.get("addr:street", result.get("addr_street", "")),
                     "addr_housenumber": tags.get("addr:housenumber", result.get("addr_housenumber", "")),
