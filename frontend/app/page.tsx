@@ -62,17 +62,18 @@ export default function Home() {
   const [showMetro, setShowMetro] = useState(false);
   const [showRain, setShowRain] = useState(false);
   const [wheelchairOnly, setWheelchairOnly] = useState(false);
-  // Default selection — restauranger + barer + takbarer. Cafés döljs som
-  // standard eftersom de flesta öppnar Soldryck för att planera lunch /
-  // afterwork, inte fika. Användaren kan slå på café-chippet när det
-  // behövs.
+  // Default — alla fyra typer påslagna så användaren ser hela datasetet
+  // när appen öppnas. Tom uppsättning betyder "inget av kategorierna är på"
+  // och döljer alla venues; det är knapparnas själva urval, inte en
+  // extramodifier ovanpå "allt".
   const [typeFilter, setTypeFilter] = useState<Set<VenueType>>(
-    () => new Set<VenueType>(["restaurant", "bar", "rooftop"]),
+    () => new Set<VenueType>(["restaurant", "cafe", "bar", "rooftop"]),
   );
   const [sunRange, setSunRange] = useState<SunRange>(null);
   const [focusVenueId, setFocusVenueId] = useState<string | null>(initialVenue);
   const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
   const [openNowFilter, setOpenNowFilter] = useState(false);
+  const [alcoholOnly, setAlcoholOnly] = useState(false);
   // Splash is skipped for users who already added Soldryck to the home
   // screen — they saw it on first install. Initial state must be false so
   // the server render matches the first client render (no hydration
@@ -186,6 +187,8 @@ export default function Home() {
         onMetroStationChange={setMetroStation}
         openNowFilter={openNowFilter}
         onOpenNowFilterChange={setOpenNowFilter}
+        alcoholOnly={alcoholOnly}
+        onAlcoholOnlyChange={setAlcoholOnly}
         venues={allVenues}
         onSelectVenue={(id) => setFocusVenueId(id)}
         hour={hour}
@@ -194,7 +197,7 @@ export default function Home() {
         getClosestDateKey={getDateKey}
       />
 
-      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} showMetro={showMetro} showRain={showRain} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} openNowFilter={openNowFilter} wheelchairOnly={wheelchairOnly} />
+      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} showMetro={showMetro} showRain={showRain} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} openNowFilter={openNowFilter} alcoholOnly={alcoholOnly} wheelchairOnly={wheelchairOnly} />
 
       <TimeSlider
         hour={hour}

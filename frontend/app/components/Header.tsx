@@ -22,7 +22,10 @@ function LineDots({ lines }: { lines: string[] }) {
   );
 }
 
-// Huvudkategorier (OR-logik). Renderas före "Glas" som är en AND-modifier.
+// Huvudkategorier (OR-logik). Renderas till vänster om divider:n.
+// Bar-knappen matchar venue.type === bar/pub/biergarten — alla "drink-
+// ställen" — och är skild från Glas, som är en AND-modifier för
+// serveringstillstånd.
 const TYPE_BUTTONS: { type: VenueType; label: string; svg: string }[] = [
   {
     type: "restaurant",
@@ -35,28 +38,38 @@ const TYPE_BUTTONS: { type: VenueType; label: string; svg: string }[] = [
     svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>`,
   },
   {
+    type: "bar",
+    label: "Bar",
+    svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
+  },
+  {
     type: "rooftop",
     label: "Takbar",
     svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><line x1="3" y1="7" x2="7" y2="7"/><line x1="17" y1="7" x2="21" y2="7"/></svg>`,
   },
 ];
 
-// Modifier (AND tillsammans med huvudkategori, OR ensam). Egen knapp med
-// avskiljande divider före i filterraden så det visuellt är klart att den
-// snävar in resten av urvalet snarare än att lägga till.
-const MODIFIER_BUTTON: { type: VenueType; label: string; svg: string } = {
-  type: "bar",
-  label: "Glas",
-  svg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
-};
+// Glas — AND-modifier som snävar in på platser med serveringstillstånd.
+// Skild från Bar (som är venue.type-filter) sedan användartest visade att
+// dubbelrollen "Bar är både kategori och alkoholfilter" var rörig.
+const ALCOHOL_MODIFIER_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M9 7c0-1.5 1-3 3-3"/><path d="M12 15v6"/><path d="M9 21h6"/></svg>`;
 
 // Aktiv-stil för "snäva in"-knappar (Glas, Öppet, T-bana). Använder en
 // ljusblå palett i stället för huvudkategoriernas orange, så användaren
 // uppfattar att de filtrerar/överlägger på andra premisser.
 const BLUE_ACTIVE_BG = "linear-gradient(160deg, rgba(96,165,250,0.45) 0%, rgba(59,130,246,0.28) 60%, rgba(255,255,255,0.12) 100%)";
 const BLUE_ACTIVE_BORDER = "1px solid rgba(59,130,246,0.75)";
-const BLUE_ACTIVE_SHADOW = "0 0 0 1px rgba(59,130,246,0.35), 0 0 14px rgba(96,165,250,0.6), 0 0 28px rgba(96,165,250,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)";
+// Aktiva knappar: färgad halo OCH samma kastskugga som glass-fönstren på
+// kartan (Sök i detta område m.fl.) — så de "lyfter" lika tydligt över
+// kartan oavsett om de är aktiva eller inaktiva.
+const BLUE_ACTIVE_SHADOW = "0 0 0 1px rgba(59,130,246,0.35), 0 0 14px rgba(96,165,250,0.6), 0 0 28px rgba(96,165,250,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)";
 const BLUE_ACTIVE_TEXT = "#1e40af";
+
+// Standard kastskugga för filterknapparna — speglar `glassStyle` i SunMap
+// så raden av filterknappar ligger på samma "höjd" som övriga glas-paneler
+// (Sök i detta område, sökresultat-listan etc.).
+const FILTER_BTN_SHADOW = "0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)";
+const ORANGE_ACTIVE_SHADOW = "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)";
 
 interface HeaderProps {
   filter: "all" | "sun" | "shade";
@@ -77,6 +90,8 @@ interface HeaderProps {
   onMetroStationChange: (station: MetroStation | null) => void;
   openNowFilter: boolean;
   onOpenNowFilterChange: (v: boolean) => void;
+  alcoholOnly: boolean;
+  onAlcoholOnlyChange: (v: boolean) => void;
   venues: { id: string; name: string; type: string; address: string; lat: number; lng: number }[];
   onSelectVenue: (id: string) => void;
   hour: number;
@@ -189,9 +204,17 @@ function SettingsButton({
     }
   }
 
+  // Default-tillståndet är "alla fyra typer på", så badgen ska inte räkna
+  // det som "aktivt filter" — bara avvikelser från default (något bortvalt,
+  // helt tomt urval, eller bara fast utvalt subset) flaggas.
+  const typeFilterIsDefault =
+    typeFilter.size === 4 &&
+    typeFilter.has("restaurant") && typeFilter.has("cafe") &&
+    typeFilter.has("bar") && typeFilter.has("rooftop");
+
   const activeCount =
     (filter !== "all" ? 1 : 0) +
-    typeFilter.size +
+    (typeFilterIsDefault ? 0 : 1) +
     (metroStation ? 1 : 0) +
     (showShadows ? 1 : 0) +
     (showMetro ? 1 : 0) +
@@ -607,6 +630,7 @@ export default function Header({
   wheelchairOnly, onWheelchairOnlyChange,
   metroStation, onMetroStationChange,
   openNowFilter, onOpenNowFilterChange,
+  alcoholOnly, onAlcoholOnlyChange,
   venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey,
 }: HeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(true);
@@ -695,7 +719,7 @@ export default function Header({
             }}
           >
             {TYPE_BUTTONS.map(({ type, label, svg }) => {
-                const active = typeFilter.size === 0 || typeFilter.has(type);
+                const active = typeFilter.has(type);
                 return (
                   <button
                     key={type}
@@ -715,9 +739,7 @@ export default function Header({
                       border: active
                         ? "1px solid rgba(251,146,60,0.75)"
                         : "0.5px solid rgba(255,255,255,0.45)",
-                      boxShadow: active
-                        ? "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.08)"
-                        : "0 2px 8px rgba(0,0,0,0.06)",
+                      boxShadow: active ? ORANGE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
                       color: active ? "#9a3412" : "#888",
                       opacity: active ? 1 : 0.65,
                       transform: "translateZ(0)",
@@ -747,47 +769,35 @@ export default function Header({
               }}
             />
 
-            {/* Glas — AND-modifier. Tillsammans med en huvudkategori snävas
-                den in till "den kategorin SOM ÄVEN serverar alkohol". Ensam
-                fungerar den som en huvudkategori (alla med alkohol). Samma
-                visuella stil som övriga så användaren snabbt fattar att det
-                är en filterknapp, men separerad av divider:n ovan. */}
-            {(() => {
-              const { type, label, svg } = MODIFIER_BUTTON;
-              const active = typeFilter.size === 0 || typeFilter.has(type);
-              const isModifying =
-                typeFilter.has(type) &&
-                (typeFilter.has("restaurant") || typeFilter.has("cafe") || typeFilter.has("rooftop"));
-              return (
-                <button
-                  key={type}
-                  onClick={() => toggleType(type)}
-                  title={isModifying ? `${label} — kräver alkoholservering` : label}
-                  aria-label={`Filter ${label}`}
-                  aria-pressed={typeFilter.has(type)}
-                  className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
-                  style={{
-                    width: 40,
-                    height: 40,
-                    background: active ? BLUE_ACTIVE_BG : "rgba(255,255,255,0.14)",
-                    backdropFilter: "blur(16px) saturate(1.5)",
-                    WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                    border: active ? BLUE_ACTIVE_BORDER : "0.5px solid rgba(255,255,255,0.45)",
-                    boxShadow: active ? BLUE_ACTIVE_SHADOW : "0 2px 8px rgba(0,0,0,0.06)",
-                    color: active ? BLUE_ACTIVE_TEXT : "#888",
-                    opacity: active ? 1 : 0.65,
-                    transform: "translateZ(0)",
-                    isolation: "isolate",
-                    flexShrink: 0,
-                  }}
-                >
-                  <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? BLUE_ACTIVE_TEXT : "rgba(0,0,0,0.65)" }}>
-                    {label}
-                  </span>
-                </button>
-              );
-            })()}
+            {/* Glas — AND-modifier för serveringstillstånd (servesAlcohol).
+                Snävar in övriga urvalet, lägger inte till — därför blå styling
+                som de andra modifierarna (Öppet, T-bana) och divider:n innan. */}
+            <button
+              onClick={() => onAlcoholOnlyChange(!alcoholOnly)}
+              title="Bara ställen med serveringstillstånd"
+              aria-label="Filter Glas — serveringstillstånd"
+              aria-pressed={alcoholOnly}
+              className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+              style={{
+                width: 40,
+                height: 40,
+                background: alcoholOnly ? BLUE_ACTIVE_BG : "rgba(255,255,255,0.14)",
+                backdropFilter: "blur(16px) saturate(1.5)",
+                WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+                border: alcoholOnly ? BLUE_ACTIVE_BORDER : "0.5px solid rgba(255,255,255,0.45)",
+                boxShadow: alcoholOnly ? BLUE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                color: alcoholOnly ? BLUE_ACTIVE_TEXT : "#888",
+                opacity: alcoholOnly ? 1 : 0.65,
+                transform: "translateZ(0)",
+                isolation: "isolate",
+                flexShrink: 0,
+              }}
+            >
+              <span dangerouslySetInnerHTML={{ __html: ALCOHOL_MODIFIER_SVG }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: alcoholOnly ? BLUE_ACTIVE_TEXT : "rgba(0,0,0,0.65)" }}>
+                Glas
+              </span>
+            </button>
 
             {/* Öppet nu-knapp — kräver att hours fetchas för viewport-venues,
                 så markörer kan dröja någon sekund innan stängda försvinner. */}
@@ -804,7 +814,7 @@ export default function Header({
                 backdropFilter: "blur(16px) saturate(1.5)",
                 WebkitBackdropFilter: "blur(16px) saturate(1.5)",
                 border: openNowFilter ? BLUE_ACTIVE_BORDER : "0.5px solid rgba(255,255,255,0.45)",
-                boxShadow: openNowFilter ? BLUE_ACTIVE_SHADOW : "0 2px 8px rgba(0,0,0,0.06)",
+                boxShadow: openNowFilter ? BLUE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
                 color: openNowFilter ? BLUE_ACTIVE_TEXT : "#888",
                 opacity: openNowFilter ? 1 : 0.65,
                 transform: "translateZ(0)",
@@ -835,7 +845,7 @@ export default function Header({
                 backdropFilter: "blur(16px) saturate(1.5)",
                 WebkitBackdropFilter: "blur(16px) saturate(1.5)",
                 border: showMetro ? BLUE_ACTIVE_BORDER : "0.5px solid rgba(255,255,255,0.45)",
-                boxShadow: showMetro ? BLUE_ACTIVE_SHADOW : "0 2px 8px rgba(0,0,0,0.06)",
+                boxShadow: showMetro ? BLUE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
                 color: showMetro ? BLUE_ACTIVE_TEXT : "#888",
                 opacity: showMetro ? 1 : 0.65,
                 transform: "translateZ(0)",

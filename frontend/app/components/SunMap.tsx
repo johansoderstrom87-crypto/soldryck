@@ -340,44 +340,30 @@ export const VENUE_TYPES = ["restaurant", "cafe", "bar", "rooftop"] as const;
 export type VenueType = (typeof VENUE_TYPES)[number];
 
 /**
- * Filterlogik:
- *   • Huvudkategorierna (Äta / Fika / Takbar) → OR. Trycker du flera ser du
- *     unionen av dem.
- *   • Glas (bar) → modifier:
- *       – Tillsammans med minst en huvudkategori: AND. Snävar in valda
- *         kategorier till de som även serverar alkohol.
- *       – Ensam: behandlas som en huvudkategori (alla platser med
- *         servesAlcohol = sant) — så "tryck bara Glas" känns naturligt.
+ * Filterlogik — kategoriknapparna (Äta / Fika / Bar / Takbar) är en union:
+ *   • Är någon vald visar vi venues som matchar minst en av dem (OR).
+ *   • Är inga valda visar vi inga venues — knapparna är hela urvalet, inte
+ *     ett extra filter ovanpå "allt". Det gör visuellt och funktionellt
+ *     beteende konsekvent: en avstängd knapp betyder att den kategorin är
+ *     borta, inte att det finns en dold default som tar över.
  *
- *   `servesAlcohol` är en separat tagg i datan: sätts av pipeline för
- *   bar/pub/biergarten, och för Google-bekräftade platser med
- *   serveringstillstånd. Det är alltså orthogonal mot venue.type, vilket
- *   är det som låter modifier-modellen fungera.
+ *   Glas (servesAlcohol) hanteras som en separat AND-modifier utanför
+ *   detta filter, se `alcoholOnly` i markerbygget — den snävar in urvalet
+ *   till bara platser med serveringstillstånd.
+ *
+ *   Mappning till venue.type är generös så att "alla fyra på" täcker hela
+ *   datasetet: restaurant/fast_food/food_court → Äta,
+ *   cafe/ice_cream → Fika, bar/pub/biergarten → Bar.
  */
-function matchesTypeFilter(venue: { type: string; rooftop?: boolean; servesAlcohol?: boolean }, typeFilter: Set<VenueType>): boolean {
-  if (typeFilter.size === 0) return true;
+function matchesTypeFilter(venue: { type: string; rooftop?: boolean }, typeFilter: Set<VenueType>): boolean {
+  if (typeFilter.size === 0) return false;
 
-  const wantsAlcohol = typeFilter.has("bar");
-  const hasMainSelection =
-    typeFilter.has("restaurant") || typeFilter.has("cafe") || typeFilter.has("rooftop");
+  if (typeFilter.has("restaurant") && (venue.type === "restaurant" || venue.type === "fast_food" || venue.type === "food_court")) return true;
+  if (typeFilter.has("cafe") && (venue.type === "cafe" || venue.type === "ice_cream")) return true;
+  if (typeFilter.has("bar") && (venue.type === "bar" || venue.type === "pub" || venue.type === "biergarten")) return true;
+  if (typeFilter.has("rooftop") && venue.rooftop) return true;
 
-  // Glas ensam → visa allt med alkohol (inkl. rena barer/pubar).
-  if (wantsAlcohol && !hasMainSelection) {
-    return venue.type === "bar" || venue.type === "pub" || !!venue.servesAlcohol;
-  }
-
-  // OR mellan huvudkategorierna.
-  let matchesAnyMain = false;
-  if (typeFilter.has("restaurant") && venue.type === "restaurant") matchesAnyMain = true;
-  else if (typeFilter.has("cafe") && venue.type === "cafe") matchesAnyMain = true;
-  else if (typeFilter.has("rooftop") && venue.rooftop) matchesAnyMain = true;
-
-  if (!matchesAnyMain) return false;
-
-  // AND: om Glas är aktivt måste platsen även servera alkohol.
-  if (wantsAlcohol && !venue.servesAlcohol) return false;
-
-  return true;
+  return false;
 }
 
 export type SunRange = { from: number; to: number } | null;
@@ -396,6 +382,7 @@ interface SunMapProps {
   onFocusHandled?: () => void;
   metroStation?: MetroStation | null;
   openNowFilter?: boolean;
+  alcoholOnly?: boolean;
   showRain?: boolean;
   wheelchairOnly?: boolean;
 }
@@ -1173,7 +1160,7 @@ function buildVenuePopupHtml(
   `;
 }
 
-export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, showRain = false, focusVenueId, onFocusHandled, metroStation, openNowFilter = false, wheelchairOnly = false }: SunMapProps) {
+export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, showRain = false, focusVenueId, onFocusHandled, metroStation, openNowFilter = false, alcoholOnly = false, wheelchairOnly = false }: SunMapProps) {
   // Defer expensive map rebuild while the user is actively scrubbing the timeline
   const hour = useDeferredValue(hourProp);
 
@@ -1536,21 +1523,52 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       }).addTo(layer);
     }
 
+    // Tjocklek på spåren skalas med zoom — annars känns linjerna oproportionerligt
+    // feta när man är utzoomad. Snäpps i diskreta steg så vi inte rebrar varje
+    // animationsframe under en pinch-zoom.
+    const trackWeightForZoom = (zoom: number): number => {
+      if (zoom <= 11) return 1.2;
+      if (zoom === 12) return 1.6;
+      if (zoom === 13) return 2;
+      if (zoom === 14) return 2.6;
+      return 3.2;
+    };
+
     // Spår — plattformiserade (raka vid stationer, kurvor mellan)
+    const trackPolylines: L.Polyline[] = [];
     for (const track of platformized) {
-      L.polyline(track.coords, {
-        color: lineColors[track.color], weight: 4, opacity: 0.85,
+      const poly = L.polyline(track.coords, {
+        color: lineColors[track.color], weight: trackWeightForZoom(map.getZoom()), opacity: 0.85,
         lineCap: "round", lineJoin: "round", smoothFactor: 0, interactive: false,
       }).addTo(layer);
+      trackPolylines.push(poly);
     }
 
-    // Stationscirklar ovanpå spåren
+    // Stationscirklar ovanpå spåren — radie skalas också ner vid låg zoom så
+    // de inte ser ut som tjocka prickar längs en tunn linje.
+    const stationRadiusForZoom = (zoom: number): number => {
+      if (zoom <= 12) return 2.5;
+      if (zoom === 13) return 3.2;
+      if (zoom === 14) return 4;
+      return 5;
+    };
+    const stationCircles: L.CircleMarker[] = [];
     for (const { pos, color } of allSnaps) {
-      L.circleMarker(pos, {
-        radius: 5, color: lineColors[color], weight: 2.5,
+      const circle = L.circleMarker(pos, {
+        radius: stationRadiusForZoom(map.getZoom()), color: lineColors[color], weight: 2,
         fillColor: "#ffffff", fillOpacity: 1, interactive: false,
       }).addTo(layer);
+      stationCircles.push(circle);
     }
+
+    const onZoom = () => {
+      const z = map.getZoom();
+      const w = trackWeightForZoom(z);
+      for (const p of trackPolylines) p.setStyle({ weight: w });
+      const r = stationRadiusForZoom(z);
+      for (const c of stationCircles) c.setRadius(r);
+    };
+    map.on("zoomend", onZoom);
 
     // Entré-ikoner: vit cirkel + färgad ring + ↑
     for (const ent of metroNetwork.METRO_ENTRANCES) {
@@ -1570,6 +1588,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     metroNetworkRef.current = layer;
 
     return () => {
+      map.off("zoomend", onZoom);
       if (metroNetworkRef.current) {
         metroNetworkRef.current.remove();
         metroNetworkRef.current = null;
@@ -1776,6 +1795,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       // Filter by type
       if (!matchesTypeFilter(venue, typeFilter)) return;
 
+      // Filter by serveringstillstånd — AND-modifier, snävar in urvalet.
+      if (alcoholOnly && !venue.servesAlcohol) return;
+
       // Filter by wheelchair-accessibility. OSM tag values: yes / no /
       // limited / designated. We treat "yes" and "designated" as positive.
       if (wheelchairOnly) {
@@ -1968,7 +1990,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     return () => {
       map.off("zoomend moveend", handleViewportChange);
     };
-  }, [dateKey, typeFilter, sunRange, weather, metroStation, wheelchairOnly, allVenues]);
+  }, [dateKey, typeFilter, sunRange, weather, metroStation, wheelchairOnly, alcoholOnly, allVenues]);
 
   // Hour & sun/shade-filter update — fast path. Retoggles `.marker-dot`'s
   // class and visibility on existing markers. Markers outside the viewport
@@ -2158,6 +2180,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           if (dist > STATION_RADIUS_M) continue;
         }
         if (!matchesTypeFilter(venue, typeFilter)) continue;
+        // Glas-modifier: obekräftade venues har per definition inte bekräftad
+        // alkoholservering, så de göms när användaren snävar in på Glas.
+        if (alcoholOnly) continue;
 
         const icon = L.divIcon({
           className: "marker-root marker-unconfirmed",
@@ -2242,7 +2267,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       unconfirmedMarkersRef.current.forEach((mk) => mk.remove());
       unconfirmedMarkersRef.current = [];
     };
-  }, [metroStation, typeFilter]);
+  }, [metroStation, typeFilter, alcoholOnly]);
 
   // Rain radar overlay — RainViewer's free public tile service. Extracted
   // to a hook so SunMap can incrementally shrink (#49). Same pattern fits
@@ -2982,7 +3007,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       {openNowFilter && openNowFetching > 0 && (
         <div style={{
           position: "absolute",
-          top: "calc(160px + var(--safe-top, 0px))",
+          // Sänkt så att pillen hamnar UNDER "Sök i detta område"-knappen
+          // (~164px + ~34px höjd) istället för bakom den. Båda kan vara
+          // synliga samtidigt när man precis togglat Öppet.
+          top: "calc(208px + var(--safe-top, 0px))",
           left: "50%",
           transform: "translateX(-50%)",
           zIndex: 1085,
