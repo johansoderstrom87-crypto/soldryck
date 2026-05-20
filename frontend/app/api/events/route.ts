@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getPool, ensureEventsTable } from "../../lib/db";
+import { isAdminRequest, unauthorizedResponse } from "../../lib/admin-auth";
 
 const MAX_BATCH = 60;
 const MAX_NAME_LEN = 80;
@@ -76,11 +77,7 @@ export async function POST(req: NextRequest) {
  * dashboard view. Add more aggregations as needed.
  */
 export async function GET(req: NextRequest) {
-  const key = req.nextUrl.searchParams.get("key");
-  const adminKey = process.env.ADMIN_KEY;
-  if (!adminKey || key !== adminKey) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isAdminRequest(req)) return unauthorizedResponse();
 
   const pool = getPool();
   if (!pool) return Response.json({ error: "DB ej konfigurerad" }, { status: 503 });

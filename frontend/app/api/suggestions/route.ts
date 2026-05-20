@@ -1,13 +1,8 @@
 import { NextRequest } from "next/server";
 import { getPool, ensureSuggestionsTable } from "../../lib/db";
+import { isAdminRequest, unauthorizedResponse } from "../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
-
-function isAdmin(req: NextRequest): boolean {
-  const key = req.nextUrl.searchParams.get("key");
-  const adminKey = process.env.ADMIN_KEY;
-  return Boolean(adminKey) && key === adminKey;
-}
 
 export async function POST(req: NextRequest) {
   const pool = getPool();
@@ -31,9 +26,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!isAdmin(req)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isAdminRequest(req)) return unauthorizedResponse();
   const pool = getPool();
   if (!pool) {
     return Response.json({ error: "Databas ej konfigurerad" }, { status: 503 });
@@ -51,9 +44,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!isAdmin(req)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isAdminRequest(req)) return unauthorizedResponse();
   const pool = getPool();
   if (!pool) {
     return Response.json({ error: "Databas ej konfigurerad" }, { status: 503 });
@@ -74,9 +65,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!isAdmin(req)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isAdminRequest(req)) return unauthorizedResponse();
   const pool = getPool();
   if (!pool) {
     return Response.json({ error: "Databas ej konfigurerad" }, { status: 503 });

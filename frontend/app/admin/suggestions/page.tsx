@@ -13,15 +13,13 @@ export default function AdminSuggestionsPage() {
   const [rows, setRows] = useState<Suggestion[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [key, setKey] = useState("");
   const [tab, setTab] = useState<"new" | "liked">("new");
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  const load = useCallback(async (k: string) => {
-    if (!k) return;
+  const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/suggestions?key=${encodeURIComponent(k)}`);
-      if (res.status === 401) throw new Error("Fel nyckel");
+      const res = await fetch(`/api/suggestions`);
+      if (res.status === 401) throw new Error("Ej autentiserad");
       if (!res.ok) throw new Error("Serverfel");
       const data = await res.json();
       setRows(data);
@@ -34,17 +32,13 @@ export default function AdminSuggestionsPage() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const k = params.get("key") ?? "";
-    setKey(k);
-    if (!k) { setError("Ingen nyckel angiven (?key=...)"); setLoading(false); return; }
-    load(k);
+    load();
   }, [load]);
 
   const updateStatus = async (id: number, status: "new" | "liked") => {
     setBusyId(id);
     try {
-      const res = await fetch(`/api/suggestions?key=${encodeURIComponent(key)}`, {
+      const res = await fetch(`/api/suggestions`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status }),
@@ -62,7 +56,7 @@ export default function AdminSuggestionsPage() {
     if (!confirm("Kasta detta förslag?")) return;
     setBusyId(id);
     try {
-      const res = await fetch(`/api/suggestions?key=${encodeURIComponent(key)}&id=${id}`, {
+      const res = await fetch(`/api/suggestions?id=${id}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Kunde inte ta bort");
@@ -87,7 +81,7 @@ export default function AdminSuggestionsPage() {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0 }}>Soldryck — Förslag</h1>
       </div>
       <a
-        href={key ? `/admin?key=${encodeURIComponent(key)}` : "/admin"}
+        href="/admin"
         style={{ fontSize: 12, color: "#64748b", textDecoration: "underline", display: "inline-block", marginBottom: 20 }}
       >
         ← Tillbaka till rapporter

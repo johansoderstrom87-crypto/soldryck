@@ -25,7 +25,8 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Match /admin/claims (and sub-paths) and /api/admin/*.
-  // Leave the existing /admin (feedback page with ?key=...) untouched.
-  matcher: ["/admin/claims/:path*", "/api/admin/:path*"],
+  // Guard every admin page and the /api/admin/* family.
+  // Mixed-auth API routes (e.g. /api/feedback with public POST + admin GET)
+  // do their own Basic Auth check via isAdminRequest() in app/lib/admin-auth.
+  matcher: ["/admin/:path*", "/api/admin/:path*"],
 };

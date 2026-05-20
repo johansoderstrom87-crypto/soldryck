@@ -30,18 +30,12 @@ export default function AdminPage() {
   const [rows, setRows] = useState<FeedbackRow[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [key, setKey] = useState("");
   const [filter, setFilter] = useState<"all" | "schedule" | "seating">("all");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const k = params.get("key") ?? "";
-    setKey(k);
-    if (!k) { setError("Ingen nyckel angiven (?key=...)"); setLoading(false); return; }
-
-    fetch(`/api/feedback?key=${encodeURIComponent(k)}`)
+    fetch(`/api/feedback`)
       .then((r) => {
-        if (r.status === 401) throw new Error("Fel nyckel");
+        if (r.status === 401) throw new Error("Ej autentiserad");
         if (!r.ok) throw new Error("Serverfel");
         return r.json();
       })
@@ -65,7 +59,7 @@ export default function AdminPage() {
         </svg>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0 }}>Soldryck — Admin</h1>
         <a
-          href={key ? `/admin/suggestions?key=${encodeURIComponent(key)}` : "/admin/suggestions"}
+          href="/admin/suggestions"
           style={{
             marginLeft: "auto",
             fontSize: 12,

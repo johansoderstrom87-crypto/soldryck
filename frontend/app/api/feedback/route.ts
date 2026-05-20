@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getPool, ensureTable } from "../../lib/db";
+import { isAdminRequest, unauthorizedResponse } from "../../lib/admin-auth";
 
 export async function POST(req: NextRequest) {
   const pool = getPool();
@@ -30,11 +31,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const key = req.nextUrl.searchParams.get("key");
-  const adminKey = process.env.ADMIN_KEY;
-  if (!adminKey || key !== adminKey) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isAdminRequest(req)) return unauthorizedResponse();
 
   const pool = getPool();
   if (!pool) {
