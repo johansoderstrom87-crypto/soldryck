@@ -92,6 +92,40 @@ export const viewport: Viewport = {
   themeColor: "#f59e0b",
 };
 
+// Schema.org structured data — server-rendered so crawlers (Google) and
+// AI-svartjänster (ChatGPT-search, Perplexity, Claude) ser entitetstypen
+// utan att behöva exekvera JS. WebApplication är rätt typ för en gratis
+// kart-webapp; areaServed pekar på Stockholm vilket hjälper geo-relevans.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Soldryck",
+  url: SITE_URL,
+  description: DESCRIPTION,
+  applicationCategory: "TravelApplication",
+  operatingSystem: "Web",
+  inLanguage: "sv-SE",
+  isAccessibleForFree: true,
+  browserRequirements: "Requires JavaScript. Requires HTML5.",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "SEK",
+  },
+  areaServed: {
+    "@type": "City",
+    name: "Stockholm",
+    addressCountry: "SE",
+  },
+  featureList: [
+    "Soldata per uteservering timme för timme",
+    "Baserat på 3D-byggnadsmodeller (Stockholm Dataportalen SBK LOD1)",
+    "Solpositionsberäkning via ray-casting",
+    "Väderprognos från SMHI",
+    "Filter på takbarer, tunnelbanestation, öppettider",
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -103,6 +137,12 @@ export default function RootLayout({
         {/* Leaflet CSS is imported via `import "leaflet/dist/leaflet.css"`
             in this file — Next bundles + serves from the same origin.
             Icons handled by Next's metadata.icons — see above. */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
+          }}
+        />
       </head>
       <body className="h-full overflow-hidden">
         {children}

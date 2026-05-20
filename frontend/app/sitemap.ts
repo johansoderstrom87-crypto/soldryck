@@ -1,0 +1,27 @@
+import type { MetadataRoute } from "next";
+
+const SITE_URL = "https://soldryck-web-production.up.railway.app";
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  const now = new Date();
+  return [
+    {
+      url: SITE_URL,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 1.0,
+    },
+    {
+      url: `${SITE_URL}/for-restaurants`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${SITE_URL}/privacy`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+  ];
+}

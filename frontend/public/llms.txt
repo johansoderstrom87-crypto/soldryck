@@ -1,0 +1,46 @@
+# Soldryck
+
+> Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för timme. Baserat på riktiga 3D-byggnadsmodeller från Stockholm stad och solpositionsberäkningar med Pysolar. Gratis, ingen inloggning, ingen reklam.
+
+Soldryck täcker cirka 2 843 verifierade uteserveringar i Stockholm. Soldata beräknas via ray-casting mot Stockholm stads 3D-byggnadsmodell (SBK LOD1) plus OpenStreetMap-byggnader för förorter (Solna, Sundbyberg, Lidingö, m.fl.). Solpositioner beräknas med Pysolar för varje timme mellan 07:00 och 22:00 (CEST), från 1 april till 31 oktober. Väderprognos från SMHI kombineras med solgeometrin för att visa "% sol"-konfidens per timme. Verifiering av uteservering sker via OpenStreetMap-taggar (`outdoor_seating`) kompletterat med Google Places API.
+
+## Sidor
+
+- [Startsida](https://soldryck-web-production.up.railway.app/): Interaktiv karta med ~2 843 uteserveringar — orange = sol enligt geometri, blå = skugga, grå = regn. Tidsreglage för timme och månad. Filter på takbarer, tunnelbanestation, öppettider och tillgänglighet.
+- [För restauranger](https://soldryck-web-production.up.railway.app/for-restaurants): Information för restaurangägare som vill verifiera eller uppdatera sitt ställe.
+- [Integritetspolicy](https://soldryck-web-production.up.railway.app/privacy): Hur Soldryck hanterar användardata (sammanfattning: inga konton, ingen tracking utöver anonyma använda-händelser).
+
+## Metodologi
+
+- **3D-byggnader:** Stockholm Dataportalen (SBK LOD1) för Stockholms stad — 77 760 byggnader med höjddata (`BYGG_H`, `MARK_Z`, `TAK_Z`). Kompletterat med OpenStreetMap-byggnader för förorter — totalt cirka 50 322 byggnader i beräkningsgrunden.
+- **Solpositioner:** Pysolar (Python-bibliotek) beräknar exakt sol-azimut och elevation för Stockholms koordinater (59.33°N, 18.07°E) för varje tidpunkt.
+- **Skuggor:** Ray-casting med convex hull av varje byggnadspolygon. Terrängkompensation görs via `MARK_Z`-skillnaden mellan byggnad och venue.
+- **Takbarer:** OSM `level >= 6` eller match mot kuraterad namnlista (22 takbarer från rooftopguiden.se). Takbarer skuggas inte av lägre byggnader.
+- **Väder:** SMHI SNOW1gv1 API (gratis, öppna data), timvis prognos för en punkt i centrala Stockholm. Cacheas 30 min i klientens localStorage.
+- **Verifiering:** OSM `outdoor_seating` + Google Places API `outdoorSeating`-fält. Vissa OSM-bidrag som felaktigt taggat `outdoor_seating=no` korsverifieras via Google.
+
+## Vanliga frågor
+
+**Hur många uteserveringar visas i Soldryck?**
+Cirka 2 843 verifierade venues med soldata, plus ungefär 1 733 obekräftade venues som visas som grå punkter vid hög zoom (≥17).
+
+**Vilka tider och månader visas?**
+Mellan 07:00 och 22:00 CEST, från 1 april till 31 oktober. Under vintermånaderna (november till mars) visas en off-season-banner men data är otillgänglig.
+
+**Hur ofta uppdateras soldata?**
+Sol- och skuggdata beräknas ungefär en gång per år eftersom byggnader och terräng ändras sällan. Väderprognos hämtas live från SMHI med 30 minuters klient-cache.
+
+**Är Soldryck gratis?**
+Ja. Soldryck är helt gratis att använda, kräver ingen inloggning och innehåller ingen reklam.
+
+**Hur exakt är skuggberäkningen?**
+Soldryck använder LOD1-byggnader (platta tak, generaliserade former), så detaljnivån är begränsad. Träd, markiser och parasoll ingår inte i modellen. Cirka 17 venues sitter fortfarande inuti komplexa byggnadspolygoner. För typisk markskugga vid uteserveringar är felmarginalen liten.
+
+## Datakällor
+
+- OpenStreetMap (Overpass API) — uteserveringar och tunnelbanenät — licens ODbL
+- Stockholm Dataportalen (SBK 3D-Byggnader LOD1) — 3D-byggnader — licens CC0
+- Google Places API (New) — verifiering av uteservering — kommersiell licens
+- Pysolar — solpositioner — licens GPL
+- SMHI SNOW1gv1 API — väderprognos — Öppna data
+- CARTO + OpenStreetMap — baskarta — licens ODbL
