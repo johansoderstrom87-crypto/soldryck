@@ -1334,6 +1334,34 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     mapRef.current = map;
 
+    // Patch Leaflet's Popup prototype så transform aldrig sätts på popup-
+    // containern. Anledning: Leaflets _updatePosition använder DomUtil.
+    // setPosition (transform:translate3d) när _zoomAnimated är true (default
+    // på moderna webbläsare). Transform på popup-elementet skapar en ny
+    // containing block och blockerar backdrop-filter på .leaflet-popup-
+    // content-wrapper (vi vill ha samma glas-blur som Header-kortet).
+    // Med _zoomAnimated=false använder Leaflet bottom/left istället, vilket
+    // inte skapar någon containing block. Patchen körs en gång globalt.
+    const popupProto = L.Popup.prototype as unknown as {
+      __soldryckBlurPatched?: boolean;
+      onAdd: (map: L.Map) => unknown;
+    };
+    if (!popupProto.__soldryckBlurPatched) {
+      popupProto.__soldryckBlurPatched = true;
+      const origOnAdd = popupProto.onAdd;
+      popupProto.onAdd = function (this: L.Popup & {
+        _zoomAnimated?: boolean;
+        _container?: HTMLElement;
+        _updatePosition?: () => void;
+      }, mapArg: L.Map) {
+        const ret = origOnAdd.call(this, mapArg);
+        this._zoomAnimated = false;
+        if (this._container) this._container.style.transform = "";
+        this._updatePosition?.();
+        return ret;
+      };
+    }
+
     // Leaflet creates every pane (including popupPane) inside mapPane, which
     // gets a transform during pan/zoom — that's how popups normally stay
     // anchored to the map. mapPane's transform also creates a stacking
@@ -1369,22 +1397,6 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     // above the header. Putting the marker around 70 % of the viewport
     // height instead leaves room for the popup to grow upward.
     map.on("popupopen", (e: { popup?: L.Popup }) => {
-      // Tvinga popupen att positionera sig via bottom/left istället för
-      // transform:translate3d (Leaflets default). Annars sätts en transform
-      // på popup-containern, vilket skapar en ny containing block och
-      // blockerar backdrop-filter på popup-content-wrapper (vi vill ha
-      // samma glasiga blur som Header/TimeSlider).
-      const popup = e.popup as L.Popup & {
-        _zoomAnimated?: boolean;
-        _container?: HTMLElement;
-        _updatePosition?: () => void;
-      } | undefined;
-      if (popup && popup._zoomAnimated !== false) {
-        popup._zoomAnimated = false;
-        if (popup._container) popup._container.style.transform = "";
-        popup._updatePosition?.();
-      }
-
       const latlng = e.popup?.getLatLng?.();
       if (!latlng || !mapRef.current) return;
       const m = mapRef.current;
