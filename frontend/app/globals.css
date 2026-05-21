@@ -859,12 +859,96 @@ html, body {
 .popup-timeline-panel {
   background: rgba(255, 255, 255, 0.6);
   border-radius: var(--r-sm);
-  padding: 7px 10px;
+  padding: 7px 10px 6px;
   margin-top: 10px;
   border: 0.5px solid rgba(255, 255, 255, 0.75);
   box-shadow:
     0 1px 3px rgba(15, 23, 42, 0.06),
     0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+/* Timeline cells — one column per hour. Each cell stacks:
+     1. bar-stack (fixed-height container, bar aligned to its bottom)
+        - bar (variable height, rounded top, two-stop gradient)
+        - glow (10 px fade in the bar's colour — the "light shining down")
+     2. hour label (slate-900 so the number reads cleanly against glass)
+     3. dot-wrap (8 px reserved space; only the current hour shows a dot)
+   The bar-stack's fixed height with flex-end alignment means shorter bars
+   don't push longer ones up — every bar shares the same baseline, which
+   is what makes the sun's arc shape read as an arc. */
+.timeline-cells {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: 4px;
+}
+.timeline-cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.timeline-cell-stack {
+  width: 100%;
+  height: 38px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  position: relative;
+}
+.timeline-cell-bar {
+  width: 100%;
+  border-radius: 5px 5px 0 0;
+}
+.timeline-cell-glow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  height: 10px;
+  opacity: 0.45;
+  pointer-events: none;
+}
+.timeline-cell-label {
+  font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
+  font-size: 8.5px;
+  color: #0f172a;
+  line-height: 1;
+  padding-top: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.timeline-cell-dot-wrap {
+  height: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.timeline-now-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: timeline-now-pulse 1.6s ease-in-out infinite;
+}
+@keyframes timeline-now-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(245, 158, 11, 0.65),
+      0 0 6px rgba(245, 158, 11, 0.7);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(245, 158, 11, 0),
+      0 0 14px rgba(245, 158, 11, 1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .timeline-now-dot {
+    animation: none;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
+  }
 }
 
 /* "Bästa timmen" — the day's headline moment. Treated like a hero CTA:

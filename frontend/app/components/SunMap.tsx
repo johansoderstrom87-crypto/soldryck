@@ -957,38 +957,53 @@ function buildVenuePopupHtml(
   const sunHours = getSunHrs(venue, dateKey);
   const hours = Array.from({ length: 16 }, (_, i) => i + 7);
 
-  const shadowTimeline = hours
+  // One unified cell per hour: variable-height bar (arc-shaped across the
+  // day, peaks at solar noon), a soft fade-glow beneath in the same colour
+  // as the bar (so the bar visually "shines down"), the hour label, and
+  // an animated dot marking the user's currently-selected hour.
+  const timelineCells = hours
     .map((h) => {
       const s = normalize(getStatus(venue, dateKey, h));
-      let bg: string;
+      // Top/bottom colours for the bar's vertical gradient. Sun gets four
+      // tiers of warmth depending on distance from solar noon (13:00) so
+      // the row reads like a sunrise→peak→sunset curve.
+      let top: string;
+      let base: string;
       if (s === "sun") {
         const dist = Math.abs(h - 13);
-        if (dist >= 6) bg = "background:linear-gradient(180deg,#fef9c3,#fde68a)";
-        else if (dist >= 4) bg = "background:linear-gradient(180deg,#fde68a,#fbbf24)";
-        else if (dist >= 2) bg = "background:linear-gradient(180deg,#fbbf24,#f59e0b)";
-        else bg = "background:linear-gradient(180deg,#f59e0b,#ea580c)";
-      } else {
-        bg = s === "partial" ? "background:linear-gradient(135deg,#fed7aa,#fb923c)"
-           : s === "night" ? "background:#1e293b"
-           : "background:#e2e8f0";
-      }
-      return `<div style="flex:1;height:16px;border-radius:4px;${bg};min-width:0" title="${h}:00 — ${statusToLabel(s)}"></div>`;
-    })
-    .join("");
+        if (dist >= 6)      { top = "#fef3c7"; base = "#fde68a"; }
+        else if (dist >= 4) { top = "#fde68a"; base = "#fcd34d"; }
+        else if (dist >= 2) { top = "#fcd34d"; base = "#fbbf24"; }
+        else                { top = "#fbbf24"; base = "#f59e0b"; }
+      } else if (s === "partial") { top = "#fed7aa"; base = "#fb923c"; }
+      else if (s === "night")     { top = "#475569"; base = "#1e293b"; }
+      else                        { top = "#e2e8f0"; base = "#cbd5e1"; }
 
-  const hourLabels = hours
-    .map((h) => {
-      const bold = h === hour ? "font-weight:700;color:#334155" : "";
-      return `<div style="flex:1;text-align:center;font-size:6px;color:#94a3b8;min-width:0;${bold}">${h}</div>`;
-    })
-    .join("");
+      // Arc-shaped height. sin() peaks at the middle hour so the bars
+      // visually trace the sun's path across the day. Status modifiers
+      // keep shade/night bars shorter than sun-lit ones at the same hour.
+      const arcFactor = Math.sin(((h - 7) / 15) * Math.PI);
+      let barHeight: number;
+      if (s === "night")      barHeight = 10;
+      else if (s === "shade") barHeight = 14;
+      else if (s === "partial") barHeight = 22 + Math.round(arcFactor * 8);
+      else                      barHeight = 22 + Math.round(arcFactor * 14);
 
-  const nowDots = hours
-    .map((h) =>
-      h === hour
-        ? `<div style="flex:1;min-width:0;display:flex;justify-content:center"><div style="width:5px;height:5px;border-radius:50%;background:#f59e0b;box-shadow:0 0 4px rgba(245,158,11,0.7)"></div></div>`
-        : `<div style="flex:1;min-width:0"></div>`
-    )
+      const isNow = h === hour;
+      const labelWeight = isNow ? 700 : 500;
+      const dotHtml = isNow
+        ? `<span class="timeline-now-dot" aria-hidden="true"></span>`
+        : "";
+
+      return `<div class="timeline-cell" title="${h}:00 — ${statusToLabel(s)}">
+        <div class="timeline-cell-stack">
+          <div class="timeline-cell-bar" style="height:${barHeight}px;background:linear-gradient(180deg,${top} 0%,${base} 100%);box-shadow:0 1px 0 rgba(255,255,255,0.4) inset"></div>
+          <div class="timeline-cell-glow" style="background:linear-gradient(180deg,${base} 0%,transparent 100%)"></div>
+        </div>
+        <div class="timeline-cell-label" style="font-weight:${labelWeight}">${h}</div>
+        <div class="timeline-cell-dot-wrap">${dotHtml}</div>
+      </div>`;
+    })
     .join("");
 
   const bestHour = getBestHour(venue, dateKey, weather);
@@ -1115,16 +1130,39 @@ function buildVenuePopupHtml(
     ? `<span title="Tillgänglig enligt OpenStreetMap" style="display:inline-flex;align-items:center;margin-left:6px;padding:1px 5px;background:#eff6ff;border-radius:999px;color:#1d4ed8;font-size:10px;font-weight:700">♿</span>`
     : "";
 
-  // Sun confidence — shadow ray-cast × weather. Rendered next to the
-  // selected hour ("Kl 19:00 · Solchans 100%") above the timeline bar so it
-  // reads as a time-bound metric (tied to where the slider is right now),
-  // not a static venue property.
+  // Sun confidence — shadow ray-cast × weather. The chip background now
+  // reflects what's actually going on in the sky at the selected hour
+  // (rain → blue, snow/sleet → cool grey-blue, thunder → indigo, shade
+  // → slate, sun-by-conf → amber tiers) so a glance at the chip tells
+  // you the weather mode, not just the percentage.
   const wSymbol = weather?.hourly[hour]?.symbolCode;
   const conf = sunConfidence(status, wSymbol);
-  const confTier = conf >= 80 ? { bg: "#dcfce7", fg: "#14532d" }
-                : conf >= 50 ? { bg: "#fef3c7", fg: "#92400e" }
-                :              { bg: "#f1f5f9", fg: "#475569" };
-  const confChipHtml = `<span title="Sannolikheten att du känner sol just kl ${hour}:00 — kombinerar skuggberäkningen med SMHI:s prognos" style="display:inline-flex;align-items:center;gap:3px;padding:1px 7px;background:${confTier.bg};border-radius:999px;color:${confTier.fg};font-size:10px;font-weight:700;line-height:1.5">
+  const confTier = (() => {
+    // Weather-driven modes dominate when present.
+    if (wSymbol !== undefined) {
+      // Rain / heavy showers
+      if ((wSymbol >= 8 && wSymbol <= 10) || (wSymbol >= 18 && wSymbol <= 20)) {
+        return { bg: "linear-gradient(135deg,#dbeafe,#93c5fd)", fg: "#1e3a8a", border: "rgba(37,99,235,0.25)" };
+      }
+      // Thunder
+      if (wSymbol === 11 || wSymbol === 21) {
+        return { bg: "linear-gradient(135deg,#e0e7ff,#a5b4fc)", fg: "#312e81", border: "rgba(79,70,229,0.30)" };
+      }
+      // Snow / sleet
+      if ((wSymbol >= 12 && wSymbol <= 17) || (wSymbol >= 22 && wSymbol <= 27)) {
+        return { bg: "linear-gradient(135deg,#f8fafc,#cbd5e1)", fg: "#1e293b", border: "rgba(100,116,139,0.30)" };
+      }
+    }
+    // Shade / night fall back to slate so the chip never looks "sunny" when it isn't.
+    if (status === "shade" || status === "night") {
+      return { bg: "linear-gradient(135deg,#f1f5f9,#cbd5e1)", fg: "#334155", border: "rgba(71,85,105,0.20)" };
+    }
+    // Clear-ish sun: amber tier by confidence.
+    if (conf >= 80) return { bg: "linear-gradient(135deg,#fde68a,#fbbf24)", fg: "#78350f", border: "rgba(245,158,11,0.35)" };
+    if (conf >= 50) return { bg: "linear-gradient(135deg,#fef3c7,#fde68a)", fg: "#92400e", border: "rgba(245,158,11,0.25)" };
+    return { bg: "linear-gradient(135deg,#f1f5f9,#cbd5e1)", fg: "#475569", border: "rgba(71,85,105,0.20)" };
+  })();
+  const confChipHtml = `<span title="Sannolikheten att du känner sol just kl ${hour}:00 — kombinerar skuggberäkningen med SMHI:s prognos" style="display:inline-flex;align-items:center;gap:3px;padding:2px 9px;background:${confTier.bg};border:0.5px solid ${confTier.border};border-radius:999px;color:${confTier.fg};font-size:10px;font-weight:700;line-height:1.5;box-shadow:0 1px 2px rgba(15,23,42,0.05)">
       Solchans ${conf}%
     </span>`;
 
@@ -1179,9 +1217,7 @@ function buildVenuePopupHtml(
           <span style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.04em">Kl ${hour}:00</span>
           ${confChipHtml}
         </div>
-        <div style="display:flex;gap:2px">${shadowTimeline}</div>
-        <div style="display:flex;gap:2px;margin-top:2px">${hourLabels}</div>
-        <div style="display:flex;gap:2px;margin-top:1px">${nowDots}</div>
+        <div class="timeline-cells">${timelineCells}</div>
         <div style="font-size:10px;color:#94a3b8;text-align:right;margin-top:3px">${sunHours} soltimmar</div>
       </div>
       ${sunArrivesLine}
