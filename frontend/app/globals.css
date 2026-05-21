@@ -710,10 +710,11 @@ html, body {
 }
 
 /* Popup action buttons. Each button stacks an icon glyph on top of a short
-   label ("Favorit", "Maps", "Sida", "Dela") so the row reads at a glance
-   and gives a comfortable tap target on mobile. Buttons share the row
-   equally via flex:1 — if the website button is hidden, the remaining
-   three just grow wider. */
+   label ("Favorit", "Maps", "Sida", "Dela"). Each button gets its own
+   visible drop-shadow so the row of four reads as four distinct cards
+   even against the popup's glass surface. Larger ~24 px icons + colour-
+   coded glyphs (amber heart, red map pin, blue globe, purple share) make
+   the row scannable at a glance. */
 .popup-actions {
   display: flex;
   align-items: stretch;
@@ -729,11 +730,11 @@ html, body {
 .popup-btn {
   flex: 1;
   min-width: 0;
-  min-height: 56px;
-  padding: 8px 4px 7px;
+  min-height: 62px;
+  padding: 9px 4px 8px;
   border: 0.5px solid rgba(15, 23, 42, 0.08);
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.85);
   color: #334155;
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
   font-size: 11px;
@@ -743,25 +744,31 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   text-decoration: none;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  transition: background 0.12s ease, transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 4px 12px rgba(15, 23, 42, 0.08);
+  transition: background 0.14s ease, transform 0.1s ease, box-shadow 0.14s ease, border-color 0.14s ease;
 }
 .popup-btn:hover {
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  background: #ffffff;
   border-color: rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.08),
+    0 8px 20px rgba(15, 23, 42, 0.12);
 }
-.popup-btn:active { transform: scale(0.96); }
+.popup-btn:active { transform: translateY(0) scale(0.96); }
 .popup-btn-glyph {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
+  font-size: 22px;
   line-height: 1;
-  height: 20px;
+  height: 26px;
 }
+.popup-btn-glyph svg { display: block; }
 .popup-btn-label {
   font-size: 10.5px;
   font-weight: 600;
@@ -770,9 +777,17 @@ html, body {
   line-height: 1;
 }
 .popup-btn-icon { color: inherit; }
-.popup-btn-fav { color: #475569; }
-.popup-btn-fav.is-fav .popup-btn-label { color: #ef4444; }
-.popup-btn-fav:hover { background: #fff5f5; border-color: rgba(239, 68, 68, 0.25); }
+/* Favourite: amber heart, outlined by default, filled when .is-fav. The
+   single SVG inherits fill from currentColor when .is-fav is set, which
+   lets us toggle state in JS by just flipping a class. */
+.popup-btn-fav { color: #f59e0b; }
+.popup-btn-fav .popup-btn-glyph svg { fill: none; }
+.popup-btn-fav.is-fav .popup-btn-glyph svg { fill: currentColor; }
+.popup-btn-fav.is-fav .popup-btn-label { color: #b45309; }
+.popup-btn-fav:hover {
+  background: #fffbeb;
+  border-color: rgba(245, 158, 11, 0.30);
+}
 .popup-btn-primary {
   background: #f59e0b;
   color: #fff;
@@ -780,75 +795,203 @@ html, body {
 .popup-btn-primary:hover { background: #d97706; }
 .popup-btn-web .popup-btn-glyph { color: #1d4ed8; }
 .popup-btn-web:hover { background: #eff6ff; border-color: rgba(29, 78, 216, 0.2); }
-.popup-btn-share .popup-btn-glyph { color: #475569; }
-.popup-btn-share:hover { background: #f8fafc; }
+/* Share: purple icon so each of the four cards has a unique brand colour. */
+.popup-btn-share .popup-btn-glyph { color: #8b5cf6; }
+.popup-btn-share:hover {
+  background: #faf5ff;
+  border-color: rgba(139, 92, 246, 0.25);
+}
 
-/* "Bästa timmen" — interactive shortcut that scrubs the timeline to the
-   day's best sun-window. The right-pointing chevron + cursor:pointer signal
-   that this is a button, not a passive label. Background tier matches the
-   warm amber used elsewhere for sun-related accents. */
-.popup-best-hour {
+/* Sun/moon status emoji in the name row — sits in a soft white disk so
+   it reads as a "status pill" rather than a bare emoji floating against
+   the card. Sized large enough to compete with the venue name without
+   overpowering it; equal padding all around for a balanced look. */
+.popup-status-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.6);
+  border: 0.5px solid rgba(15, 23, 42, 0.06);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+/* Meta row (rating + type + price + accessibility + walk). The rating
+   star lives in a fixed 8 px slot that lines up vertically with the
+   .venue-hours-dot below, so the row above and the hours row read as
+   a clean two-line block sharing the same left-edge rhythm. */
+.popup-meta-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  width: 100%;
+  gap: 8px;
   margin-top: 6px;
-  padding: 6px 8px 6px 10px;
-  background: #fffbeb;
-  border: 0.5px solid rgba(245, 158, 11, 0.25);
-  border-left: 3px solid #f59e0b;
-  border-radius: 0 var(--r-sm) var(--r-sm) 0;
-  color: #78350f;
   font-size: 11px;
-  font-weight: 500;
+  color: #64748b;
+}
+.popup-meta-slot {
+  width: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+.popup-meta-text { flex: 1; min-width: 0; }
+
+/* Timeline panel — the day's sun/shade bar and the "Solchans" chip. Gets
+   its own light drop-shadow so it visually separates from the popup's
+   glass surface. */
+.popup-timeline-panel {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: var(--r-sm);
+  padding: 7px 10px;
+  margin-top: 10px;
+  border: 0.5px solid rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+/* "Bästa timmen" — the day's headline moment. Treated like a hero CTA:
+   amber gradient, glowing star in its own disc, eyebrow label + hour,
+   chevron arrow on the right, and a subtle shimmer that drifts across
+   the surface so the button feels alive ("oh, THIS is the best hour").
+   The shine animation only runs every ~4 s so it doesn't become noisy. */
+.popup-best-hour {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px 14px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 55%, #fcd34d 100%);
+  border: 0.5px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--r-md);
+  color: #78350f;
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
   cursor: pointer;
   text-align: left;
-  transition: background 0.12s ease, transform 0.08s ease, box-shadow 0.12s ease;
+  overflow: hidden;
+  box-shadow:
+    0 2px 6px rgba(245, 158, 11, 0.18),
+    0 8px 20px rgba(245, 158, 11, 0.20);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 .popup-best-hour:hover {
-  background: #fef3c7;
-  box-shadow: 0 1px 4px rgba(245, 158, 11, 0.15);
+  transform: translateY(-1px);
+  box-shadow:
+    0 3px 8px rgba(245, 158, 11, 0.22),
+    0 10px 26px rgba(245, 158, 11, 0.28);
 }
-.popup-best-hour:active { transform: scale(0.99); }
-.popup-best-hour-star { font-size: 11px; flex-shrink: 0; line-height: 1; }
-.popup-best-hour-text { flex: 1; min-width: 0; }
-.popup-best-hour-arrow { color: #b45309; flex-shrink: 0; opacity: 0.7; transition: transform 0.12s ease, opacity 0.12s ease; }
-.popup-best-hour:hover .popup-best-hour-arrow { transform: translateX(2px); opacity: 1; }
+.popup-best-hour:active { transform: translateY(0) scale(0.99); }
+.popup-best-hour-shine {
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  transform: skewX(-18deg);
+  animation: best-hour-shine 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes best-hour-shine {
+  0%, 100% { left: -40%; }
+  55%      { left: 130%; }
+}
+.popup-best-hour-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #fffbeb 0%, #fbbf24 70%, #f59e0b 100%);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.55),
+    0 0 14px rgba(245, 158, 11, 0.45);
+  flex-shrink: 0;
+  z-index: 1;
+}
+.popup-best-hour-icon { font-size: 18px; line-height: 1; filter: drop-shadow(0 1px 1px rgba(180, 83, 9, 0.3)); }
+.popup-best-hour-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  z-index: 1;
+}
+.popup-best-hour-eyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  color: #b45309;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.popup-best-hour-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #78350f;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.popup-best-hour-arrow {
+  color: #b45309;
+  flex-shrink: 0;
+  z-index: 1;
+  transition: transform 0.14s ease;
+}
+.popup-best-hour:hover .popup-best-hour-arrow { transform: translateX(3px); }
 
-/* ✕ in the top-right corner of the popup. Solid white disk with a soft
-   shadow and a hairline ring (inset shadow) — reads as a clean, premium
-   modal-close button against any background (photo, glass surface, or a
-   colourful sky). Lifts slightly on hover, shrinks on press. */
+@media (prefers-reduced-motion: reduce) {
+  .popup-best-hour-shine { animation: none; opacity: 0; }
+}
+
+/* ✕ in the top-right corner of the popup. Translucent white disk so the
+   underlying photo / glass surface bleeds through subtly — reads as a
+   premium modal-close button without dominating the popup. Equal 10 px
+   inset from top and right so the spacing to both edges matches visually.
+   Lifts slightly on hover, shrinks on press. */
 .popup-close-btn {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  /* Inner wrapper sits inside .leaflet-popup-content's 12 px / 16 px margin.
+     Negative offsets compensate so the button lands 10 px from BOTH popup
+     edges visually, not just from the inner wrapper edges. */
+  top: -2px;
+  right: -6px;
   width: 30px;
   height: 30px;
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: #ffffff;
-  color: #475569;
+  background: rgba(255, 255, 255, 0.65);
+  color: #334155;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 5;
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.10),
-    0 4px 12px rgba(15, 23, 42, 0.14),
-    inset 0 0 0 0.5px rgba(15, 23, 42, 0.08);
+    0 1px 2px rgba(15, 23, 42, 0.12),
+    0 4px 12px rgba(15, 23, 42, 0.16),
+    inset 0 0 0 0.5px rgba(15, 23, 42, 0.10);
   transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
 }
 .popup-close-btn:hover {
+  background: rgba(255, 255, 255, 0.92);
   color: #0f172a;
   transform: scale(1.06);
   box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.12),
-    0 6px 16px rgba(15, 23, 42, 0.18),
-    inset 0 0 0 0.5px rgba(15, 23, 42, 0.10);
+    0 2px 4px rgba(15, 23, 42, 0.14),
+    0 6px 16px rgba(15, 23, 42, 0.20),
+    inset 0 0 0 0.5px rgba(15, 23, 42, 0.12);
 }
 .popup-close-btn:active { transform: scale(0.94); }
 .popup-close-btn:focus-visible {
@@ -898,29 +1041,75 @@ html, body {
 }
 .popup-claim-link:hover { background: rgba(245, 158, 11, 0.18); }
 
-/* "Boka bord"-link — slim row between action buttons and the small footer
-   links. Calendar-ikon + text, fills the popup width so it reads as a
-   distinct call-to-action without competing with the main 3-button row. */
+/* "Boka bord"-link — slim premium CTA between the action buttons and the
+   footer links. Calendar icon in its own amber-tinted square + bold title
+   + small "via X" source line + trailing chevron. Hover gently warms the
+   background and lifts the card. Counterpoint to the louder "Bästa
+   timmen" gradient above. */
 .popup-book {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  padding: 6px 8px;
-  background: rgba(15, 23, 42, 0.04);
-  border: 0.5px solid rgba(15, 23, 42, 0.08);
-  border-radius: var(--r-sm);
-  color: #334155;
-  font-size: 11px;
-  font-weight: 600;
-  text-decoration: none;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 9px 12px 9px 10px;
+  background: #ffffff;
+  border: 0.5px solid rgba(15, 23, 42, 0.10);
+  border-radius: var(--r-md);
+  color: #0f172a;
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
-  transition: background 0.12s ease, color 0.12s ease;
+  text-decoration: none;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 4px 12px rgba(15, 23, 42, 0.06);
+  transition: background 0.14s ease, border-color 0.14s ease, transform 0.1s ease, box-shadow 0.14s ease;
 }
 .popup-book:hover {
-  background: rgba(245, 158, 11, 0.1);
-  color: #b45309;
+  background: #fffaf0;
+  border-color: rgba(245, 158, 11, 0.45);
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 5px rgba(245, 158, 11, 0.12),
+    0 6px 18px rgba(245, 158, 11, 0.14);
 }
+.popup-book:active { transform: translateY(0) scale(0.99); }
+.popup-book-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  background: #fef3c7;
+  color: #b45309;
+  flex-shrink: 0;
+}
+.popup-book-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.popup-book-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.popup-book-source {
+  font-size: 10px;
+  font-weight: 500;
+  color: #94a3b8;
+  line-height: 1;
+}
+.popup-book-arrow {
+  color: #b45309;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: transform 0.14s ease, opacity 0.14s ease;
+}
+.popup-book:hover .popup-book-arrow { transform: translateX(3px); opacity: 1; }
 .popup-verified-tag {
   font-size: 9px;
   color: #16a34a;

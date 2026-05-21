@@ -1000,9 +1000,15 @@ function buildVenuePopupHtml(
         data-hour="${bestHour.hour}"
         title="Hoppa till kl ${bestHour.hour}:00"
       >
-        <span class="popup-best-hour-star">&#11088;</span>
-        <span class="popup-best-hour-text">B&auml;sta timmen: ${bestHour.label}</span>
-        <svg class="popup-best-hour-arrow" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        <span class="popup-best-hour-shine" aria-hidden="true"></span>
+        <span class="popup-best-hour-icon-wrap" aria-hidden="true">
+          <span class="popup-best-hour-icon">&#11088;</span>
+        </span>
+        <span class="popup-best-hour-body">
+          <span class="popup-best-hour-eyebrow">B&auml;sta timmen idag</span>
+          <span class="popup-best-hour-text">${bestHour.label}</span>
+        </span>
+        <svg class="popup-best-hour-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
       </button>`
     : "";
 
@@ -1064,8 +1070,16 @@ function buildVenuePopupHtml(
       })()
     : "";
 
-  const ratingHtml = venue.rating != null
-    ? `&#11088; ${venue.rating.toFixed(1)}${venue.ratingCount != null ? `<span style="color:#b0bec5"> (${venue.ratingCount.toLocaleString("sv-SE")})</span>` : ""} &middot; `
+  // Rating split into two pieces: a star-glyph that sits in a fixed 8 px
+  // slot at the start of the meta row (so it lines up vertically with the
+  // hours dot below), and the value text which uses slate-900 so the
+  // number reads clearly instead of fading into the muted meta colour.
+  const hasRating = venue.rating != null;
+  const ratingStarHtml = hasRating
+    ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" style="display:block" aria-hidden="true"><path d="M12 2l2.9 7.4 7.9.6-6 5.2 1.9 7.8L12 18.6 5.3 23l1.9-7.8-6-5.2 7.9-.6z"/></svg>`
+    : "";
+  const ratingTextHtml = hasRating
+    ? `<span style="color:#0f172a;font-weight:600">${venue.rating!.toFixed(1)}</span>${venue.ratingCount != null ? `<span style="color:#94a3b8;font-weight:400"> (${venue.ratingCount.toLocaleString("sv-SE")})</span>` : ""}<span style="color:#cbd5e1;margin:0 5px">&middot;</span>`
     : "";
 
   // Walking time — only present when the user has GPS on. Pinned next to
@@ -1132,13 +1146,16 @@ function buildVenuePopupHtml(
         title="Stäng"
       ><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       ${photoContainerHtml}
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-right:28px">
-        <strong style="font-size:17px;line-height:1.2;flex:1;margin-right:6px">${venue.name}</strong>
-        <span style="font-size:20px;flex-shrink:0">${statusToEmoji(status)}</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding-right:38px;margin-top:2px">
+        <strong style="font-size:17px;line-height:1.25;flex:1;color:#0f172a;letter-spacing:-0.01em">${venue.name}</strong>
+        <span class="popup-status-emoji" aria-hidden="true">${statusToEmoji(status)}</span>
       </div>
-      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}${priceHtml}${wheelchairHtml}${walkHtml}<span id="venue-trust-${venue.id}"></span></div>
+      <div class="popup-meta-row">
+        <span class="popup-meta-slot" aria-hidden="true">${ratingStarHtml}</span>
+        <span class="popup-meta-text">${ratingTextHtml}${typeToLabel(venue.type)}${priceHtml}${wheelchairHtml}${walkHtml}<span id="venue-trust-${venue.id}"></span></span>
+      </div>
       <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
-      <div style="background:rgba(255,255,255,0.55);border-radius:8px;padding:6px 8px;margin-top:8px;border:0.5px solid rgba(255,255,255,0.7)">
+      <div class="popup-timeline-panel">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;padding:0 1px">
           <span style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.04em">Kl ${hour}:00</span>
           ${confChipHtml}
@@ -1157,7 +1174,11 @@ function buildVenuePopupHtml(
           data-venue-id="${venue.id}"
           title="Spara som favorit"
         >
-          <span class="popup-btn-glyph">${getFavorites().has(venue.id) ? "&#10084;&#65039;" : "&#9825;"}</span>
+          <span class="popup-btn-glyph">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+          </span>
           <span class="popup-btn-label">Favorit</span>
         </button>
         <a
@@ -1165,9 +1186,14 @@ function buildVenuePopupHtml(
           target="_blank"
           rel="noopener noreferrer"
           title="Öppna i Google Maps"
-          class="popup-btn popup-btn-icon"
+          class="popup-btn popup-btn-icon popup-btn-maps"
         >
-          <span class="popup-btn-glyph"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></span>
+          <span class="popup-btn-glyph">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/>
+              <circle cx="12" cy="9" r="2.5" fill="#fff"/>
+            </svg>
+          </span>
           <span class="popup-btn-label">Maps</span>
         </a>
         ${venue.website ? `<a
@@ -1178,7 +1204,9 @@ function buildVenuePopupHtml(
           class="popup-btn popup-btn-icon popup-btn-web"
           data-venue-id="${venue.id}"
         >
-          <span class="popup-btn-glyph"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg></span>
+          <span class="popup-btn-glyph">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>
+          </span>
           <span class="popup-btn-label">Sida</span>
         </a>` : ""}
         <button
@@ -1187,7 +1215,9 @@ function buildVenuePopupHtml(
           data-venue-name="${venue.name}"
           title="Dela"
         >
-          <span class="popup-btn-glyph"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></span>
+          <span class="popup-btn-glyph">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          </span>
           <span class="popup-btn-label">Dela</span>
         </button>
       </div>
@@ -1198,14 +1228,19 @@ function buildVenuePopupHtml(
         target="_blank"
         rel="noopener noreferrer"
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
-          <rect x="3" y="4" width="18" height="18" rx="2"/>
-          <line x1="16" y1="2" x2="16" y2="6"/>
-          <line x1="8" y1="2" x2="8" y2="6"/>
-          <line x1="3" y1="10" x2="21" y2="10"/>
-        </svg>
-        <span style="flex:1">Boka bord</span>
-        <span style="font-size:9px;color:#94a3b8;font-weight:500">${bookSource}</span>
+        <span class="popup-book-icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </span>
+        <span class="popup-book-body">
+          <span class="popup-book-title">Boka bord</span>
+          <span class="popup-book-source">${bookSource}</span>
+        </span>
+        <svg class="popup-book-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
       <div class="popup-actions-row">
         <button
@@ -1984,15 +2019,14 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             map.closePopup();
           };
         }
-        // Favorite button \u2014 only swap the glyph span so the "Favorit" label stays put.
+        // Favorite button \u2014 toggle `.is-fav` so the SVG flips between
+        // outlined and filled via CSS (fill: none \u2194 currentColor).
         const favBtn = document.querySelector(`.fav-btn[data-venue-id="${venue.id}"]`);
         if (favBtn) {
           (favBtn as HTMLElement).onclick = () => {
             const favs = toggleFavorite(venue.id);
             const nowFav = favs.has(venue.id);
             track(nowFav ? "favorite_added" : "favorite_removed", { type: venue.type });
-            const glyph = favBtn.querySelector(".popup-btn-glyph");
-            if (glyph) glyph.innerHTML = nowFav ? "\u2764\uFE0F" : "\u2661";
             (favBtn as HTMLElement).classList.toggle("is-fav", nowFav);
           };
         }

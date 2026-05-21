@@ -146,8 +146,8 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
           width={embedded ? 22 : 16}
           height={embedded ? 20 : 14}
           viewBox="0 0 24 24"
-          fill={favIds.size > 0 ? "#ef4444" : "none"}
-          stroke={favIds.size > 0 ? "#ef4444" : "#475569"}
+          fill={favIds.size > 0 ? "#f59e0b" : "none"}
+          stroke={favIds.size > 0 ? "#f59e0b" : "#475569"}
           strokeWidth={1.8}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -155,9 +155,12 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
         </svg>
         {favIds.size > 0 && (
-          <span className={embedded
-            ? "absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow"
-            : "bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold"}>
+          <span
+            className={embedded
+              ? "absolute -top-1 -right-1 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow"
+              : "text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold"}
+            style={{ background: "#f59e0b" }}
+          >
             {favIds.size}
           </span>
         )}

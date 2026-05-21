@@ -254,7 +254,7 @@ function SettingsButton({
           <line x1="1" y1="12" x2="16" y2="12" />
         </svg>
         {activeCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-amber-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow">
+          <span className="absolute -top-1 -right-1 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow" style={{ background: "#f59e0b" }}>
             {activeCount}
           </span>
         )}
@@ -691,8 +691,8 @@ export default function Header({
           <Image
             src="/logo.png"
             alt="Soldryck"
-            width={54}
-            height={66}
+            width={81}
+            height={99}
             style={{ objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(245,158,11,0.3))" }}
           />
 
