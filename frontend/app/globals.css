@@ -130,18 +130,17 @@ html, body {
   transform: translateZ(0);
 }
 
-/* Popups får riktig backdrop-blur trots det globala blur-stoppet ovan —
-   till skillnad från TimeSlider/Header (som ligger över kartan och repaintar
-   varje pan-frame) öppnas popupar på en stillastående karta, så blur-kostnaden
-   betalas bara vid open/close. Klass-selektorn beats `*` på specificitet
-   även med !important på båda. */
+/* Popupen matchar TimeSlider/Header-glasytorna (theme-surface) — låg vit
+   transparens utan riktig blur. Backdrop-filter testades men appPopupPane
+   har `transform: translate3d` för att följa kartan, vilket skapar en ny
+   backdrop-root och stänger ute kartlagret från filtret (gör blur effektivt
+   no-op). Lågt opacitetsvärde över `theme-map-overlay` ger samma "frostade"
+   intryck utan dyra repaint. */
 .leaflet-popup-content-wrapper {
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(14px) saturate(1.3) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(1.3) !important;
+  background: var(--theme-surface-bg) !important;
   border-radius: var(--r-xl) !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.7) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  border: 0.5px solid var(--theme-surface-border) !important;
+  box-shadow: var(--theme-surface-shadow) !important;
   overflow: hidden !important;
 }
 
@@ -155,9 +154,7 @@ html, body {
 }
 
 .leaflet-popup-tip {
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(14px) saturate(1.3) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(1.3) !important;
+  background: var(--theme-surface-bg) !important;
 }
 
 .leaflet-popup-content {
