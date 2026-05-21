@@ -709,16 +709,16 @@ html, body {
   font-weight: 400;
 }
 
-/* Popup action buttons. Used to be inline-styled in buildVenuePopupHtml,
-   which made it easy for the favourite / map / share / feedback / claim
-   visuals to drift apart over time. These classes give them a single,
-   consistent design language: 32 px height, --r-sm corners, subtle
-   borders, hover lift. */
+/* Popup action buttons. Each button stacks an icon glyph on top of a short
+   label ("Favorit", "Maps", "Sida", "Dela") so the row reads at a glance
+   and gives a comfortable tap target on mobile. Buttons share the row
+   equally via flex:1 — if the website button is hidden, the remaining
+   three just grow wider. */
 .popup-actions {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 .popup-actions-row {
   display: flex;
@@ -727,57 +727,89 @@ html, body {
   margin-top: 4px;
 }
 .popup-btn {
-  height: 32px;
-  border: none;
-  border-radius: var(--r-sm);
-  background: #fff;
+  flex: 1;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 4px 7px;
+  border: 0.5px solid rgba(15, 23, 42, 0.08);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.75);
+  color: #334155;
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: background 0.12s ease, transform 0.08s ease;
-}
-.popup-btn:active { transform: scale(0.97); }
-.popup-btn-icon {
-  flex: 0 0 32px;
-  width: 32px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  color: inherit;
+  gap: 5px;
   text-decoration: none;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: background 0.12s ease, transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease;
 }
-.popup-btn-icon:hover { background: #f8fafc; }
-.popup-btn-fav {
-  flex: 0 0 32px;
-  width: 32px;
-  background: #fff;
-  border: 1px solid #fecaca;
-  color: #ef4444;
-  font-size: 16px;
+.popup-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  border-color: rgba(15, 23, 42, 0.12);
 }
-.popup-btn-fav:hover { background: #fef2f2; }
+.popup-btn:active { transform: scale(0.96); }
+.popup-btn-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  line-height: 1;
+  height: 20px;
+}
+.popup-btn-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #475569;
+  line-height: 1;
+}
+.popup-btn-icon { color: inherit; }
+.popup-btn-fav { color: #475569; }
+.popup-btn-fav.is-fav .popup-btn-label { color: #ef4444; }
+.popup-btn-fav:hover { background: #fff5f5; border-color: rgba(239, 68, 68, 0.25); }
 .popup-btn-primary {
-  flex: 1;
-  min-width: 0;
   background: #f59e0b;
   color: #fff;
 }
 .popup-btn-primary:hover { background: #d97706; }
-/* Website + share = ikon-only knappar med samma 32px-storlek som maps-ikonen.
-   Share tonas ner till neutral grå (vit + ikongrå) eftersom det inte längre
-   är den primära CTA:n — boka bord/website tar den platsen istället. */
-.popup-btn-web {
-  color: #1d4ed8;
-}
-.popup-btn-web:hover { background: #eff6ff; }
-.popup-btn-share {
-  font-size: 14px;
-  color: #475569;
-}
+.popup-btn-web .popup-btn-glyph { color: #1d4ed8; }
+.popup-btn-web:hover { background: #eff6ff; border-color: rgba(29, 78, 216, 0.2); }
+.popup-btn-share .popup-btn-glyph { color: #475569; }
 .popup-btn-share:hover { background: #f8fafc; }
+
+/* Discrete ✕ in the top-right corner of the popup. Soft glass disk so it
+   reads as a close-affordance without competing with the venue name. */
+.popup-close-btn {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0.5px solid rgba(15, 23, 42, 0.08);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  transition: background 0.12s ease, color 0.12s ease, transform 0.08s ease;
+}
+.popup-close-btn:hover {
+  background: #fff;
+  color: #0f172a;
+  border-color: rgba(15, 23, 42, 0.18);
+}
+.popup-close-btn:active { transform: scale(0.92); }
 .popup-btn-seating {
   flex: 1;
   min-width: 0;

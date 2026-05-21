@@ -1091,9 +1091,15 @@ function buildVenuePopupHtml(
   const bookSource = onTheFork ? "via The Fork" : "via Google";
 
   return `
-    <div style="min-width:260px">
+    <div style="min-width:260px;position:relative">
+      <button
+        class="popup-close-btn close-btn"
+        data-venue-id="${venue.id}"
+        aria-label="Stäng"
+        title="Stäng"
+      ><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg></button>
       ${photoContainerHtml}
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-right:28px">
         <strong style="font-size:17px;line-height:1.2;flex:1;margin-right:6px">${venue.name}</strong>
         <span style="font-size:20px;flex-shrink:0">${statusToEmoji(status)}</span>
       </div>
@@ -1110,17 +1116,23 @@ function buildVenuePopupHtml(
       ${happyHourHtml}
       <div class="popup-actions">
         <button
-          class="popup-btn popup-btn-fav fav-btn"
+          class="popup-btn popup-btn-fav fav-btn${getFavorites().has(venue.id) ? " is-fav" : ""}"
           data-venue-id="${venue.id}"
           title="Spara som favorit"
-        >${getFavorites().has(venue.id) ? "&#10084;&#65039;" : "&#9825;"}</button>
+        >
+          <span class="popup-btn-glyph">${getFavorites().has(venue.id) ? "&#10084;&#65039;" : "&#9825;"}</span>
+          <span class="popup-btn-label">Favorit</span>
+        </button>
         <a
           href="${mapUrl}"
           target="_blank"
           rel="noopener noreferrer"
           title="Öppna i Google Maps"
           class="popup-btn popup-btn-icon"
-        ><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></a>
+        >
+          <span class="popup-btn-glyph"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></span>
+          <span class="popup-btn-label">Maps</span>
+        </a>
         ${venue.website ? `<a
           href="${venue.website}"
           target="_blank"
@@ -1128,13 +1140,19 @@ function buildVenuePopupHtml(
           title="Hemsida"
           class="popup-btn popup-btn-icon popup-btn-web"
           data-venue-id="${venue.id}"
-        ><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg></a>` : ""}
+        >
+          <span class="popup-btn-glyph"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg></span>
+          <span class="popup-btn-label">Sida</span>
+        </a>` : ""}
         <button
           class="popup-btn popup-btn-icon popup-btn-share share-btn"
           data-venue-id="${venue.id}"
           data-venue-name="${venue.name}"
           title="Dela"
-        >&#128279;</button>
+        >
+          <span class="popup-btn-glyph"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></span>
+          <span class="popup-btn-label">Dela</span>
+        </button>
       </div>
       <a
         class="popup-book book-btn"
@@ -1921,14 +1939,24 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         // stay for type-level analytics; the id is anonymous (just a public
         // OSM/Google identifier, nothing about the user).
         track("popup_opened", { id: String(venue.id), type: venue.type, rooftop: !!venue.rooftop });
-        // Favorite button
+        // Close button \u2014 explicit \u2715 in the popup's top-right corner.
+        const closeBtn = document.querySelector(`.close-btn[data-venue-id="${venue.id}"]`);
+        if (closeBtn) {
+          (closeBtn as HTMLElement).onclick = (e) => {
+            e.stopPropagation();
+            map.closePopup();
+          };
+        }
+        // Favorite button \u2014 only swap the glyph span so the "Favorit" label stays put.
         const favBtn = document.querySelector(`.fav-btn[data-venue-id="${venue.id}"]`);
         if (favBtn) {
           (favBtn as HTMLElement).onclick = () => {
             const favs = toggleFavorite(venue.id);
             const nowFav = favs.has(venue.id);
             track(nowFav ? "favorite_added" : "favorite_removed", { type: venue.type });
-            (favBtn as HTMLElement).innerHTML = nowFav ? "\u2764\uFE0F" : "\u2661";
+            const glyph = favBtn.querySelector(".popup-btn-glyph");
+            if (glyph) glyph.innerHTML = nowFav ? "\u2764\uFE0F" : "\u2661";
+            (favBtn as HTMLElement).classList.toggle("is-fav", nowFav);
           };
         }
 
@@ -1976,8 +2004,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
               navigator.share({ title: `${venue.name} — Soldryck`, text: `Se solläget på ${venue.name}!`, url: shareUrl });
             } else {
               navigator.clipboard.writeText(shareUrl).then(() => {
-                (shareBtn as HTMLElement).textContent = "Kopierad!";
-                setTimeout(() => { (shareBtn as HTMLElement).innerHTML = "&#128279; Dela"; }, 2000);
+                const label = shareBtn.querySelector(".popup-btn-label");
+                if (label) {
+                  const original = label.textContent;
+                  label.textContent = "Kopierad!";
+                  setTimeout(() => { label.textContent = original ?? "Dela"; }, 2000);
+                }
               });
             }
           };
