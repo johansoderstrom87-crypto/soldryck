@@ -130,17 +130,19 @@ html, body {
   transform: translateZ(0);
 }
 
-/* Popupen matchar TimeSlider/Header-glasytorna (theme-surface) — låg vit
-   transparens utan riktig blur. Backdrop-filter testades men appPopupPane
-   har `transform: translate3d` för att följa kartan, vilket skapar en ny
-   backdrop-root och stänger ute kartlagret från filtret (gör blur effektivt
-   no-op). Lågt opacitetsvärde över `theme-map-overlay` ger samma "frostade"
-   intryck utan dyra repaint. */
+/* Popup-bakgrunden är en kompromiss: tillräckligt transparent för att kartan
+   ska synas (matchar TimeSlider/Header som ligger på 0.30), men popupen har
+   mer textinnehåll och saknar de färgade solfält som ger TimeSlider visuell
+   tyngd — så ren 0.30 gjorde popupen genomskinlig och innehållet svårt att
+   läsa. 0.50 + extra tjock vit border + starkare skugga ger fönstret tydlig
+   "card"-definition utan att tappa glasigheten.
+   Backdrop-filter testades men appPopupPane har transform:translate3d som
+   skapar en ny backdrop-root → blur blev effektivt no-op. */
 .leaflet-popup-content-wrapper {
-  background: var(--theme-surface-bg) !important;
+  background: rgba(255, 255, 255, 0.50) !important;
   border-radius: var(--r-xl) !important;
-  border: 0.5px solid var(--theme-surface-border) !important;
-  box-shadow: var(--theme-surface-shadow) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.18), 0 3px 12px rgba(0, 0, 0, 0.12) !important;
   overflow: hidden !important;
 }
 
@@ -154,7 +156,7 @@ html, body {
 }
 
 .leaflet-popup-tip {
-  background: var(--theme-surface-bg) !important;
+  background: rgba(255, 255, 255, 0.50) !important;
 }
 
 .leaflet-popup-content {
