@@ -1349,12 +1349,19 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     appPopupPane.style.left = "0";
     appPopupPane.style.zIndex = "1150";
     appPopupPane.style.pointerEvents = "none";
-    const syncPaneTransform = () => {
+    // Mirra mapPane:s position via top/left istället för transform.
+    // Anledning: transform på en förälder skapar en ny "containing block"
+    // som blockerar backdrop-filter på alla descendents — popupen kunde
+    // alltså aldrig få glasig blur över kartan. top/left har ingen sådan
+    // effekt. Reflow-kostnaden är minimal eftersom panelen är tom när
+    // ingen popup är öppen, och en öppen popup har inga djupa children.
+    const syncPanePosition = () => {
       const mapPanePos = (map as any)._getMapPanePos?.() ?? { x: 0, y: 0 };
-      appPopupPane.style.transform = `translate3d(${mapPanePos.x}px, ${mapPanePos.y}px, 0)`;
+      appPopupPane.style.left = `${mapPanePos.x}px`;
+      appPopupPane.style.top = `${mapPanePos.y}px`;
     };
-    syncPaneTransform();
-    map.on("move zoom viewreset zoomanim", syncPaneTransform);
+    syncPanePosition();
+    map.on("move zoom viewreset zoomanim", syncPanePosition);
 
     // Pan so the marker sits in the lower-middle of the viewport when its
     // popup opens. panTo() would centre the marker, but our popups can be
@@ -1381,7 +1388,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     });
 
     return () => {
-      map.off("move zoom viewreset zoomanim", syncPaneTransform);
+      map.off("move zoom viewreset zoomanim", syncPanePosition);
       appPopupPane.remove();
       map.remove();
       mapRef.current = null;
