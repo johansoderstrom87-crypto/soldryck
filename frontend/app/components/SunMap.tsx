@@ -1352,12 +1352,20 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       popupProto.onAdd = function (this: L.Popup & {
         _zoomAnimated?: boolean;
         _container?: HTMLElement;
+        _wrapper?: HTMLElement;
         _updatePosition?: () => void;
       }, mapArg: L.Map) {
         const ret = origOnAdd.call(this, mapArg);
         this._zoomAnimated = false;
         if (this._container) this._container.style.transform = "";
         this._updatePosition?.();
+        // Sätt backdrop-blur inline med !important via setProperty —
+        // bypassar det globala `* { backdrop-filter: none !important }`
+        // helt och hållet utan att förlita sig på CSS-specificitet.
+        if (this._wrapper) {
+          this._wrapper.style.setProperty("backdrop-filter", "blur(30px) saturate(1.5)", "important");
+          this._wrapper.style.setProperty("-webkit-backdrop-filter", "blur(30px) saturate(1.5)", "important");
+        }
         return ret;
       };
     }
