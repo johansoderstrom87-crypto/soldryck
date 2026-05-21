@@ -1002,13 +1002,25 @@ function buildVenuePopupHtml(
       >
         <span class="popup-best-hour-shine" aria-hidden="true"></span>
         <span class="popup-best-hour-icon-wrap" aria-hidden="true">
-          <span class="popup-best-hour-icon">&#11088;</span>
+          <svg class="popup-best-hour-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="4.5" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+            <g stroke="#b45309" stroke-width="1.8" stroke-linecap="round">
+              <line x1="12" y1="2.5" x2="12" y2="4.5"/>
+              <line x1="12" y1="19.5" x2="12" y2="21.5"/>
+              <line x1="2.5" y1="12" x2="4.5" y2="12"/>
+              <line x1="19.5" y1="12" x2="21.5" y2="12"/>
+              <line x1="5.1" y1="5.1" x2="6.6" y2="6.6"/>
+              <line x1="17.4" y1="17.4" x2="18.9" y2="18.9"/>
+              <line x1="5.1" y1="18.9" x2="6.6" y2="17.4"/>
+              <line x1="17.4" y1="6.6" x2="18.9" y2="5.1"/>
+            </g>
+          </svg>
         </span>
         <span class="popup-best-hour-body">
           <span class="popup-best-hour-eyebrow">B&auml;sta timmen idag</span>
           <span class="popup-best-hour-text">${bestHour.label}</span>
         </span>
-        <svg class="popup-best-hour-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        <svg class="popup-best-hour-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
       </button>`
     : "";
 
@@ -1121,6 +1133,13 @@ function buildVenuePopupHtml(
     ? ""
     : `<div id="venue-photo-${venue.id}" style="margin:-12px -16px 10px -16px;height:140px;background:linear-gradient(180deg,#f1f5f9,#e2e8f0);border-radius:12px 12px 0 0;overflow:hidden">${cachedPhoto ? `<img src="${cachedPhoto}" alt="${venue.name}" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" />` : ""}</div>`;
 
+  // Name row padding: 0 when a photo exists (close button overlays the
+  // photo, so the status emoji can sit flush against the inner-div right
+  // edge — i.e. aligned with the timeline panel + action-button row
+  // below). Without a photo the close button sits on the same row as the
+  // emoji, so we need to step the emoji back to avoid collision.
+  const namePaddingRight = photoContainerHtml ? 0 : 42;
+
   // Walking directions deep-link — Google Maps uses the user's current
   // location as origin by default. Most clicks come from people on the
   // ground who actually want to walk there, not browse the venue listing.
@@ -1146,7 +1165,7 @@ function buildVenuePopupHtml(
         title="Stäng"
       ><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       ${photoContainerHtml}
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding-right:38px;margin-top:2px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding-right:${namePaddingRight}px;margin-top:2px">
         <strong style="font-size:17px;line-height:1.25;flex:1;color:#0f172a;letter-spacing:-0.01em">${venue.name}</strong>
         <span class="popup-status-emoji" aria-hidden="true">${statusToEmoji(status)}</span>
       </div>
