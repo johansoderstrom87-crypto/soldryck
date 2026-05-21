@@ -1369,6 +1369,22 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     // above the header. Putting the marker around 70 % of the viewport
     // height instead leaves room for the popup to grow upward.
     map.on("popupopen", (e: { popup?: L.Popup }) => {
+      // Tvinga popupen att positionera sig via bottom/left istället för
+      // transform:translate3d (Leaflets default). Annars sätts en transform
+      // på popup-containern, vilket skapar en ny containing block och
+      // blockerar backdrop-filter på popup-content-wrapper (vi vill ha
+      // samma glasiga blur som Header/TimeSlider).
+      const popup = e.popup as L.Popup & {
+        _zoomAnimated?: boolean;
+        _container?: HTMLElement;
+        _updatePosition?: () => void;
+      } | undefined;
+      if (popup && popup._zoomAnimated !== false) {
+        popup._zoomAnimated = false;
+        if (popup._container) popup._container.style.transform = "";
+        popup._updatePosition?.();
+      }
+
       const latlng = e.popup?.getLatLng?.();
       if (!latlng || !mapRef.current) return;
       const m = mapRef.current;
