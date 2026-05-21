@@ -197,7 +197,7 @@ export default function Home() {
         getClosestDateKey={getDateKey}
       />
 
-      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} showShadows={showShadows} showMetro={showMetro} showRain={showRain} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} openNowFilter={openNowFilter} alcoholOnly={alcoholOnly} wheelchairOnly={wheelchairOnly} />
+      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} onSetHour={setHour} showShadows={showShadows} showMetro={showMetro} showRain={showRain} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} openNowFilter={openNowFilter} alcoholOnly={alcoholOnly} wheelchairOnly={wheelchairOnly} />
 
       <TimeSlider
         hour={hour}

@@ -783,6 +783,39 @@ html, body {
 .popup-btn-share .popup-btn-glyph { color: #475569; }
 .popup-btn-share:hover { background: #f8fafc; }
 
+/* "Bästa timmen" — interactive shortcut that scrubs the timeline to the
+   day's best sun-window. The right-pointing chevron + cursor:pointer signal
+   that this is a button, not a passive label. Background tier matches the
+   warm amber used elsewhere for sun-related accents. */
+.popup-best-hour {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 8px 6px 10px;
+  background: #fffbeb;
+  border: 0.5px solid rgba(245, 158, 11, 0.25);
+  border-left: 3px solid #f59e0b;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  color: #78350f;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease, transform 0.08s ease, box-shadow 0.12s ease;
+}
+.popup-best-hour:hover {
+  background: #fef3c7;
+  box-shadow: 0 1px 4px rgba(245, 158, 11, 0.15);
+}
+.popup-best-hour:active { transform: scale(0.99); }
+.popup-best-hour-star { font-size: 11px; flex-shrink: 0; line-height: 1; }
+.popup-best-hour-text { flex: 1; min-width: 0; }
+.popup-best-hour-arrow { color: #b45309; flex-shrink: 0; opacity: 0.7; transition: transform 0.12s ease, opacity 0.12s ease; }
+.popup-best-hour:hover .popup-best-hour-arrow { transform: translateX(2px); opacity: 1; }
+
 /* Discrete ✕ in the top-right corner of the popup. Soft glass disk so it
    reads as a close-affordance without competing with the venue name. */
 .popup-close-btn {

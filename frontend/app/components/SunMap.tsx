@@ -376,6 +376,7 @@ interface SunMapProps {
   sunRange: SunRange;
   weather: WeatherData | null;
   onFeedback?: (venue: FeedbackVenue) => void;
+  onSetHour?: (hour: number) => void;
   showShadows?: boolean;
   showMetro?: boolean;
   focusVenueId?: string | null;
@@ -966,10 +967,17 @@ function buildVenuePopupHtml(
 
   const bestHour = getBestHour(venue, dateKey, weather);
   const bestHourLine = bestHour
-    ? `<div style="border-left:3px solid #f59e0b;padding:3px 8px;margin-top:6px;background:#fffbeb;border-radius:0 6px 6px 0;display:flex;align-items:center;gap:5px">
-        <span style="font-size:11px">&#11088;</span>
-        <span style="font-size:11px;color:#78350f;font-weight:500">B&auml;sta timmen: ${bestHour.label}</span>
-      </div>`
+    ? `<button
+        type="button"
+        class="popup-best-hour best-hour-btn"
+        data-venue-id="${venue.id}"
+        data-hour="${bestHour.hour}"
+        title="Hoppa till kl ${bestHour.hour}:00"
+      >
+        <span class="popup-best-hour-star">&#11088;</span>
+        <span class="popup-best-hour-text">B&auml;sta timmen: ${bestHour.label}</span>
+        <svg class="popup-best-hour-arrow" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>`
     : "";
 
   // "Sol om X min" — only meaningful when the user is looking at the live
@@ -1055,20 +1063,18 @@ function buildVenuePopupHtml(
     ? `<span title="Tillgänglig enligt OpenStreetMap" style="display:inline-flex;align-items:center;margin-left:6px;padding:1px 5px;background:#eff6ff;border-radius:999px;color:#1d4ed8;font-size:10px;font-weight:700">♿</span>`
     : "";
 
-  // Sun confidence — shadow ray-cast × weather. Hidden when 0 (shade/night)
-  // because all-grey markers are already visually clear about that.
+  // Sun confidence — shadow ray-cast × weather. Rendered next to the
+  // selected hour ("Kl 19:00 · Solchans 100%") above the timeline bar so it
+  // reads as a time-bound metric (tied to where the slider is right now),
+  // not a static venue property.
   const wSymbol = weather?.hourly[hour]?.symbolCode;
   const conf = sunConfidence(status, wSymbol);
-  const confHtml = conf > 0
-    ? (() => {
-        const tier = conf >= 80 ? { bg: "#dcfce7", fg: "#14532d" }
-                  : conf >= 50 ? { bg: "#fef3c7", fg: "#92400e" }
-                  :              { bg: "#f1f5f9", fg: "#475569" };
-        return `<span title="Sannolikheten att du faktiskt känner sol — kombinerar skugg-beräkningen med vädret" style="display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:1px 6px;background:${tier.bg};border-radius:999px;color:${tier.fg};font-size:10px;font-weight:700">
-          ${conf}% sol
-        </span>`;
-      })()
-    : "";
+  const confTier = conf >= 80 ? { bg: "#dcfce7", fg: "#14532d" }
+                : conf >= 50 ? { bg: "#fef3c7", fg: "#92400e" }
+                :              { bg: "#f1f5f9", fg: "#475569" };
+  const confChipHtml = `<span title="Sannolikheten att du känner sol just kl ${hour}:00 — kombinerar skuggberäkningen med SMHI:s prognos" style="display:inline-flex;align-items:center;gap:3px;padding:1px 7px;background:${confTier.bg};border-radius:999px;color:${confTier.fg};font-size:10px;font-weight:700;line-height:1.5">
+      Solchans ${conf}%
+    </span>`;
 
   const cachedPhoto = venuePhotoCache.get(venue.id);
   const photoContainerHtml = cachedPhoto === null
@@ -1103,13 +1109,17 @@ function buildVenuePopupHtml(
         <strong style="font-size:17px;line-height:1.2;flex:1;margin-right:6px">${venue.name}</strong>
         <span style="font-size:20px;flex-shrink:0">${statusToEmoji(status)}</span>
       </div>
-      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}${priceHtml}${wheelchairHtml}${confHtml}${walkHtml}<span id="venue-trust-${venue.id}"></span></div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">${ratingHtml}${typeToLabel(venue.type)}${priceHtml}${wheelchairHtml}${walkHtml}<span id="venue-trust-${venue.id}"></span></div>
       <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
-      <div style="background:rgba(255,255,255,0.55);border-radius:8px;padding:5px 6px;margin-top:8px;border:0.5px solid rgba(255,255,255,0.7)">
+      <div style="background:rgba(255,255,255,0.55);border-radius:8px;padding:6px 8px;margin-top:8px;border:0.5px solid rgba(255,255,255,0.7)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;padding:0 1px">
+          <span style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.04em">Kl ${hour}:00</span>
+          ${confChipHtml}
+        </div>
         <div style="display:flex;gap:2px">${shadowTimeline}</div>
         <div style="display:flex;gap:2px;margin-top:2px">${hourLabels}</div>
         <div style="display:flex;gap:2px;margin-top:1px">${nowDots}</div>
-        <div style="font-size:10px;color:#94a3b8;text-align:right;margin-top:2px">${sunHours} soltimmar</div>
+        <div style="font-size:10px;color:#94a3b8;text-align:right;margin-top:3px">${sunHours} soltimmar</div>
       </div>
       ${sunArrivesLine}
       ${bestHourLine}
@@ -1187,7 +1197,7 @@ function buildVenuePopupHtml(
   `;
 }
 
-export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, showShadows, showMetro, showRain = false, focusVenueId, onFocusHandled, metroStation, openNowFilter = false, alcoholOnly = false, wheelchairOnly = false }: SunMapProps) {
+export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, onSetHour, showShadows, showMetro, showRain = false, focusVenueId, onFocusHandled, metroStation, openNowFilter = false, alcoholOnly = false, wheelchairOnly = false }: SunMapProps) {
   // Defer expensive map rebuild while the user is actively scrubbing the timeline
   const hour = useDeferredValue(hourProp);
 
@@ -2012,6 +2022,25 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
                 }
               });
             }
+          };
+        }
+
+        // "Bästa timmen" → scrub the timeline to that hour. Close + reopen
+        // so the popup rebuilds against the new hour (the chip recolours, the
+        // orange dot under the timeline jumps, "Kl X:00" updates). Without
+        // the reopen the popup content would silently lie about which hour
+        // the chip belongs to.
+        const bestHourBtn = document.querySelector(`.best-hour-btn[data-venue-id="${venue.id}"]`);
+        if (bestHourBtn && onSetHour) {
+          (bestHourBtn as HTMLElement).onclick = () => {
+            const targetHour = Number((bestHourBtn as HTMLElement).dataset.hour);
+            if (!Number.isFinite(targetHour)) return;
+            track("best_hour_clicked", { type: venue.type, hour: targetHour });
+            onSetHour(targetHour);
+            map.closePopup();
+            // Tiny delay so the parent state update flushes before we re-open;
+            // otherwise the rebuilt popup would read the previous hourRef.
+            setTimeout(() => marker.openPopup(), 60);
           };
         }
 
