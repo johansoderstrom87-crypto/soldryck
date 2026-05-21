@@ -825,8 +825,18 @@ function renderVenuePhoto(container: HTMLElement, venue: any) {
     .catch(() => {});
 }
 
-/** Render an opening-hours block from `/api/venue-hours`, with cache. */
-function renderVenueHours(container: HTMLElement, venue: any) {
+/**
+ * Render an opening-hours block from `/api/venue-hours`, with cache.
+ *
+ * `map` is passed so the expand toggle can `panBy` the map view by the
+ * height of the week-rows panel. Leaflet popups always grow upward from
+ * their tip (= the marker), which makes an expansion read as "the popup
+ * jumped up" — disorienting when the user clicked a chevron expecting the
+ * week to appear *below*. Panning the map by the same delta keeps the
+ * popup's top edge visually pinned and the new rows appear under the
+ * existing content, which is what users expect.
+ */
+function renderVenueHours(container: HTMLElement, venue: any, map?: L.Map | null) {
   const inject = (data: VenueHoursPayload) => {
     if (!data || (data.openNow === null && !data.week)) return;
     const DAYS = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
@@ -892,8 +902,24 @@ function renderVenueHours(container: HTMLElement, venue: any) {
     if (toggle && week) {
       toggle.onclick = () => {
         const visible = week.style.display !== "none";
-        week.style.display = visible ? "none" : "block";
-        toggle.setAttribute("aria-expanded", visible ? "false" : "true");
+        if (visible) {
+          // Closing: measure first so we can pan the map back up by the
+          // height we're about to remove.
+          const h = week.offsetHeight;
+          week.style.display = "none";
+          toggle.setAttribute("aria-expanded", "false");
+          map?.panBy([0, h], { animate: true, duration: 0.2 });
+        } else {
+          week.style.display = "block";
+          toggle.setAttribute("aria-expanded", "true");
+          // Measure AFTER making it visible so offsetHeight is real.
+          const h = week.offsetHeight;
+          // Negative dy pans the map view downward → marker (and popup tip)
+          // moves down by `h` px, which cancels out the popup growing
+          // upward by `h` px. Net effect: popup top stays put, week rows
+          // appear under the status row.
+          map?.panBy([0, -h], { animate: true, duration: 0.2 });
+        }
       };
     }
   };
@@ -1099,11 +1125,12 @@ function buildVenuePopupHtml(
   return `
     <div style="min-width:260px;position:relative">
       <button
+        type="button"
         class="popup-close-btn close-btn"
         data-venue-id="${venue.id}"
         aria-label="Stäng"
         title="Stäng"
-      ><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg></button>
+      ><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       ${photoContainerHtml}
       <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-right:28px">
         <strong style="font-size:17px;line-height:1.2;flex:1;margin-right:6px">${venue.name}</strong>
@@ -1977,7 +2004,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         if (photoContainer) renderVenuePhoto(photoContainer, venue);
 
         const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
-        if (hoursContainer) renderVenueHours(hoursContainer, venue);
+        if (hoursContainer) renderVenueHours(hoursContainer, venue, map);
 
         const trustContainer = document.getElementById(`venue-trust-${venue.id}`);
         if (trustContainer) renderVenueTrust(trustContainer, venue);
@@ -2365,7 +2392,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           if (photoContainer) renderVenuePhoto(photoContainer, venue);
 
           const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
-          if (hoursContainer) renderVenueHours(hoursContainer, venue);
+          if (hoursContainer) renderVenueHours(hoursContainer, venue, m);
 
           // "Vet du?" button → open feedback modal in seating mode
           const seatingBtn = document.querySelector(`.seating-btn[data-venue-id="${venue.id}"]`);
