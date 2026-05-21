@@ -174,8 +174,8 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
 
 - **Frontend:** Railway via Dockerfile (multi-stage Node.js 20 Alpine, standalone Next.js output)
 - **Domän:** `soldryck.se` (custom domain på Railway, pekar på samma service som `soldryck-web-production.up.railway.app`)
-- **Deploy-kommando:** `railway up --service soldryck-web` från projektrot
-- **CI:** Manuell deploy (ingen auto-deploy från GitHub)
+- **CI:** Auto-deploy från GitHub master-push (konfigurerat i Railway-serviceinställningarna — Deployments-tabben visar "via GitHub" för senaste deploy)
+- **Manuell deploy** (om GitHub-kopplingen skulle gå sönder): `railway up --service soldryck-web` från projektrot
 - **Image-storlek:** ~50 MB (shadow-data exkluderat — se nedan)
 
 ### Shadow-data via Railway Volume
