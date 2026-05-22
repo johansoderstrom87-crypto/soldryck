@@ -1554,11 +1554,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       const m = mapRef.current;
       const size = m.getSize();
       const current = m.latLngToContainerPoint(latlng);
-      // Target Y as a fraction of viewport height. 0.7 puts the marker
-      // (and the popup's tail) above the sun/temp/wind bar at the bottom
-      // — leaving the popup content clear of the time slider panel while
-      // still giving the popup room to grow upward without clipping.
-      const target = L.point(size.x / 2, size.y * 0.7);
+      // Target Y as a fraction of viewport height. 0.76 sits the marker
+      // tip just above the sun/temp/wind bar — close enough that the
+      // pin's connection to the popup reads cleanly, far enough that the
+      // popup body still clears the time slider panel.
+      const target = L.point(size.x / 2, size.y * 0.76);
       // panBy moves the map center by N pixels; content shifts by -N. We
       // want the marker pixel to move from `current` to `target`, i.e. the
       // content to shift by (target - current), so panBy(current - target).
