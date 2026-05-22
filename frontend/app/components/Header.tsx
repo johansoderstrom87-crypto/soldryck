@@ -716,11 +716,15 @@ export default function Header({
       {/* Top-left meny-knapp — kombinerad Soldryck-logo + hamburger.
           Ersätter den tidigare centrerade plattan med separat logo +
           hamburger + favoriter. Allt har flyttats hit; Favoriter når man
-          som menypost i dropdown:en. */}
+          som menypost i dropdown:en.
+
+          Top-värdet placerar knappen UNDER filter-raden (~14 top + 44 hög
+          + 8 marginal ≈ 66 px från safe-top) så de inte överlappar på
+          smala skärmar där filter-raden sträcker sig nära vänsterkanten. */}
       <div
         className="absolute pointer-events-auto select-none"
         style={{
-          top: "calc(var(--safe-top, 0px) + 10px)",
+          top: "calc(var(--safe-top, 0px) + 70px)",
           left: "calc(var(--safe-left, 0px) + 12px)",
           zIndex: 20,
         }}

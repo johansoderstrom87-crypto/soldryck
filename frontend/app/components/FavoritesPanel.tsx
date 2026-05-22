@@ -130,11 +130,12 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
   // synlig men oklickbar (alla klick gick rakt igenom till kartan).
   const controlledStyle: React.CSSProperties = {
     position: "fixed",
-    top: "calc(var(--safe-top, 0px) + 72px)",
+    // Menyknappen sitter på safe-top + 70 (höjd 52 + lite marginal) → 132.
+    top: "calc(var(--safe-top, 0px) + 132px)",
     left: "calc(var(--safe-left, 0px) + 12px)",
     width: 300,
     maxWidth: "calc(100vw - 24px)",
-    maxHeight: "calc(100vh - 100px)",
+    maxHeight: "calc(100vh - 160px)",
     overflowY: "auto",
     pointerEvents: "auto",
   };
