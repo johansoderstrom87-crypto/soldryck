@@ -1103,7 +1103,7 @@ function buildVenuePopupHtml(
   // number reads clearly instead of fading into the muted meta colour.
   const hasRating = venue.rating != null;
   const ratingStarHtml = hasRating
-    ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="#f59e0b" style="display:block" aria-hidden="true"><path d="M12 2l2.9 7.4 7.9.6-6 5.2 1.9 7.8L12 18.6 5.3 23l1.9-7.8-6-5.2 7.9-.6z"/></svg>`
+    ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="#f59e0b" style="display:block" aria-hidden="true"><path d="M12 2l2.9 7.4 7.9.6-6 5.2 1.9 7.8L12 18.6 5.3 23l1.9-7.8-6-5.2 7.9-.6z"/></svg>`
     : "";
   const ratingTextHtml = hasRating
     ? `<span style="color:#0f172a;font-weight:600">${venue.rating!.toFixed(1)}</span>${venue.ratingCount != null ? `<span style="color:#94a3b8;font-weight:400"> (${venue.ratingCount.toLocaleString("sv-SE")})</span>` : ""}<span style="color:#cbd5e1;margin:0 5px">&middot;</span>`
