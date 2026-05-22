@@ -1483,6 +1483,174 @@ html, body {
   to   { transform: rotate(360deg); }
 }
 
+/* ─── Venue bottom sheet (Google Maps-stil) ─────────────────────────────
+   Glider upp underifrån när en venue väljs. Två snap points: "peek"
+   (kortvy) och "full" (~85vh). Drag-greppet sitter i toppen; body är
+   en separat scroll-yta så användaren kan scrolla utan att råka stänga.
+   Containern är fixed mot viewporten, INTE inuti kartan — annars hade
+   den ärvt Leaflets transform-stacking och fastnat under Headern.
+
+   z-index 5000 placerar sheet:en över Header (1100), högerknappar (1001),
+   time slider och alla andra UI-paneler. Backdrop ligger på 4990. */
+.venue-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5000;
+  /* Glasaktig bakgrund: semi-transparent vit med fallback. Blur sätts
+     inline via JS (setProperty + !important) för att kringgå det globala
+     `* { backdrop-filter: none !important }`. */
+  background: rgba(255, 255, 255, 0.72);
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18), 0 -2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  touch-action: pan-y;
+  will-change: transform;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  /* Safe-area: extra utrymme i botten på iOS så body-padding fortfarande
+     ligger ovanför hem-indicatorn. */
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.venue-sheet-grip {
+  flex: 0 0 auto;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.venue-sheet-grip:active { cursor: grabbing; }
+
+.venue-sheet-handle {
+  width: 42px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.22);
+  transition: background 0.15s ease;
+}
+.venue-sheet-grip:hover .venue-sheet-handle {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.venue-sheet-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 4px 16px 16px;
+}
+
+/* Backdrop — dimras endast i "full" snap. I "peek" är pointer-events off
+   så kartan tar emot drag/pan normalt under sheet:en. */
+.venue-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.32);
+  z-index: 4990;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+.venue-sheet-backdrop[data-active="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* När sheet är på "peek" vill vi inte att den blockerar kart-interaktion
+   utanför sin egen yta. Pekarhändelser på själva sheet:en behålls. */
+.venue-sheet[data-snap="peek"] {
+  pointer-events: auto;
+}
+
+/* Den HTML som injiceras i .venue-sheet-body kommer från
+   buildVenuePopupHtml (samma som tidigare popup-innehåll). Dess root
+   har `min-width: 260px` inline — vi nollar det så bredden följer
+   sheet:en på alla viewports. */
+.venue-sheet-body > div[style*="min-width"] {
+  min-width: 0 !important;
+  width: 100%;
+}
+
+/* Sheet-body har 4px padding-top — hero ska flyta ända upp till
+   drag-handtaget för att läsa som en hero-bild. Negativa horisontella
+   margins flushar mot sheet-kanterna (-16 matchar body-padding-right). */
+.venue-sheet-body { padding-top: 0 !important; }
+
+/* ── Hero-banner ovanpå venue-sheet ──
+   Alltid 140px hög: visar en stor sol/moln/regn/måne-emoji centrerad
+   som default. När renderVenuePhoto hittar en Google Places-bild fyller
+   den `.popup-hero-photo` med en <img> som överlagrar emoji-bakgrunden. */
+.popup-hero {
+  position: relative;
+  height: 140px;
+  margin: 0 -16px 12px;
+  background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
+  overflow: hidden;
+}
+.popup-hero-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+  line-height: 1;
+  opacity: 0.85;
+  text-shadow: 0 2px 8px rgba(255,255,255,0.4);
+  pointer-events: none;
+}
+.popup-hero-photo {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+.popup-hero-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Stäng-knappen för popups ligger inuti hero på sheet:en — höj den över
+   ev. <img>-overlay så den alltid är klickbar. */
+.venue-sheet-body .popup-close-btn {
+  z-index: 10;
+}
+
+/* Vald markör — pulserande ring som visar vilken pin sheet:en hör till.
+   Sätts från SunMap via .marker-selected på marker-root. */
+.marker-selected .marker-dot {
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.9),
+    0 0 0 6px rgba(245, 158, 11, 0.75),
+    0 4px 14px rgba(245, 158, 11, 0.45) !important;
+  transform: scale(1.25);
+  transition: transform 0.18s ease;
+  z-index: 2;
+}
+.marker-selected.marker-unconfirmed .marker-dot {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.9),
+    0 0 0 5px rgba(245, 158, 11, 0.75) !important;
+}
+
+@keyframes venue-sheet-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(255,255,255,0.9), 0 0 0 6px rgba(245,158,11,0.75), 0 4px 14px rgba(245,158,11,0.45); }
+  50%      { box-shadow: 0 0 0 3px rgba(255,255,255,0.9), 0 0 0 10px rgba(245,158,11,0.35), 0 4px 14px rgba(245,158,11,0.45); }
+}
+.marker-selected:not(.marker-unconfirmed) .marker-dot {
+  animation: venue-sheet-pulse 1.8s ease-in-out infinite;
+}
+
 /* Respect users who've asked for less motion. Almost everything fades to a
    single static frame; loading spinners are kept rotating but slowed so the
    user still gets the "something is happening" cue. Hard-killing all

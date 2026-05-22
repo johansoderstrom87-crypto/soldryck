@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useDeferredValue, useState } from "react";
+import { useEffect, useRef, useMemo, useDeferredValue, useState, useCallback } from "react";
 import AreaSearchPanel from "./AreaSearchPanel";
+import VenueSheet, { type SheetSnap } from "./VenueSheet";
 import L from "leaflet";
 
 // Helpers come from the venues-computed module (always present, even before
@@ -1148,17 +1149,23 @@ function buildVenuePopupHtml(
       Solchans ${conf}%
     </span>`;
 
+  // Hero-banner längst upp: alltid synlig så stäng-knappen har något att
+  // landa över. Innehåller en stor sol/moln/regn/måne-emoji centrerad i
+  // bakgrunden + en absolut-positionerad foto-container ovanpå. När
+  // renderVenuePhoto fyller foto-containern med en <img> överlagrar
+  // bilden hero-statusen. När bilden saknas (cache null eller fetch null)
+  // gömmer renderVenuePhoto bara foto-containern, så emoji förblir synlig.
   const cachedPhoto = venuePhotoCache.get(venue.id);
-  const photoContainerHtml = cachedPhoto === null
-    ? ""
-    : `<div id="venue-photo-${venue.id}" style="margin:-12px -16px 10px -16px;height:140px;background:linear-gradient(180deg,#f1f5f9,#e2e8f0);border-radius:12px 12px 0 0;overflow:hidden">${cachedPhoto ? `<img src="${cachedPhoto}" alt="${venue.name}" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" />` : ""}</div>`;
-
-  // Name row padding: 0 when a photo exists (close button overlays the
-  // photo, so the status emoji can sit flush against the inner-div right
-  // edge — i.e. aligned with the timeline panel + action-button row
-  // below). Without a photo the close button sits on the same row as the
-  // emoji, so we need to step the emoji back to avoid collision.
-  const namePaddingRight = photoContainerHtml ? 0 : 42;
+  const cachedImgHtml = cachedPhoto
+    ? `<img src="${cachedPhoto}" alt="${venue.name}" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" />`
+    : "";
+  const heroHtml = `<div class="popup-hero">
+    <span class="popup-hero-status" aria-hidden="true">${statusToEmoji(status)}</span>
+    <div id="venue-photo-${venue.id}" class="popup-hero-photo">${cachedImgHtml}</div>
+  </div>`;
+  // Namn-raden behöver inte längre lämna plats för stäng-knappen — stäng
+  // ligger nu över hero-bannern ovanför.
+  const namePaddingRight = 0;
 
   // Walking directions deep-link — Google Maps uses the user's current
   // location as origin by default. Most clicks come from people on the
@@ -1184,10 +1191,9 @@ function buildVenuePopupHtml(
         aria-label="Stäng"
         title="Stäng"
       ><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
-      ${photoContainerHtml}
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding-right:${namePaddingRight}px;margin-top:2px">
+      ${heroHtml}
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding-right:${namePaddingRight}px;margin-top:8px">
         <strong style="font-size:17px;line-height:1.25;flex:1;color:#0f172a;letter-spacing:-0.01em">${venue.name}</strong>
-        <span class="popup-status-emoji" aria-hidden="true">${statusToEmoji(status)}</span>
       </div>
       <div class="popup-meta-row">
         <span class="popup-meta-slot" aria-hidden="true">${ratingStarHtml}</span>
@@ -1290,6 +1296,55 @@ function buildVenuePopupHtml(
               Äger du det h&auml;r?
             </a>`
         }
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Mindre sheet-innehåll för obekräftade venues (grå punkter). Samma DOM-ids
+ * som confirmed-versionen (`venue-photo-*`, `venue-hours-*`) så de delar de
+ * cachade render-helpers — bara meta-raden + uteservering-noticen skiljer.
+ */
+function buildUnconfirmedSheetHtml(venue: any): string {
+  const address = venue.address
+    ? `<div style="color:#94a3b8;font-size:11px;margin-top:1px">${venue.address}</div>`
+    : "";
+  const noticeBg = venue.source === "google_denied" ? "#fef2f2" : "#fffbeb";
+  const noticeBorder = venue.source === "google_denied" ? "#fecaca" : "#fde68a";
+  const noticeColor = venue.source === "google_denied" ? "#991b1b" : "#92400e";
+  const noticeText = venue.source === "google_denied"
+    ? "Enligt Google: <b>ingen uteservering</b>"
+    : "Ingen bekr&auml;ftad uteservering";
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}&travelmode=walking`;
+  const mapsPinSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg>`;
+  return `
+    <div style="min-width:220px;position:relative">
+      <button
+        type="button"
+        class="popup-close-btn close-btn"
+        data-venue-id="${venue.id}"
+        aria-label="St&auml;ng"
+        title="St&auml;ng"
+      ><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      <div style="margin-bottom:4px;padding-right:36px">
+        <strong style="font-size:16px;line-height:1.25;color:#0f172a">${venue.name}</strong>
+        <div style="color:#64748b;font-size:11px;margin-top:1px">${typeToLabel(venue.type)}</div>
+        ${address}
+      </div>
+      <div id="venue-photo-${venue.id}" style="margin-top:6px"></div>
+      <div id="venue-hours-${venue.id}" style="margin-top:4px"></div>
+      <div style="background:${noticeBg};border:1px solid ${noticeBorder};border-radius:7px;padding:6px 9px;margin-top:8px;font-size:11px;color:${noticeColor}">
+        ${noticeText}
+      </div>
+      <div class="popup-actions">
+        <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" title="&Ouml;ppna i Google Maps"
+          class="popup-btn popup-btn-icon">
+          ${mapsPinSvg}
+        </a>
+        <button class="popup-btn popup-btn-seating seating-btn" data-venue-id="${venue.id}">
+          Vet du?
+        </button>
       </div>
     </div>
   `;
@@ -1398,6 +1453,210 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     claimedListeners.add(onChange);
     return () => { claimedListeners.delete(onChange); };
   }, []);
+
+  // ─── Bottom sheet state ──────────────────────────────────────────────
+  // Selected venue + its kind (drives which HTML/handlers go in the sheet).
+  // Replaces Leaflet's bindPopup/openPopup machinery. Marker selection
+  // (`.marker-selected` class) is keyed off `selected.venue.id`.
+  const [selected, setSelected] = useState<
+    { kind: "confirmed"; venue: ComputedVenue } | { kind: "unconfirmed"; venue: any } | null
+  >(null);
+  const [sheetSnap, setSheetSnap] = useState<SheetSnap>("closed");
+  const sheetSnapRef = useRef<SheetSnap>("closed");
+  sheetSnapRef.current = sheetSnap;
+  const selectedIdRef = useRef<string | number | null>(null);
+  selectedIdRef.current = selected?.venue?.id ?? null;
+
+  const closeSheet = useCallback(() => setSelected(null), []);
+
+  // Visual marker selection — toggles `.marker-selected` on the icon root
+  // for whichever venue is currently shown in the sheet. Cleared when sheet
+  // closes. Looks at both confirmed and unconfirmed marker arrays.
+  useEffect(() => {
+    const id = selected?.venue?.id;
+    const toggle = (mk: L.Marker, on: boolean) => {
+      const el = (mk as L.Marker & { _icon?: HTMLElement })._icon;
+      if (el) el.classList.toggle("marker-selected", on);
+    };
+    for (const { marker, venue } of markerVenuesRef.current) {
+      toggle(marker, id != null && venue.id === id);
+    }
+    for (const marker of unconfirmedMarkersRef.current) {
+      const v = (marker as L.Marker & { __soldryckVenue?: any }).__soldryckVenue;
+      toggle(marker, id != null && v?.id === id);
+    }
+  }, [selected, claimedVer]);
+
+  // Pan the map so the selected marker sits in the upper portion of the
+  // visible area (above the bottom sheet). Mirrors Google Maps: the pin
+  // remains visible after the sheet rises. Re-runs when the snap changes
+  // (peek → full) so the marker stays in view if the sheet grows.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selected) return;
+    const { lat, lng } = selected.venue;
+    if (typeof lat !== "number" || typeof lng !== "number") return;
+    const size = map.getSize();
+    const current = map.latLngToContainerPoint([lat, lng]);
+    // Sheet covers ~300 px (peek) or ~85% of viewport (full). At peek we
+    // aim the marker at 30 % of viewport height; at full the sheet hides
+    // the map almost entirely so we don't waste a pan there.
+    if (sheetSnap === "full") return;
+    const targetY = Math.max(80, size.y * 0.30);
+    const target = L.point(size.x / 2, targetY);
+    const dx = current.x - target.x;
+    const dy = current.y - target.y;
+    if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+    map.panBy([dx, dy], { animate: true, duration: 0.35 });
+  }, [selected, sheetSnap]);
+
+  // ─── Sheet content + handler attachment ──────────────────────────────
+  // Memoized so VenueSheet's useLayoutEffect only re-injects HTML when
+  // something it cares about actually changed (venue, hour, weather,
+  // claimedVer). Without memo it would rebuild on every parent render.
+  const sheetHtml = useMemo(() => {
+    if (!selected) return "";
+    if (selected.kind === "confirmed") {
+      return buildVenuePopupHtml(selected.venue, dateKey, hourProp, weather ?? null);
+    }
+    return buildUnconfirmedSheetHtml(selected.venue);
+    // claimedVer included so happy-hour panel refreshes when /api/claimed-venues lands.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, dateKey, hourProp, weather, claimedVer]);
+
+  /**
+   * Re-attaches click/event handlers to elements inside the sheet body.
+   * Called by VenueSheet on every (re)mount of the HTML — i.e. whenever
+   * `sheetHtml` changes (new venue, new hour, claimed-venue refresh).
+   *
+   * Mirror of the old `marker.on("popupopen", ...)` blocks; the only diffs
+   * are that close → setSelected(null), and the best-hour rebuild no
+   * longer needs an explicit close+reopen cycle (the hour prop change
+   * triggers a sheetHtml rebuild automatically).
+   */
+  const attachSheetHandlers = useCallback((container: HTMLElement) => {
+    if (!selected) return;
+    const map = mapRef.current;
+    const venue = selected.venue;
+
+    if (selected.kind === "confirmed") {
+      track("popup_opened", { id: String(venue.id), type: venue.type, rooftop: !!venue.rooftop });
+    }
+
+    const closeBtn = container.querySelector(`.close-btn[data-venue-id="${venue.id}"]`);
+    if (closeBtn) {
+      (closeBtn as HTMLElement).onclick = (e) => {
+        e.stopPropagation();
+        setSelected(null);
+      };
+    }
+
+    // Photo + hours — cached fetchers, safe to re-call on every rebuild.
+    // Use getElementById (not querySelector) because venue.id can contain
+    // `/` or `:` (OSM "node/123", Google "ChIJ…") which are illegal in
+    // CSS id selectors and would throw a SyntaxError, leaving the photo
+    // and hours panels silently empty.
+    const photoContainer = document.getElementById(`venue-photo-${venue.id}`);
+    if (photoContainer) renderVenuePhoto(photoContainer, venue);
+
+    const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
+    if (hoursContainer) renderVenueHours(hoursContainer, venue, map ?? undefined);
+
+    if (selected.kind === "unconfirmed") {
+      const seatingBtn = container.querySelector(`.seating-btn[data-venue-id="${venue.id}"]`);
+      if (seatingBtn && onFeedback) {
+        (seatingBtn as HTMLElement).onclick = () => {
+          onFeedback({ id: venue.id, name: venue.name, type: venue.type, currentSchedule: {}, mode: "seating" });
+          setSelected(null);
+        };
+      }
+      return;
+    }
+
+    // ── Confirmed-only handlers below ──
+    const favBtn = container.querySelector(`.fav-btn[data-venue-id="${venue.id}"]`);
+    if (favBtn) {
+      (favBtn as HTMLElement).onclick = () => {
+        const favs = toggleFavorite(venue.id);
+        const nowFav = favs.has(venue.id);
+        track(nowFav ? "favorite_added" : "favorite_removed", { type: venue.type });
+        (favBtn as HTMLElement).classList.toggle("is-fav", nowFav);
+      };
+    }
+
+    // getElementById — same id-with-slashes reason as photo/hours above.
+    const trustContainer = document.getElementById(`venue-trust-${venue.id}`);
+    if (trustContainer) renderVenueTrust(trustContainer, venue);
+
+    const bookBtn = container.querySelector(`.book-btn[data-venue-id="${venue.id}"]`);
+    if (bookBtn) {
+      (bookBtn as HTMLElement).onclick = () => {
+        track("book_clicked", { type: venue.type });
+      };
+    }
+
+    const webBtn = container.querySelector(`.popup-btn-web[data-venue-id="${venue.id}"]`);
+    if (webBtn) {
+      (webBtn as HTMLElement).onclick = () => {
+        track("website_clicked", { type: venue.type });
+      };
+    }
+
+    const shareBtn = container.querySelector(`.share-btn[data-venue-id="${venue.id}"]`);
+    if (shareBtn) {
+      (shareBtn as HTMLElement).onclick = () => {
+        track("share_clicked", { type: venue.type });
+        const url = new URL(window.location.href);
+        url.search = "";
+        url.searchParams.set("venue", venue.id);
+        url.searchParams.set("hour", String(hourRef.current));
+        const shareUrl = url.toString();
+        if (navigator.share) {
+          navigator.share({ title: `${venue.name} — Soldryck`, text: `Se solläget på ${venue.name}!`, url: shareUrl });
+        } else {
+          navigator.clipboard.writeText(shareUrl).then(() => {
+            const label = shareBtn.querySelector(".popup-btn-label");
+            if (label) {
+              const original = label.textContent;
+              label.textContent = "Kopierad!";
+              setTimeout(() => { label.textContent = original ?? "Dela"; }, 2000);
+            }
+          });
+        }
+      };
+    }
+
+    const bestHourBtn = container.querySelector(`.best-hour-btn[data-venue-id="${venue.id}"]`);
+    if (bestHourBtn && onSetHour) {
+      (bestHourBtn as HTMLElement).onclick = () => {
+        const targetHour = Number((bestHourBtn as HTMLElement).dataset.hour);
+        if (!Number.isFinite(targetHour)) return;
+        track("best_hour_clicked", { type: venue.type, hour: targetHour });
+        // No close+reopen needed — hour prop flows back and sheetHtml
+        // rebuilds via useMemo, which re-fires this very handler with
+        // the new "current hour" state painted into the timeline.
+        onSetHour(targetHour);
+      };
+    }
+
+    const feedbackBtn = container.querySelector(`.feedback-btn[data-venue-id="${venue.id}"]`);
+    if (feedbackBtn && onFeedback) {
+      (feedbackBtn as HTMLElement).onclick = () => {
+        const currentSchedule: Record<number, "sun" | "shade" | "night"> = {};
+        for (let h = 7; h <= 22; h++) {
+          currentSchedule[h] = normalize(getStatus(venue, dateKey, h)) as "sun" | "shade" | "night";
+        }
+        onFeedback({
+          id: venue.id,
+          name: venue.name,
+          type: venue.type,
+          currentSchedule,
+        });
+        setSelected(null);
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, dateKey, onFeedback, onSetHour]);
 
   // Initialize map
   useEffect(() => {
@@ -2047,137 +2306,16 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         popupAnchor: [0, -ICON_SIZE / 2 - 4],
       });
 
-      // Popup HTML is built lazily on open via the function form of bindPopup.
-      // The function reads hour/weather from refs so it always reflects the
-      // current slider state — no stale "current hour" highlight.
+      // Marker click → open bottom sheet (see <VenueSheet> at the bottom of
+      // this component). All popupopen-style event handlers now live in
+      // `attachSheetHandlers` and re-fire whenever the sheet's HTML rebuilds
+      // (hour scrub, claimed-venue refresh).
+      //
       // Marker is NOT added to the map here; cullToViewport (below) only
       // adds markers that are actually inside the buffered viewport.
-      const marker = L.marker([venue.lat, venue.lng], { icon }).bindPopup(
-        () => buildVenuePopupHtml(venue, dateKey, hourRef.current, weatherRef.current),
-        {
-          maxWidth: 300,
-          pane: "appPopupPane",
-          autoPan: false,
-        },
-      );
+      const marker = L.marker([venue.lat, venue.lng], { icon });
+      marker.on("click", () => setSelected({ kind: "confirmed", venue }));
 
-      marker.on("popupopen", () => {
-        // Include venue.id so /api/trending can roll up by venue. Type+rooftop
-        // stay for type-level analytics; the id is anonymous (just a public
-        // OSM/Google identifier, nothing about the user).
-        track("popup_opened", { id: String(venue.id), type: venue.type, rooftop: !!venue.rooftop });
-        // Close button \u2014 explicit \u2715 in the popup's top-right corner.
-        const closeBtn = document.querySelector(`.close-btn[data-venue-id="${venue.id}"]`);
-        if (closeBtn) {
-          (closeBtn as HTMLElement).onclick = (e) => {
-            e.stopPropagation();
-            map.closePopup();
-          };
-        }
-        // Favorite button \u2014 toggle `.is-fav` so the SVG flips between
-        // outlined and filled via CSS (fill: none \u2194 currentColor).
-        const favBtn = document.querySelector(`.fav-btn[data-venue-id="${venue.id}"]`);
-        if (favBtn) {
-          (favBtn as HTMLElement).onclick = () => {
-            const favs = toggleFavorite(venue.id);
-            const nowFav = favs.has(venue.id);
-            track(nowFav ? "favorite_added" : "favorite_removed", { type: venue.type });
-            (favBtn as HTMLElement).classList.toggle("is-fav", nowFav);
-          };
-        }
-
-        // Photo + hours render through cached helpers — fetch happens at most
-        // once per venue per page session, regardless of how many times the
-        // user opens this popup.
-        const photoContainer = document.getElementById(`venue-photo-${venue.id}`);
-        if (photoContainer) renderVenuePhoto(photoContainer, venue);
-
-        const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
-        if (hoursContainer) renderVenueHours(hoursContainer, venue, map);
-
-        const trustContainer = document.getElementById(`venue-trust-${venue.id}`);
-        if (trustContainer) renderVenueTrust(trustContainer, venue);
-
-        // Book-bord link — track click but let the anchor navigate normally
-        const bookBtn = document.querySelector(`.book-btn[data-venue-id="${venue.id}"]`);
-        if (bookBtn) {
-          (bookBtn as HTMLElement).onclick = () => {
-            track("book_clicked", { type: venue.type });
-          };
-        }
-
-        // Hemsida-länk — same anchor-navigates-normally pattern. Trackad så vi
-        // ser hur ofta folk klickar sig vidare till venuens egen sajt.
-        const webBtn = document.querySelector(`.popup-btn-web[data-venue-id="${venue.id}"]`);
-        if (webBtn) {
-          (webBtn as HTMLElement).onclick = () => {
-            track("website_clicked", { type: venue.type });
-          };
-        }
-
-        // Share button
-        const shareBtn = document.querySelector(`.share-btn[data-venue-id="${venue.id}"]`);
-        if (shareBtn) {
-          (shareBtn as HTMLElement).onclick = () => {
-            track("share_clicked", { type: venue.type });
-            const url = new URL(window.location.href);
-            url.search = "";
-            url.searchParams.set("venue", venue.id);
-            url.searchParams.set("hour", String(hourRef.current));
-            const shareUrl = url.toString();
-
-            if (navigator.share) {
-              navigator.share({ title: `${venue.name} — Soldryck`, text: `Se solläget på ${venue.name}!`, url: shareUrl });
-            } else {
-              navigator.clipboard.writeText(shareUrl).then(() => {
-                const label = shareBtn.querySelector(".popup-btn-label");
-                if (label) {
-                  const original = label.textContent;
-                  label.textContent = "Kopierad!";
-                  setTimeout(() => { label.textContent = original ?? "Dela"; }, 2000);
-                }
-              });
-            }
-          };
-        }
-
-        // "Bästa timmen" → scrub the timeline to that hour. Close + reopen
-        // so the popup rebuilds against the new hour (the chip recolours, the
-        // orange dot under the timeline jumps, "Kl X:00" updates). Without
-        // the reopen the popup content would silently lie about which hour
-        // the chip belongs to.
-        const bestHourBtn = document.querySelector(`.best-hour-btn[data-venue-id="${venue.id}"]`);
-        if (bestHourBtn && onSetHour) {
-          (bestHourBtn as HTMLElement).onclick = () => {
-            const targetHour = Number((bestHourBtn as HTMLElement).dataset.hour);
-            if (!Number.isFinite(targetHour)) return;
-            track("best_hour_clicked", { type: venue.type, hour: targetHour });
-            onSetHour(targetHour);
-            map.closePopup();
-            // Tiny delay so the parent state update flushes before we re-open;
-            // otherwise the rebuilt popup would read the previous hourRef.
-            setTimeout(() => marker.openPopup(), 60);
-          };
-        }
-
-        // Feedback button
-        const btn = document.querySelector(`.feedback-btn[data-venue-id="${venue.id}"]`);
-        if (btn && onFeedback) {
-          (btn as HTMLElement).onclick = () => {
-            const currentSchedule: Record<number, "sun" | "shade" | "night"> = {};
-            for (let h = 7; h <= 22; h++) {
-              currentSchedule[h] = normalize(getStatus(venue, dateKey, h)) as "sun" | "shade" | "night";
-            }
-            onFeedback({
-              id: venue.id,
-              name: venue.name,
-              type: venue.type,
-              currentSchedule,
-            });
-            map.closePopup();
-          };
-        }
-      });
 
       markersRef.current.push(marker);
       markerVenuesRef.current.push({ marker, venue });
@@ -2380,7 +2518,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       });
       if (found) {
         // Cull may not have added this marker yet (setView is mid-animation).
-        // Force-attach it so openPopup has DOM to render into.
+        // Force-attach so the selection-toggle effect can paint the ring.
         if (!((found.marker as any)._map)) {
           found.marker.addTo(map);
           applyMarkerVisualState(
@@ -2388,7 +2526,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             computeMarkerState(found.venue, dateKey, hourRef.current, filterRef.current, weatherRef.current, openNowFilterRef.current),
           );
         }
-        setTimeout(() => found.marker.openPopup(), 500);
+        // Open the bottom sheet after the setView animation settles so the
+        // pan-to-keep-marker-above-sheet effect operates on the final view.
+        setTimeout(() => setSelected({ kind: "confirmed", venue: found.venue }), 500);
       }
     }
     onFocusHandled?.();
@@ -2436,68 +2576,14 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           popupAnchor: [0, -9],
         });
 
-        const address = venue.address
-          ? `<div style="color:#94a3b8;font-size:11px;margin-top:1px">${venue.address}</div>`
-          : "";
-
-        const noticeBg = venue.source === "google_denied" ? "#fef2f2" : "#fffbeb";
-        const noticeBorder = venue.source === "google_denied" ? "#fecaca" : "#fde68a";
-        const noticeColor = venue.source === "google_denied" ? "#991b1b" : "#92400e";
-        const noticeText = venue.source === "google_denied"
-          ? "Enligt Google: <b>ingen uteservering</b>"
-          : "Ingen bekr&auml;ftad uteservering";
-
-        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}&travelmode=walking`;
-        const mapsPinSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg>`;
-
-        const popup = L.popup({
-          maxWidth: 280,
-          pane: "appPopupPane",
-          autoPan: false,
-        }).setContent(`
-          <div style="min-width:220px">
-            <div style="margin-bottom:4px">
-              <strong style="font-size:14px;line-height:1.2">${venue.name}</strong>
-              <div style="color:#64748b;font-size:11px;margin-top:1px">${typeToLabel(venue.type)}</div>
-              ${address}
-            </div>
-            <div id="venue-photo-${venue.id}" style="margin-top:6px"></div>
-            <div id="venue-hours-${venue.id}" style="margin-top:4px"></div>
-            <div style="background:${noticeBg};border:1px solid ${noticeBorder};border-radius:7px;padding:6px 9px;margin-top:8px;font-size:11px;color:${noticeColor}">
-              ${noticeText}
-            </div>
-            <div class="popup-actions">
-              <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" title="Öppna i Google Maps"
-                class="popup-btn popup-btn-icon">
-                ${mapsPinSvg}
-              </a>
-              <button class="popup-btn popup-btn-seating seating-btn" data-venue-id="${venue.id}">
-                Vet du?
-              </button>
-            </div>
-          </div>
-        `);
-
         const marker = L.marker([venue.lat, venue.lng], { icon, zIndexOffset: -200 })
-          .addTo(m)
-          .bindPopup(popup);
-
-        marker.on("popupopen", () => {
-          const photoContainer = document.getElementById(`venue-photo-${venue.id}`);
-          if (photoContainer) renderVenuePhoto(photoContainer, venue);
-
-          const hoursContainer = document.getElementById(`venue-hours-${venue.id}`);
-          if (hoursContainer) renderVenueHours(hoursContainer, venue, m);
-
-          // "Vet du?" button → open feedback modal in seating mode
-          const seatingBtn = document.querySelector(`.seating-btn[data-venue-id="${venue.id}"]`);
-          if (seatingBtn && onFeedback) {
-            (seatingBtn as HTMLElement).onclick = () => {
-              onFeedback({ id: venue.id, name: venue.name, type: venue.type, currentSchedule: {}, mode: "seating" });
-              m.closePopup();
-            };
-          }
-        });
+          .addTo(m);
+        // Stash the venue on the marker instance so the selection-toggle
+        // effect can resolve which unconfirmed venue belongs to which icon
+        // (we don't keep a parallel venues array for these like we do for
+        // confirmed markers).
+        (marker as L.Marker & { __soldryckVenue?: any }).__soldryckVenue = venue;
+        marker.on("click", () => setSelected({ kind: "unconfirmed", venue }));
 
         unconfirmedMarkersRef.current.push(marker);
       }
@@ -2756,8 +2842,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           computeMarkerState(found.venue, dateKey, hourRef.current, filterRef.current, weatherRef.current),
         );
       }
-      // Delay popup until flyTo animation completes (~1s)
-      setTimeout(() => found.marker.openPopup(), 1100);
+      // Delay sheet open until flyTo animation completes (~1s) so the
+      // pan-above-sheet effect operates on the final viewport.
+      setTimeout(() => setSelected({ kind: "confirmed", venue: found.venue }), 1100);
     }
   }
 
@@ -2914,7 +3001,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           computeMarkerState(found.venue, dateKey, hourRef.current, filterRef.current, weatherRef.current),
         );
       }
-      setTimeout(() => found.marker.openPopup(), 500);
+      setTimeout(() => setSelected({ kind: "confirmed", venue: found.venue }), 500);
     }
     setSearchOpen(false);
     setSearchQuery("");
@@ -3322,6 +3409,17 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           getSunHours={getSunHrs}
         />
       )}
+
+      {/* Venue bottom sheet — Google Maps-stil. Glider upp underifrån när
+          en markör klickas, peek ⇄ full snap, drag-to-close. Ersätter
+          Leaflets bindPopup helt. */}
+      <VenueSheet
+        venueKey={selected ? `${selected.kind}:${selected.venue.id}` : null}
+        html={sheetHtml}
+        onMount={attachSheetHandlers}
+        onClose={closeSheet}
+        onSnapChange={setSheetSnap}
+      />
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
