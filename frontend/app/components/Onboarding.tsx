@@ -132,12 +132,16 @@ function placeCard(
     const left = Math.max(margin, Math.min(vw - cardWidth - margin, spot.x + spot.w / 2 - cardWidth / 2));
     return { bottom: vh - spot.y + gap, left, width: cardWidth };
   }
-  // right: card to the left of the spot
-  const right = vw - spot.x + gap;
-  // Vertically center on spot, clamp
+  // right: card to the left of the spot. Position via `left` (not `right`)
+  // so we can clamp horizontally against the viewport — without the clamp
+  // the card overflowed off-screen on narrow phones when the spot's left
+  // edge crept too far left (e.g. when the GPS tooltip was open and the
+  // spot rect unioned with it).
+  const idealLeft = spot.x - gap - cardWidth;
+  const left = Math.max(margin, Math.min(vw - cardWidth - margin, idealLeft));
   const idealTop = spot.y + spot.h / 2 - 80;
   const top = Math.max(margin, Math.min(vh - 200 - margin, idealTop));
-  return { top, right, width: cardWidth };
+  return { top, left, width: cardWidth };
 }
 
 export default function Onboarding({ ready }: { ready: boolean }) {

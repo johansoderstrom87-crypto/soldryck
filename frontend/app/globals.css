@@ -962,7 +962,15 @@ html, body {
 .time-slider-knob {
   border-radius: 9999px;
   background:
-    radial-gradient(circle at 50% 50%, #ffffff 0%, #fefce8 55%, #fef08a 88%, #fde047 100%);
+    radial-gradient(
+      circle at 50% 50%,
+      #ffffff 0%,
+      #fffbeb 28%,
+      #fef9c3 52%,
+      #fde047 72%,
+      #fbbf24 86%,
+      #f97316 100%
+    );
   color: #0f172a;
   font-weight: 900;
   letter-spacing: -0.02em;
