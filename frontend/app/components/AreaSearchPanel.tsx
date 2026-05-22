@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { buildClosedStatus } from "../lib/venueHours";
+import Sheet from "./Sheet";
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
 type SortMode = "sun-remaining" | "rating" | "sun-count";
@@ -325,6 +326,8 @@ function VenueCard({
 }
 
 export interface AreaSearchPanelProps {
+  /** Sheet visibility. When false the panel slides off-screen with animation. */
+  open: boolean;
   venues: any[];
   hour: number;
   dateKey: string;
@@ -335,7 +338,7 @@ export interface AreaSearchPanelProps {
 }
 
 export default function AreaSearchPanel({
-  venues, hour, dateKey, onClose, onSelectVenue, getStatus, getSunHours,
+  open, venues, hour, dateKey, onClose, onSelectVenue, getStatus, getSunHours,
 }: AreaSearchPanelProps) {
   // Multi-select sort. Each enabled criterion contributes its rank in the
   // single-sort order; the combined order is the sum of ranks (lowest =
@@ -416,58 +419,42 @@ export default function AreaSearchPanel({
   };
 
   return (
-    <div style={{
-      position: "absolute",
-      top: 0, left: 0, bottom: 0,
-      width: "min(220px, 100%)",
-      // Above Header (1100) and TimeSlider (1250) so the column always
-      // sits on top of the bottom panel and filter row instead of being
-      // clipped behind them.
-      zIndex: 1300,
-      display: "flex",
-      flexDirection: "column",
-      // Same glass as TimeSlider / header
-      background: "rgba(255,255,255,0.3)",
-      backdropFilter: "blur(14px) saturate(1.3)",
-      WebkitBackdropFilter: "blur(14px) saturate(1.3)",
-      border: "none",
-      borderRight: "0.5px solid rgba(255,255,255,0.45)",
-      boxShadow: "6px 0 24px rgba(0,0,0,0.12)",
-      fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
-      transform: "translateZ(0)",
-      isolation: "isolate",
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: "14px 10px 10px",
-        borderBottom: "0.5px solid rgba(255,255,255,0.45)",
-        flexShrink: 0,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      peekHeight={460}
+      desktopWidth={300}
+      className="area-search-sheet"
+    >
+      {/* Sticky header — title + close + sort. Stays put while the list
+          below scrolls so the user can re-sort without scrolling back up. */}
+      <div className="area-search-header">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>I detta område</div>
-            <div style={{ fontSize: 11, color: "#475569" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>I detta område</div>
+            <div style={{ fontSize: 11, color: "#475569", marginTop: 1 }}>
               {venues.length} {venues.length === 1 ? "ställe" : "ställen"}
             </div>
           </div>
           <button
             onClick={onClose}
             style={{
-              width: 26, height: 26,
-              border: "0.5px solid rgba(255,255,255,0.55)", borderRadius: 8,
-              background: "rgba(255,255,255,0.3)", backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)", cursor: "pointer",
+              width: 30, height: 30,
+              border: "0.5px solid rgba(255,255,255,0.55)", borderRadius: 10,
+              background: "rgba(255,255,255,0.55)",
+              cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "#475569", flexShrink: 0,
             }}
             title="Stäng"
+            aria-label="Stäng"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", gap: 6 }}>
           {sortBtn("sun-remaining", "Sol kvar")}
           {sortBtn("rating", "Betyg")}
           {sortBtn("sun-count", "Mest sol")}
@@ -475,7 +462,7 @@ export default function AreaSearchPanel({
       </div>
 
       {/* Venue list */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
+      <div className="area-search-list">
         {displayed.length === 0 ? (
           <div style={{ textAlign: "center", padding: "32px 16px" }}>
             <div
@@ -491,7 +478,7 @@ export default function AreaSearchPanel({
             <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", marginBottom: 3 }}>
               Inga ställen här
             </div>
-            <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, maxWidth: 220, margin: "0 auto" }}>
+            <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, maxWidth: 240, margin: "0 auto" }}>
               Pannar du utåt på kartan och söker igen hittar du fler — eller släpp filtren ovan.
             </div>
           </div>
@@ -514,11 +501,10 @@ export default function AreaSearchPanel({
               <button
                 onClick={() => setDisplayCount((c) => c + 40)}
                 style={{
-                  width: "100%", padding: "9px",
+                  width: "100%", padding: "10px",
                   border: "0.5px solid rgba(255,255,255,0.55)", borderRadius: 10,
-                  background: "rgba(255,255,255,0.3)", cursor: "pointer",
-                  fontSize: 11, color: "#475569", fontWeight: 500,
-                  backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+                  background: "rgba(255,255,255,0.4)", cursor: "pointer",
+                  fontSize: 12, color: "#475569", fontWeight: 500,
                 }}
               >
                 Visa fler ({sorted.length - displayCount} kvar)
@@ -527,6 +513,6 @@ export default function AreaSearchPanel({
           </>
         )}
       </div>
-    </div>
+    </Sheet>
   );
 }

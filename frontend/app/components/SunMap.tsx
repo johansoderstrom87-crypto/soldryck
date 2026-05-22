@@ -3412,18 +3412,23 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         </div>
       )}
 
-      {/* Area search panel */}
-      {areaSearchOpen && (
-        <AreaSearchPanel
-          venues={areaSearchVenues}
-          hour={hourProp}
-          dateKey={dateKey}
-          onClose={() => setAreaSearchOpen(false)}
-          onSelectVenue={flyToVenue}
-          getStatus={getStatus}
-          getSunHours={getSunHrs}
-        />
-      )}
+      {/* Area search sheet — alltid mounted så slide-out kan animera när
+          användaren stänger. Stängs också automatiskt när en venue väljs
+          därifrån (annars hade venue-sheet:en och area-sheet:en överlagrat
+          varandra på desktop, båda glider in från vänster). */}
+      <AreaSearchPanel
+        open={areaSearchOpen}
+        venues={areaSearchVenues}
+        hour={hourProp}
+        dateKey={dateKey}
+        onClose={() => setAreaSearchOpen(false)}
+        onSelectVenue={(venue) => {
+          setAreaSearchOpen(false);
+          flyToVenue(venue);
+        }}
+        getStatus={getStatus}
+        getSunHours={getSunHrs}
+      />
 
       {/* Venue bottom sheet — Google Maps-stil. Glider upp underifrån när
           en markör klickas, peek ⇄ full snap, drag-to-close. Ersätter
