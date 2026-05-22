@@ -54,22 +54,48 @@ const TYPE_BUTTONS: { type: VenueType; label: string; svg: string }[] = [
 // dubbelrollen "Bar är både kategori och alkoholfilter" var rörig.
 const ALCOHOL_MODIFIER_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M9 7c0-1.5 1-3 3-3"/><path d="M12 15v6"/><path d="M9 21h6"/></svg>`;
 
-// Aktiv-stil för "snäva in"-knappar (Glas, Öppet, T-bana). Använder en
-// ljusblå palett i stället för huvudkategoriernas orange, så användaren
-// uppfattar att de filtrerar/överlägger på andra premisser.
-const BLUE_ACTIVE_BG = "linear-gradient(160deg, rgba(96,165,250,0.45) 0%, rgba(59,130,246,0.28) 60%, rgba(255,255,255,0.12) 100%)";
-const BLUE_ACTIVE_BORDER = "1px solid rgba(59,130,246,0.75)";
-// Aktiva knappar: färgad halo OCH samma kastskugga som glass-fönstren på
-// kartan (Sök i detta område m.fl.) — så de "lyfter" lika tydligt över
-// kartan oavsett om de är aktiva eller inaktiva.
-const BLUE_ACTIVE_SHADOW = "0 0 0 1px rgba(59,130,246,0.35), 0 0 14px rgba(96,165,250,0.6), 0 0 28px rgba(96,165,250,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)";
-const BLUE_ACTIVE_TEXT = "#1e40af";
+// Filterraden — ett modernt glas-system där varje knapp har en mjuk
+// top-down gradient (ljus i topp, mörkare nedåt) plus en inset top-
+// highlight. Det gör att knappen läser som ett tunt glas-kort som
+// fångar ljuset, inte en flat färgplatta.
+const FILTER_BTN_BG =
+  "linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.10) 100%)";
+const FILTER_BTN_BORDER = "0.5px solid rgba(255,255,255,0.55)";
+const FILTER_BTN_SHADOW =
+  "0 8px 22px rgba(15,23,42,0.14), " +
+  "0 1px 3px rgba(15,23,42,0.08), " +
+  "inset 0 1px 0.5px rgba(255,255,255,0.65), " +
+  "inset 0 -1px 0.5px rgba(15,23,42,0.05)";
 
-// Standard kastskugga för filterknapparna — speglar `glassStyle` i SunMap
-// så raden av filterknappar ligger på samma "höjd" som övriga glas-paneler
-// (Sök i detta område, sökresultat-listan etc.).
-const FILTER_BTN_SHADOW = "0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)";
-const ORANGE_ACTIVE_SHADOW = "0 0 0 1px rgba(251,146,60,0.35), 0 0 14px rgba(251,146,60,0.6), 0 0 28px rgba(251,146,60,0.3), inset 0 1px 1px rgba(255,255,255,0.25), 0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)";
+// Aktiv huvudkategori (Äta/Fika/Bar/Takbar). Tre-stops gradient:
+// ljus persika i topp → mättad orange mitten → djup ember-bas — ger en
+// fysiskt formad knapp som glöder från sin egen färg, inte bara från
+// halon runt om.
+const ORANGE_ACTIVE_BG =
+  "linear-gradient(170deg, rgba(254,215,170,0.92) 0%, rgba(251,146,60,0.65) 48%, rgba(234,88,12,0.55) 100%)";
+const ORANGE_ACTIVE_BORDER = "1px solid rgba(251,146,60,0.85)";
+const ORANGE_ACTIVE_SHADOW =
+  "0 0 0 0.5px rgba(194,65,12,0.40), " +
+  "0 0 14px rgba(251,146,60,0.55), " +
+  "0 0 32px rgba(251,146,60,0.28), " +
+  "0 8px 22px rgba(194,65,12,0.20), " +
+  "inset 0 1px 1px rgba(255,255,255,0.65), " +
+  "inset 0 -1px 1px rgba(120,53,15,0.18)";
+
+// Aktiv modifier (Glas/Öppet/T-bana). Ljusblå palett — signalerar att
+// dessa snävar in/lägger på, inte väljer kategori. Samma 3-stops
+// behandling som orange för konsekvent djupkänsla.
+const BLUE_ACTIVE_BG =
+  "linear-gradient(170deg, rgba(186,230,253,0.92) 0%, rgba(96,165,250,0.60) 48%, rgba(37,99,235,0.50) 100%)";
+const BLUE_ACTIVE_BORDER = "1px solid rgba(59,130,246,0.85)";
+const BLUE_ACTIVE_SHADOW =
+  "0 0 0 0.5px rgba(30,64,175,0.40), " +
+  "0 0 14px rgba(96,165,250,0.55), " +
+  "0 0 32px rgba(96,165,250,0.28), " +
+  "0 8px 22px rgba(30,64,175,0.20), " +
+  "inset 0 1px 1px rgba(255,255,255,0.65), " +
+  "inset 0 -1px 1px rgba(30,58,138,0.18)";
+const BLUE_ACTIVE_TEXT = "#1e40af";
 
 interface HeaderProps {
   filter: "all" | "sun" | "shade";
@@ -691,8 +717,8 @@ export default function Header({
           <Image
             src="/logo.png"
             alt="Soldryck"
-            width={81}
-            height={99}
+            width={62}
+            height={76}
             style={{ objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(245,158,11,0.3))" }}
           />
 
@@ -727,28 +753,25 @@ export default function Header({
                     title={label}
                     aria-label={`Filter ${label}`}
                     aria-pressed={typeFilter.has(type)}
-                    className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+                    className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
                     style={{
-                      width: 40,
-                      height: 40,
-                      background: active
-                        ? "linear-gradient(160deg, rgba(251,146,60,0.45) 0%, rgba(245,158,11,0.28) 60%, rgba(255,255,255,0.12) 100%)"
-                        : "rgba(255,255,255,0.14)",
-                      backdropFilter: "blur(16px) saturate(1.5)",
-                      WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                      border: active
-                        ? "1px solid rgba(251,146,60,0.75)"
-                        : "0.5px solid rgba(255,255,255,0.45)",
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      background: active ? ORANGE_ACTIVE_BG : FILTER_BTN_BG,
+                      backdropFilter: "blur(18px) saturate(1.6)",
+                      WebkitBackdropFilter: "blur(18px) saturate(1.6)",
+                      border: active ? ORANGE_ACTIVE_BORDER : FILTER_BTN_BORDER,
                       boxShadow: active ? ORANGE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
-                      color: active ? "#9a3412" : "#888",
-                      opacity: active ? 1 : 0.65,
+                      color: active ? "#7c2d12" : "#475569",
+                      opacity: active ? 1 : 0.82,
                       transform: "translateZ(0)",
                       isolation: "isolate",
                       flexShrink: 0,
                     }}
                   >
                     <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: active ? "#9a3412" : "rgba(0,0,0,0.65)" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: active ? "#7c2d12" : "#334155" }}>
                       {label}
                     </span>
                   </button>
@@ -777,24 +800,25 @@ export default function Header({
               title="Bara ställen med serveringstillstånd"
               aria-label="Filter Glas — serveringstillstånd"
               aria-pressed={alcoholOnly}
-              className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+              className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
               style={{
-                width: 40,
-                height: 40,
-                background: alcoholOnly ? BLUE_ACTIVE_BG : "rgba(255,255,255,0.14)",
-                backdropFilter: "blur(16px) saturate(1.5)",
-                WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                border: alcoholOnly ? BLUE_ACTIVE_BORDER : "0.5px solid rgba(255,255,255,0.45)",
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                background: alcoholOnly ? BLUE_ACTIVE_BG : FILTER_BTN_BG,
+                backdropFilter: "blur(18px) saturate(1.6)",
+                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
+                border: alcoholOnly ? BLUE_ACTIVE_BORDER : FILTER_BTN_BORDER,
                 boxShadow: alcoholOnly ? BLUE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
-                color: alcoholOnly ? BLUE_ACTIVE_TEXT : "#888",
-                opacity: alcoholOnly ? 1 : 0.65,
+                color: alcoholOnly ? BLUE_ACTIVE_TEXT : "#475569",
+                opacity: alcoholOnly ? 1 : 0.82,
                 transform: "translateZ(0)",
                 isolation: "isolate",
                 flexShrink: 0,
               }}
             >
               <span dangerouslySetInnerHTML={{ __html: ALCOHOL_MODIFIER_SVG }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: alcoholOnly ? BLUE_ACTIVE_TEXT : "rgba(0,0,0,0.65)" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: alcoholOnly ? BLUE_ACTIVE_TEXT : "#334155" }}>
                 Glas
               </span>
             </button>
@@ -806,17 +830,18 @@ export default function Header({
               title="Öppet just nu"
               aria-label="Filter Öppet just nu"
               aria-pressed={openNowFilter}
-              className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+              className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
               style={{
-                width: 40,
-                height: 40,
-                background: openNowFilter ? BLUE_ACTIVE_BG : "rgba(255,255,255,0.14)",
-                backdropFilter: "blur(16px) saturate(1.5)",
-                WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                border: openNowFilter ? BLUE_ACTIVE_BORDER : "0.5px solid rgba(255,255,255,0.45)",
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                background: openNowFilter ? BLUE_ACTIVE_BG : FILTER_BTN_BG,
+                backdropFilter: "blur(18px) saturate(1.6)",
+                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
+                border: openNowFilter ? BLUE_ACTIVE_BORDER : FILTER_BTN_BORDER,
                 boxShadow: openNowFilter ? BLUE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
-                color: openNowFilter ? BLUE_ACTIVE_TEXT : "#888",
-                opacity: openNowFilter ? 1 : 0.65,
+                color: openNowFilter ? BLUE_ACTIVE_TEXT : "#475569",
+                opacity: openNowFilter ? 1 : 0.82,
                 transform: "translateZ(0)",
                 isolation: "isolate",
                 flexShrink: 0,
@@ -826,7 +851,7 @@ export default function Header({
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7v5l3 2" />
               </svg>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: openNowFilter ? BLUE_ACTIVE_TEXT : "rgba(0,0,0,0.65)" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: openNowFilter ? BLUE_ACTIVE_TEXT : "#334155" }}>
                 Öppet
               </span>
             </button>
@@ -837,17 +862,18 @@ export default function Header({
               title="Tunnelbana"
               aria-label="Visa tunnelbanenät"
               aria-pressed={showMetro}
-              className="rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+              className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
               style={{
-                width: 40,
-                height: 40,
-                background: showMetro ? BLUE_ACTIVE_BG : "rgba(255,255,255,0.14)",
-                backdropFilter: "blur(16px) saturate(1.5)",
-                WebkitBackdropFilter: "blur(16px) saturate(1.5)",
-                border: showMetro ? BLUE_ACTIVE_BORDER : "0.5px solid rgba(255,255,255,0.45)",
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                background: showMetro ? BLUE_ACTIVE_BG : FILTER_BTN_BG,
+                backdropFilter: "blur(18px) saturate(1.6)",
+                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
+                border: showMetro ? BLUE_ACTIVE_BORDER : FILTER_BTN_BORDER,
                 boxShadow: showMetro ? BLUE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
-                color: showMetro ? BLUE_ACTIVE_TEXT : "#888",
-                opacity: showMetro ? 1 : 0.65,
+                color: showMetro ? BLUE_ACTIVE_TEXT : "#475569",
+                opacity: showMetro ? 1 : 0.82,
                 transform: "translateZ(0)",
                 isolation: "isolate",
                 flexShrink: 0,
@@ -858,7 +884,7 @@ export default function Header({
                 <span style={{ width: 5, height: 5, borderRadius: 999, background: "#00a14e" }} />
                 <span style={{ width: 5, height: 5, borderRadius: 999, background: "#0065bd" }} />
               </span>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1, color: showMetro ? BLUE_ACTIVE_TEXT : "rgba(0,0,0,0.65)" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: showMetro ? BLUE_ACTIVE_TEXT : "#334155" }}>
                 T-bana
               </span>
             </button>
