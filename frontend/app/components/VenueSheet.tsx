@@ -211,14 +211,13 @@ export default function VenueSheet({
     setSnap((s) => (s === "full" ? "peek" : "full"));
   }, []);
 
-  // Don't render anything when fully closed AND no venue was ever opened.
-  // Once a venue has been opened we keep the node mounted so the close
-  // animation can play out.
-  const [hasEverOpened, setHasEverOpened] = useState(false);
-  useEffect(() => {
-    if (open) setHasEverOpened(true);
-  }, [open]);
-  if (!hasEverOpened) return null;
+  // Always render the sheet — transform/translate keeps it off-screen when
+  // closed. Returning null before the first open caused a subtle bug: the
+  // useLayoutEffect that injects `html` ran when bodyRef was still null
+  // (because the component returned null) and its deps [venueKey, html]
+  // never changed afterwards, so the first venue's content was never
+  // injected. Subsequent venues worked because venueKey changed. Keeping
+  // the node mounted at all times sidesteps the whole race.
 
   const isDragging = dragTranslate !== null;
 
