@@ -845,7 +845,7 @@ html, body {
   color: #64748b;
 }
 .popup-meta-slot {
-  width: 8px;
+  width: 26px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -859,7 +859,7 @@ html, body {
 .popup-timeline-panel {
   background: rgba(255, 255, 255, 0.6);
   border-radius: var(--r-sm);
-  padding: 7px 10px 6px;
+  padding: 7px 10px 4px;
   margin-top: 10px;
   border: 0.5px solid rgba(255, 255, 255, 0.75);
   box-shadow:

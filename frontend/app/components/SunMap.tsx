@@ -1103,7 +1103,7 @@ function buildVenuePopupHtml(
   // number reads clearly instead of fading into the muted meta colour.
   const hasRating = venue.rating != null;
   const ratingStarHtml = hasRating
-    ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" style="display:block" aria-hidden="true"><path d="M12 2l2.9 7.4 7.9.6-6 5.2 1.9 7.8L12 18.6 5.3 23l1.9-7.8-6-5.2 7.9-.6z"/></svg>`
+    ? `<svg width="26" height="26" viewBox="0 0 24 24" fill="#f59e0b" style="display:block" aria-hidden="true"><path d="M12 2l2.9 7.4 7.9.6-6 5.2 1.9 7.8L12 18.6 5.3 23l1.9-7.8-6-5.2 7.9-.6z"/></svg>`
     : "";
   const ratingTextHtml = hasRating
     ? `<span style="color:#0f172a;font-weight:600">${venue.rating!.toFixed(1)}</span>${venue.ratingCount != null ? `<span style="color:#94a3b8;font-weight:400"> (${venue.ratingCount.toLocaleString("sv-SE")})</span>` : ""}<span style="color:#cbd5e1;margin:0 5px">&middot;</span>`
@@ -1212,13 +1212,12 @@ function buildVenuePopupHtml(
         <span class="popup-meta-text">${ratingTextHtml}${typeToLabel(venue.type)}${priceHtml}${wheelchairHtml}${walkHtml}<span id="venue-trust-${venue.id}"></span></span>
       </div>
       <div id="venue-hours-${venue.id}" style="margin-top:6px"></div>
-      <div class="popup-timeline-panel">
+      <div class="popup-timeline-panel" data-sun-hours="${sunHours}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;padding:0 1px">
           <span style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.04em">Kl ${hour}:00</span>
           ${confChipHtml}
         </div>
         <div class="timeline-cells">${timelineCells}</div>
-        <div style="font-size:10px;color:#94a3b8;text-align:right;margin-top:3px">${sunHours} soltimmar</div>
       </div>
       ${sunArrivesLine}
       ${bestHourLine}
@@ -1547,18 +1546,18 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     // Pan so the marker sits in the lower-middle of the viewport when its
     // popup opens. panTo() would centre the marker, but our popups can be
     // 300-400 px tall — centring puts the top of the popup off-screen
-    // above the header. Putting the marker around 70 % of the viewport
-    // height instead leaves room for the popup to grow upward.
+    // above the header. Putting the marker low in the viewport leaves
+    // room for the popup to grow upward without clipping the name row.
     map.on("popupopen", (e: { popup?: L.Popup }) => {
       const latlng = e.popup?.getLatLng?.();
       if (!latlng || !mapRef.current) return;
       const m = mapRef.current;
       const size = m.getSize();
       const current = m.latLngToContainerPoint(latlng);
-      // Target Y as a fraction of viewport height. 0.7 keeps the marker
-      // visible (with its tip), and the popup floats above with breathing
-      // room above the time slider.
-      const target = L.point(size.x / 2, size.y * 0.7);
+      // Target Y as a fraction of viewport height. 0.82 pushes the marker
+      // down enough that even tall popups (photo + timeline + actions)
+      // clear the header on small viewports.
+      const target = L.point(size.x / 2, size.y * 0.82);
       // panBy moves the map center by N pixels; content shifts by -N. We
       // want the marker pixel to move from `current` to `target`, i.e. the
       // content to shift by (target - current), so panBy(current - target).
