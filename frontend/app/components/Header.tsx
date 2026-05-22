@@ -5,6 +5,7 @@ import Image from "next/image";
 import { type VenueType, type SunRange } from "./SunMap";
 import { METRO_STATIONS, type MetroStation } from "../data/metro-stations";
 import FavoritesPanel from "./FavoritesPanel";
+import { getFavorites } from "../lib/favorites";
 
 const LINE_COLORS: Record<string, string> = {
   red: "#e3000b",
@@ -128,7 +129,8 @@ function SettingsButton({
   metroStation, onMetroStationChange, showShadows, onToggleShadows, showMetro, onToggleMetro,
   showRain, onToggleRain,
   wheelchairOnly, onWheelchairOnlyChange,
-  embedded,
+  onOpenFavorites,
+  favoritesCount,
 }: {
   filter: "all" | "sun" | "shade";
   onFilterChange: (f: "all" | "sun" | "shade") => void;
@@ -146,7 +148,10 @@ function SettingsButton({
   onToggleRain: () => void;
   wheelchairOnly: boolean;
   onWheelchairOnlyChange: (v: boolean) => void;
-  embedded?: boolean;
+  /** Opens the favorites panel — replaces the old standalone favorites button. */
+  onOpenFavorites?: () => void;
+  /** Number of saved favorites — shown as a small badge on the menu item. */
+  favoritesCount?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -242,36 +247,38 @@ function SettingsButton({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        aria-label={open ? "Stäng inställningar" : `Inställningar och filter${activeCount > 0 ? ` (${activeCount} aktiva)` : ""}`}
+        aria-label={open ? "Stäng meny" : `Meny${activeCount > 0 ? ` (${activeCount} aktiva filter)` : ""}`}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={embedded
-          ? "rounded-xl flex items-center justify-center transition-all text-slate-700 relative hover:bg-white/40"
-          : "rounded-xl flex items-center justify-center transition-all text-slate-700 relative"}
-        style={embedded ? {
-          width: 32,
-          height: 32,
-        } : {
-          width: 40,
-          height: 40,
-          background: "rgba(255,255,255,0.3)",
-          backdropFilter: "blur(14px) saturate(1.3)",
-          WebkitBackdropFilter: "blur(14px) saturate(1.3)",
-          border: "0.5px solid rgba(255,255,255,0.55)",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+        className="rounded-2xl flex items-center justify-center transition-all relative active:scale-95"
+        style={{
+          width: 52,
+          height: 52,
+          background: "rgba(255,255,255,0.55)",
+          border: "0.5px solid rgba(255,255,255,0.7)",
+          boxShadow: "0 6px 20px rgba(245,158,11,0.18), 0 2px 6px rgba(0,0,0,0.08)",
+          padding: 4,
           transform: "translateZ(0)",
           isolation: "isolate",
         }}
-        title="Inställningar"
+        title="Meny"
       >
-        {/* Hamburger icon */}
-        <svg width="18" height="15" viewBox="0 0 17 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-          <line x1="1" y1="2" x2="16" y2="2" />
-          <line x1="1" y1="7" x2="16" y2="7" />
-          <line x1="1" y1="12" x2="16" y2="12" />
-        </svg>
+        {/* Soldryck pin-logo som primär identitet + meny-trigger */}
+        <Image
+          src="/soldryck_pin.png"
+          alt="Soldryck"
+          width={44}
+          height={44}
+          priority
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            filter: "drop-shadow(0 1px 2px rgba(245,158,11,0.25))",
+          }}
+        />
         {activeCount > 0 && (
-          <span className="absolute -top-1 -right-1 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow" style={{ background: "#f59e0b" }}>
+          <span className="absolute -top-1 -right-1 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow" style={{ background: "#f59e0b" }}>
             {activeCount}
           </span>
         )}
@@ -283,7 +290,7 @@ function SettingsButton({
           {/* Logo header */}
           <div className="flex items-center gap-2 px-2 pt-2 pb-2.5">
             <Image
-              src="/logo.png"
+              src="/soldryck_pin.png"
               alt="Soldryck"
               width={32}
               height={38}
@@ -299,6 +306,40 @@ function SettingsButton({
             </div>
           </div>
           <div className="border-t border-slate-200/70 mb-1" />
+
+          {/* Favoriter — toppvalbar entry. Stänger den här menyn och öppnar
+              favoritpanelen via callback från parent (Header). */}
+          {onOpenFavorites && (
+            <>
+              <button
+                onClick={() => { setOpen(false); onOpenFavorites(); }}
+                aria-label={`Favoriter${favoritesCount && favoritesCount > 0 ? ` (${favoritesCount} sparade)` : ""}`}
+                className="w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all text-slate-700 hover:bg-slate-100"
+              >
+                <span className="flex items-center gap-1.5">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill={favoritesCount && favoritesCount > 0 ? "#f59e0b" : "none"}
+                    stroke={favoritesCount && favoritesCount > 0 ? "#f59e0b" : "currentColor"}
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  Favoriter
+                </span>
+                {favoritesCount && favoritesCount > 0 ? (
+                  <span className="text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold" style={{ background: "#f59e0b" }}>
+                    {favoritesCount}
+                  </span>
+                ) : null}
+              </button>
+              <div className="border-t border-slate-200 my-1" />
+            </>
+          )}
 
           {/* Sun/shade filter */}
           <div className="flex flex-col gap-0.5">
@@ -651,6 +692,18 @@ export default function Header({
   venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey,
 }: HeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(true);
+  // Favoriter-panelen styrs nu från SettingsButton-dropdown (menyposten
+  // "Favoriter"). Vi håller open-state här och passar den till
+  // FavoritesPanel som rendreras separat, så panelen kan dyka upp
+  // som en egen overlay istället för en knapp i toppraden.
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [favCount, setFavCount] = useState(0);
+  useEffect(() => {
+    const read = () => setFavCount(getFavorites().size);
+    read();
+    window.addEventListener("soldryck-favorites-changed", read);
+    return () => window.removeEventListener("soldryck-favorites-changed", read);
+  }, []);
 
   function toggleType(type: VenueType) {
     const next = new Set(typeFilter);
@@ -660,72 +713,55 @@ export default function Header({
 
   return (
     <div className="absolute top-0 left-0 right-0 z-[1100] pointer-events-none">
-      {/* Centered top stack — wide card + filter row.
-          Pushed down by safe-area-inset-top so the card hangs below the
-          iPhone notch instead of behind it (statusBarStyle=black-translucent
-          + viewportFit=cover would otherwise overlap it). */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto select-none" style={{ top: "var(--safe-top, 0px)" }}>
+      {/* Top-left meny-knapp — kombinerad Soldryck-logo + hamburger.
+          Ersätter den tidigare centrerade plattan med separat logo +
+          hamburger + favoriter. Allt har flyttats hit; Favoriter når man
+          som menypost i dropdown:en. */}
+      <div
+        className="absolute pointer-events-auto select-none"
+        style={{
+          top: "calc(var(--safe-top, 0px) + 10px)",
+          left: "calc(var(--safe-left, 0px) + 12px)",
+          zIndex: 20,
+        }}
+      >
+        <SettingsButton
+          filter={filter}
+          onFilterChange={onFilterChange}
+          typeFilter={typeFilter}
+          onTypeFilterChange={onTypeFilterChange}
+          sunRange={sunRange}
+          onSunRangeChange={onSunRangeChange}
+          metroStation={metroStation}
+          onMetroStationChange={onMetroStationChange}
+          showShadows={showShadows}
+          onToggleShadows={onToggleShadows}
+          showMetro={showMetro}
+          onToggleMetro={onToggleMetro}
+          showRain={showRain}
+          onToggleRain={onToggleRain}
+          wheelchairOnly={wheelchairOnly}
+          onWheelchairOnlyChange={onWheelchairOnlyChange}
+          onOpenFavorites={() => setFavoritesOpen(true)}
+          favoritesCount={favCount}
+        />
+      </div>
 
-        {/* Top card: settings on left, logo centered, favorites on right.
-            Bakgrund/border/skuga reagerar på vald timme via .theme-surface
-            (vars sätts från lib/timeTheme.ts varje gång hour ändras). */}
-        <div
-          className="theme-surface flex items-center justify-center gap-2.5 px-3 pt-1 pb-1"
-          style={{
-            position: "relative",
-            zIndex: 20,
-            borderRadius: "0 0 18px 18px",
-            backdropFilter: "blur(14px) saturate(1.3)",
-            WebkitBackdropFilter: "blur(14px) saturate(1.3)",
-            borderWidth: "0.5px",
-            borderStyle: "solid",
-            borderTop: "none",
-            transform: "translateZ(0)",
-            isolation: "isolate",
-          }}
-        >
-          <SettingsButton
-            filter={filter}
-            onFilterChange={onFilterChange}
-            typeFilter={typeFilter}
-            onTypeFilterChange={onTypeFilterChange}
-            sunRange={sunRange}
-            onSunRangeChange={onSunRangeChange}
-            metroStation={metroStation}
-            onMetroStationChange={onMetroStationChange}
-            showShadows={showShadows}
-            onToggleShadows={onToggleShadows}
-            showMetro={showMetro}
-            onToggleMetro={onToggleMetro}
-            showRain={showRain}
-            onToggleRain={onToggleRain}
-            wheelchairOnly={wheelchairOnly}
-            onWheelchairOnlyChange={onWheelchairOnlyChange}
-            embedded
-          />
+      {/* Favoritpanel — kontrollerad av Header. Renderas som overlay,
+          oberoende av menyknappen. */}
+      <FavoritesPanel
+        venues={venues}
+        onSelectVenue={onSelectVenue}
+        hour={hour}
+        dateKey={dateKey}
+        getStatus={getStatus}
+        getClosestDateKey={getClosestDateKey}
+        controlledOpen={favoritesOpen}
+        onControlledClose={() => setFavoritesOpen(false)}
+      />
 
-          {/* Centered logo — intrinsic size is larger than the plate height
-              by design. Negative vertical margins make the flexbox measure
-              the logo at the original 76 px (so the plate behind doesn't
-              grow), while the image itself overflows top/bottom to read
-              ~28 % larger. The drop-shadow + .theme-surface overflow
-              defaults let the overflow render cleanly. */}
-          <Image
-            src="/logo.png"
-            alt="Soldryck"
-            width={78}
-            height={96}
-            style={{
-              objectFit: "contain",
-              filter: "drop-shadow(0 2px 6px rgba(245,158,11,0.3))",
-              margin: "-10px 0",
-            }}
-          />
-
-          <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} getClosestDateKey={getClosestDateKey} embedded />
-        </div>
-
-        {/* Filter row + collapse toggle */}
+      {/* Centered filter row + collapse toggle */}
+      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto select-none" style={{ top: "calc(var(--safe-top, 0px) + 14px)" }}>
         <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
           {/* marginBottom collapse — no overflow:hidden so backdrop-filter has no ghost box and buttons aren't clipped */}
           <div

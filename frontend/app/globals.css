@@ -1673,9 +1673,10 @@ html, body {
   top: 0;
   z-index: 2;
   padding: 14px 14px 12px;
-  /* Lägre opacitet så den kraftiga bluren (sätts inline via JS) får mer
-     att jobba med — kartan/listan under läser igenom som suddig glas. */
-  background: rgba(255, 255, 255, 0.32);
+  /* Mer solid bakgrund (~0.6) så texten läser tydligt, men kombinerat
+     med den kraftiga inline-bluren (48px) får man fortfarande
+     den glasaktiga genomskinligheten där kartan/listan skiner igenom. */
+  background: rgba(255, 255, 255, 0.6);
   border-bottom: 0.5px solid rgba(15, 23, 42, 0.08);
   box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
 }

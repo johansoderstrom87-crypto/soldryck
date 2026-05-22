@@ -19,6 +19,11 @@ interface FavoritesPanelProps {
       its own week without re-deriving it from `dateKey`. */
   getClosestDateKey: (date: Date) => string;
   embedded?: boolean;
+  /** When defined, the panel runs in controlled mode: parent decides when
+      it's open, no toggle button is rendered, and the panel positions
+      itself as a fixed overlay below the top-left menu button. */
+  controlledOpen?: boolean;
+  onControlledClose?: () => void;
 }
 
 function sunStyle(raw: string | undefined) {
@@ -28,8 +33,20 @@ function sunStyle(raw: string | undefined) {
   return { dot: "#cbd5e1", bg: "#f8fafc", text: "#94a3b8", label: "Natt" };
 }
 
-export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey, embedded }: FavoritesPanelProps) {
-  const [open, setOpen] = useState(false);
+export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey, embedded, controlledOpen, onControlledClose }: FavoritesPanelProps) {
+  // Controlled-läge: när controlledOpen är definierad styr parent open-state
+  // och vi renderar bara panelen (ingen toggle-knapp). Annars behåller vi
+  // den interna state-machine:n som tidigare.
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? !!controlledOpen : internalOpen;
+  const setOpen = (v: boolean) => {
+    if (isControlled) {
+      if (!v) onControlledClose?.();
+    } else {
+      setInternalOpen(v);
+    }
+  };
   const [plannerOpen, setPlannerOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
@@ -107,75 +124,92 @@ export default function FavoritesPanel({ venues, onSelectVenue, hour, dateKey, g
     }
   }
 
+  // Controlled-mode placeringen — overlay strax under top-left menyknappen.
+  // pointer-events: auto är load-bearing: Header-wrappern är pointer-events:
+  // none så bara explicit valda barn tar klick. Utan detta blev panelen
+  // synlig men oklickbar (alla klick gick rakt igenom till kartan).
+  const controlledStyle: React.CSSProperties = {
+    position: "fixed",
+    top: "calc(var(--safe-top, 0px) + 72px)",
+    left: "calc(var(--safe-left, 0px) + 12px)",
+    width: 300,
+    maxWidth: "calc(100vw - 24px)",
+    maxHeight: "calc(100vh - 100px)",
+    overflowY: "auto",
+    pointerEvents: "auto",
+  };
+
   return (
-    <div ref={ref} className="relative">
-      <button
-        ref={btnRef}
-        aria-label={`Favoriter${favIds.size > 0 ? ` (${favIds.size} sparade)` : ""}`}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => {
-          if (embedded && btnRef.current) {
-            const r = btnRef.current.getBoundingClientRect();
-            const W = 268;
-            const margin = 8;
-            const left = Math.max(margin, Math.min(r.right - W, window.innerWidth - W - margin));
-            setDropdownPos({ top: r.bottom + 6, left });
-          }
-          setOpen(!open);
-        }}
-        className={embedded
-          ? "rounded-xl flex items-center justify-center transition-all hover:bg-white/40 relative"
-          : "rounded-xl px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all text-slate-700"}
-        style={embedded ? {
-          width: 32,
-          height: 32,
-        } : {
-          background: "rgba(255,255,255,0.3)",
-          backdropFilter: "blur(14px) saturate(1.3)",
-          WebkitBackdropFilter: "blur(14px) saturate(1.3)",
-          border: "0.5px solid rgba(255,255,255,0.55)",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-          transform: "translateZ(0)",
-          isolation: "isolate",
-        }}
-        title="Mina favoriter"
-      >
-        {/* Heart icon — matches hamburger SVG style; filled when there are favorites */}
-        <svg
-          width={embedded ? 22 : 16}
-          height={embedded ? 20 : 14}
-          viewBox="0 0 24 24"
-          fill={favIds.size > 0 ? "#f59e0b" : "none"}
-          stroke={favIds.size > 0 ? "#f59e0b" : "#475569"}
-          strokeWidth={1.8}
-          strokeLinecap="round"
-          strokeLinejoin="round"
+    <div ref={ref} className={isControlled ? undefined : "relative"}>
+      {/* Toggle-knappen renderas inte i controlled mode — parent sköter
+          öppna/stäng via menypost i hamburgermenyn. */}
+      {!isControlled && (
+        <button
+          ref={btnRef}
+          aria-label={`Favoriter${favIds.size > 0 ? ` (${favIds.size} sparade)` : ""}`}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          onClick={() => {
+            if (embedded && btnRef.current) {
+              const r = btnRef.current.getBoundingClientRect();
+              const W = 268;
+              const margin = 8;
+              const left = Math.max(margin, Math.min(r.right - W, window.innerWidth - W - margin));
+              setDropdownPos({ top: r.bottom + 6, left });
+            }
+            setOpen(!open);
+          }}
+          className={embedded
+            ? "rounded-xl flex items-center justify-center transition-all hover:bg-white/40 relative"
+            : "rounded-xl px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-all text-slate-700"}
+          style={embedded ? {
+            width: 32,
+            height: 32,
+          } : {
+            background: "rgba(255,255,255,0.3)",
+            backdropFilter: "blur(14px) saturate(1.3)",
+            WebkitBackdropFilter: "blur(14px) saturate(1.3)",
+            border: "0.5px solid rgba(255,255,255,0.55)",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+            transform: "translateZ(0)",
+            isolation: "isolate",
+          }}
+          title="Mina favoriter"
         >
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-        </svg>
-        {favIds.size > 0 && (
-          <span
-            className={embedded
-              ? "absolute -top-1 -right-1 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow"
-              : "text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold"}
-            style={{ background: "#f59e0b" }}
+          <svg
+            width={embedded ? 22 : 16}
+            height={embedded ? 20 : 14}
+            viewBox="0 0 24 24"
+            fill={favIds.size > 0 ? "#f59e0b" : "none"}
+            stroke={favIds.size > 0 ? "#f59e0b" : "#475569"}
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            {favIds.size}
-          </span>
-        )}
-      </button>
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+          {favIds.size > 0 && (
+            <span
+              className={embedded
+                ? "absolute -top-1 -right-1 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow"
+                : "text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold"}
+              style={{ background: "#f59e0b" }}
+            >
+              {favIds.size}
+            </span>
+          )}
+        </button>
+      )}
 
       {open && (
         <div
-          className={`rounded-xl p-2 z-[2000] ${embedded ? "" : "absolute top-full mt-1 left-0 min-w-[260px] max-w-[300px]"}`}
+          className={`rounded-xl p-2 z-[2000] ${isControlled || embedded ? "" : "absolute top-full mt-1 left-0 min-w-[260px] max-w-[300px]"}`}
           style={{
-            ...(embedded && dropdownPos ? {
-              position: "fixed",
-              top: dropdownPos.top,
-              left: dropdownPos.left,
-              width: 268,
-            } : {}),
+            ...(isControlled
+              ? controlledStyle
+              : embedded && dropdownPos
+                ? { position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: 268 }
+                : {}),
             background: "rgba(255,255,255,0.72)",
             backdropFilter: "blur(20px) saturate(1.4)",
             WebkitBackdropFilter: "blur(20px) saturate(1.4)",
