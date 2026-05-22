@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useCallback, useEffect } from "react";
+import { useMemo, useRef, useState, useCallback, useEffect, useTransition } from "react";
 import { type WeatherData, type HourlyWeather, getSymbolInfo, toLocalDateStr } from "../lib/weather";
 import { snapToSeason } from "../lib/season";
 import DirectionGauges from "./DirectionGauges";
@@ -182,10 +182,24 @@ export default function TimeSlider({
 }: TimeSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Cachat bounding-rect för spårelementet. Skrivs på pointerdown och vid
+  // resize (via ResizeObserver-effekten nedan) — pointermove läser det
+  // istället för att kalla getBoundingClientRect() per frame. En layout-read
+  // per pointermove tvingar Safari att synka style/layout-trädet, vilket är
+  // synligt på reglagets latens när användaren scrubbar snabbt.
+  const trackRectRef = useRef<DOMRect | null>(null);
   const [dragging, setDragging] = useState(false);
   const [draggingHandle, setDraggingHandle] = useState<"from" | "to" | null>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  // Lokal kopia av aktiv timme — uppdateras synkront medan användaren drar
+  // så knoppen följer fingret pixel-perfekt. Parent-staten (page.tsx → SunMap)
+  // uppdateras via startTransition så det tunga rebuild-arbetet kan avbrytas
+  // när nästa pointermove kommer in. När draget slutar släpper vi local och
+  // går tillbaka till parent-`hour`-propen.
+  const [, startHourTransition] = useTransition();
+  const [localHour, setLocalHour] = useState<number | null>(null);
+  const displayHour = localHour ?? hour;
 
   const rangeMode = sunRange !== null;
 
@@ -202,7 +216,12 @@ export default function TimeSlider({
   useEffect(() => {
     const el = trackRef.current;
     if (!el) return;
-    const update = () => setTrackWidth(el.clientWidth);
+    const update = () => {
+      setTrackWidth(el.clientWidth);
+      // Invalida cachat rect så pointermove inte använder en gammal left/width
+      // efter att layouten flyttat sig (skroll, orientation change, IME m.m.).
+      trackRectRef.current = null;
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -259,18 +278,28 @@ export default function TimeSlider({
     [weather]
   );
 
-  const currentWeather = getHourWeather(hour);
+  const currentWeather = getHourWeather(displayHour);
 
   const clientXToHour = useCallback((clientX: number): number => {
-    const el = trackRef.current;
-    if (!el) return hour;
-    const rect = el.getBoundingClientRect();
+    const rect = trackRectRef.current;
+    if (!rect) return displayHour;
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    return HOURS[Math.round(ratio * (HOURS.length - 1))] ?? hour;
-  }, [hour]);
+    return HOURS[Math.round(ratio * (HOURS.length - 1))] ?? displayHour;
+  }, [displayHour]);
+
+  // Wrapper: knoppens lokala state uppdateras synkront (knoppen följer fingret),
+  // parent-staten skickas via transition så React kan avbryta det tunga arbetet
+  // (Header, DirectionGauges, SunMap-rebuild) när nästa pointermove kommer in.
+  const dispatchHour = (h: number) => {
+    setLocalHour(h);
+    startHourTransition(() => onHourChange(h));
+  };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    // Cacha rect:et för hela dragets längd. Pointermove läser det utan att
+    // tvinga en ny layout-pass per frame.
+    trackRectRef.current = e.currentTarget.getBoundingClientRect();
     setDragging(true);
     const h = clientXToHour(e.clientX);
     if (rangeMode && sunRange) {
@@ -281,12 +310,12 @@ export default function TimeSlider({
       if (handle === "from") {
         const newFrom = Math.min(h, sunRange.to - 1);
         onSunRangeChange({ from: newFrom, to: sunRange.to });
-        onHourChange(newFrom);
+        dispatchHour(newFrom);
       } else {
         onSunRangeChange({ from: sunRange.from, to: Math.max(h, sunRange.from + 1) });
       }
     } else {
-      if (h !== hour) onHourChange(h);
+      if (h !== displayHour) dispatchHour(h);
     }
   };
 
@@ -296,13 +325,13 @@ export default function TimeSlider({
     if (rangeMode && sunRange && draggingHandle) {
       if (draggingHandle === "from") {
         const newFrom = Math.min(h, sunRange.to - 1);
-        if (newFrom !== sunRange.from) { onSunRangeChange({ from: newFrom, to: sunRange.to }); onHourChange(newFrom); }
+        if (newFrom !== sunRange.from) { onSunRangeChange({ from: newFrom, to: sunRange.to }); dispatchHour(newFrom); }
       } else {
         const newTo = Math.max(h, sunRange.from + 1);
         if (newTo !== sunRange.to) onSunRangeChange({ from: sunRange.from, to: newTo });
       }
     } else if (!rangeMode) {
-      if (h !== hour) onHourChange(h);
+      if (h !== displayHour) dispatchHour(h);
     }
   };
 
@@ -310,6 +339,10 @@ export default function TimeSlider({
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
     setDragging(false);
     setDraggingHandle(null);
+    // Släpp local-state — parent-`hour` är nu autoritativt igen. Om transition-
+    // kön fortfarande har en in-flight uppdatering kommer den att landa via
+    // propen och displayHour faller tillbaka till `hour` automatiskt.
+    setLocalHour(null);
   };
 
   const handleCalendarSelect = (picked: Date) => {
@@ -369,7 +402,7 @@ export default function TimeSlider({
           </svg>
         </button>
         <div className="flex-1 pointer-events-none">
-          <DirectionGauges hour={hour} date={date} currentWeather={currentWeather} />
+          <DirectionGauges hour={displayHour} date={date} currentWeather={currentWeather} />
         </div>
       </div>
 
@@ -378,7 +411,7 @@ export default function TimeSlider({
         {HOURS.map((h) => {
           const hw = getHourWeather(h);
           const hwSymbol = hw ? getSymbolInfo(hw.symbolCode) : null;
-          const isSelected = h === hour;
+          const isSelected = h === displayHour;
           const past = isPastHour(h);
           // Align with slider track: 12px = panel px-3 padding, -10 = center 20px icon
           const leftPx = trackWidth > 0
@@ -464,7 +497,7 @@ export default function TimeSlider({
             {HOURS.map((h) => {
               const hidden = rangeMode
                 ? h === sunRange?.from || h === sunRange?.to
-                : h === hour;
+                : h === displayHour;
               const past = isPastHour(h);
               return (
                 <div
@@ -532,12 +565,12 @@ export default function TimeSlider({
                 style={{
                   top: "50%",
                   left: 0,
-                  transform: `translate3d(${((hour - 7 + 0.5) / HOURS.length) * trackWidth - 23}px, -50%, 0)`,
+                  transform: `translate3d(${((displayHour - 7 + 0.5) / HOURS.length) * trackWidth - 23}px, -50%, 0)`,
                   willChange: "transform",
                   transition: dragging ? "none" : "transform 0.22s ease-out",
                 }}
               >
-                {hour}
+                {displayHour}
               </div>
             )}
           </div>

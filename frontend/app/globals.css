@@ -1339,6 +1339,15 @@ html, body {
   transition: opacity 0.9s ease;
 }
 
+/* Pausa regn/snö/åska medan användaren pannar eller zoomar kartan. Tile-
+   repaints + animerade gradienter på samma frame är dyraste kombon på
+   äldre iPhones; pausen ger pan-frame-budgeten tillbaka. SunMap.tsx
+   togglar `.is-panning` via movestart/zoomstart-listeners på Leaflet-mappen. */
+.weather-fx.is-panning::before,
+.weather-fx.is-panning::after {
+  animation-play-state: paused;
+}
+
 /* Regn — tre lager av korta droppar på olika djup. Strecken är mycket
    kortare än varje "kolumns" repeat-period så det bildas distinkta
    droppar i stället för kontinuerliga linjer. Lagren har olika x-offset,

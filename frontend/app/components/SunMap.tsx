@@ -1370,6 +1370,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   const searchAreaRectRef = useRef<L.Rectangle | null>(null);
   const searchBoundsRef = useRef<L.LatLngBounds | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // .weather-fx-noden — DOM-only ref så vi kan pausa regn/snö-animationen
+  // under aktivt pan via en class-toggle, utan att gå genom React state
+  // (vilket hade triggat en re-render varje gång panen startade/slutade).
+  const weatherFxRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const geoWatchRef = useRef<number | null>(null);
   const hasCenteredRef = useRef(false);
@@ -1432,19 +1436,23 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         // Load tiles immediately during pan (not just after pan ends).
         // Default on mobile is true which causes blank tiles during drag.
         updateWhenIdle: false,
-        // Pre-fetch 4 extra tile columns/rows beyond the visible viewport so
-        // they're already loaded when the user pans into that area.
-        // Default is 2; 4–5 eliminates most blank-tile flashes on fast pans.
-        keepBuffer: 5,
+        // Pre-fetch 3 extra tile rings beyond the visible viewport. Used to
+        // be 5 to eliminate blank-tile flashes on fast pans, but at 5 the
+        // tile cache grows large enough that each pan triggers a noticeable
+        // load + decode hit on mid-range phones — 3 strikes a better balance.
+        keepBuffer: 3,
       }
     ).addTo(map);
 
     // Dark tileset, lives in its own pane (sits just above the regular tile
     // pane) and starts invisible. The darkness effect below fades its opacity
     // in/out as ambient darkness crosses 0.4 — true dark mode for evenings
-    // and overcast nights, instead of just dimming the light tiles. Skipping
-    // pre-load on phones with weak CPU would help but Carto tile fetch is
-    // cheap and the tiles are tiny.
+    // and overcast nights, instead of just dimming the light tiles.
+    //
+    // updateWhenIdle:true here because the layer is hidden (opacity 0) until
+    // ambient darkness crosses ~0.4 — wasting tile decodes during pan on a
+    // pane that the user can't currently see was a meaningful chunk of the
+    // pan-frame budget on older iPhones.
     const darkPane = map.createPane("darkTiles");
     darkPane.style.zIndex = "201"; // tilePane=200, overlayPane=400
     darkPane.style.opacity = "0";
@@ -1455,8 +1463,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       {
         pane: "darkTiles",
         maxZoom: 19,
-        updateWhenIdle: false,
-        keepBuffer: 5,
+        updateWhenIdle: true,
+        keepBuffer: 2,
       }
     ).addTo(map);
 
@@ -1475,6 +1483,16 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         setShowSearchInArea(true);
       }
     });
+
+    // Pausa animerade regn-/snö-/åskeffekter under aktivt pan/zoom. Effekten
+    // består av repeterande gradient-bakgrunder över hela viewporten som
+    // animeras med transform/background-position — billigt i isolation men
+    // dyrt att kombinera med tile-repaints på äldre iPhones. CSS-regeln för
+    // `.weather-fx.is-panning` sätter `animation-play-state: paused`.
+    const pausePanning = () => weatherFxRef.current?.classList.add("is-panning");
+    const resumePanning = () => weatherFxRef.current?.classList.remove("is-panning");
+    map.on("movestart zoomstart", pausePanning);
+    map.on("moveend zoomend", resumePanning);
 
     mapRef.current = map;
 
@@ -2231,19 +2249,25 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   }, [dateKey, typeFilter, sunRange, weather, metroStation, wheelchairOnly, alcoholOnly, allVenues]);
 
   // Hour & sun/shade-filter update — fast path. Retoggles `.marker-dot`'s
-  // class and visibility on existing markers. Markers outside the viewport
-  // (no `_icon`) are skipped automatically by applyMarkerVisualState.
+  // class and visibility on existing markers.
+  //
+  // Skip markers not currently attached to the map: their DOM doesn't exist
+  // so the work would be wasted, and computeMarkerState + getStatus aren't
+  // free at ~2 500 venues per scrub-tick. When the cull adds a marker back
+  // to the map it paints its current state via applyMarkerVisualState, so
+  // off-map markers stay correct without being touched here.
   useEffect(() => {
     if (!mapRef.current) return;
 
     for (const { marker, venue } of markerVenuesRef.current) {
+      if (!(marker as L.Marker & { _map?: L.Map })._map) continue;
       applyMarkerVisualState(
         marker,
         computeMarkerState(venue, dateKey, hour, filter, weatherRef.current, openNowFilter),
       );
       // Happy-hour glow — toggled on the marker root (sibling of marker-dot).
       // Cheap: reads from a module-level Record and a fixed pair of ints, so
-      // hitting this once per marker per scrub is negligible.
+      // hitting this once per visible marker per scrub is negligible.
       const iconEl = (marker as L.Marker & { _icon?: HTMLElement })._icon;
       if (iconEl) {
         const active = isHappyHourActive(venue.id, hour);
@@ -2924,8 +2948,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       <div className="map-ambient" aria-hidden />
       {/* Animerade regn-/snö-/åskeffekter ovanpå kartan. Drivs av SMHI-koden
           för vald timme. Effekten är pointer-events: none så kartan går att
-          panorera/zooma normalt. Stilar i globals.css. */}
-      <div className="weather-fx" data-fx={weatherFx} aria-hidden />
+          panorera/zooma normalt. Stilar i globals.css.
+          weatherFxRef används av map init-effekten för att toggla
+          `.is-panning` (pausar animationen under aktivt pan/zoom). */}
+      <div ref={weatherFxRef} className="weather-fx" data-fx={weatherFx} aria-hidden />
 
       {/* Right-side button stack.
           Single flex column anchored at bottom + right (safe-area aware).
