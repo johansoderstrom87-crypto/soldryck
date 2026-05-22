@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { buildClosedStatus } from "../lib/venueHours";
 import Sheet from "./Sheet";
 
@@ -340,6 +340,18 @@ export interface AreaSearchPanelProps {
 export default function AreaSearchPanel({
   open, venues, hour, dateKey, onClose, onSelectVenue, getStatus, getSunHours,
 }: AreaSearchPanelProps) {
+  // Inline backdrop-filter på header — globalt `* { backdrop-filter: none
+  // !important }` strippar annars all blur från alla element. setProperty
+  // med !important via JS slår den regeln (inline +
+  // !important > extern + !important på samma specificitet).
+  const headerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    el.style.setProperty("backdrop-filter", "blur(48px) saturate(1.8)", "important");
+    el.style.setProperty("-webkit-backdrop-filter", "blur(48px) saturate(1.8)", "important");
+  }, [open]);
+
   // Multi-select sort. Each enabled criterion contributes its rank in the
   // single-sort order; the combined order is the sum of ranks (lowest =
   // best on all selected axes). At least one must stay on — toggling the
@@ -425,10 +437,13 @@ export default function AreaSearchPanel({
       peekHeight={460}
       desktopWidth={300}
       className="area-search-sheet"
+      expandOnScroll
     >
       {/* Sticky header — title + close + sort. Stays put while the list
-          below scrolls so the user can re-sort without scrolling back up. */}
-      <div className="area-search-header">
+          below scrolls so the user can re-sort without scrolling back up.
+          Tung blur sätts inline via useLayoutEffect ovan så den inte
+          strippas av det globala backdrop-filter-undantaget. */}
+      <div ref={headerRef} className="area-search-header">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>I detta område</div>

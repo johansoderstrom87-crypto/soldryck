@@ -33,6 +33,13 @@ interface SheetProps {
    * manipulate the body imperatively (e.g. innerHTML injection).
    */
   bodyRef?: React.RefObject<HTMLDivElement | null>;
+  /**
+   * When true, scrolling the body while at the peek snap auto-expands the
+   * sheet to full. Mirrors Google Maps' list-of-places behaviour where a
+   * scroll gesture pulls the panel up. Mobile-only effect (desktop sidebar
+   * is always "full"). Default false.
+   */
+  expandOnScroll?: boolean;
   /** Body content. Wrapped in a `.venue-sheet-body` scroll container. */
   children?: ReactNode;
 }
@@ -64,6 +71,7 @@ export default function Sheet({
   onSnapChange,
   className,
   bodyRef,
+  expandOnScroll = false,
   children,
 }: SheetProps) {
   // Layout mode — recomputed on resize via matchMedia.
@@ -95,6 +103,19 @@ export default function Sheet({
   const [dragTranslate, setDragTranslate] = useState<number | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  // Internal body ref so the scroll-to-expand listener and scrollTop reset
+  // work regardless of whether the parent provided a `bodyRef`. A callback
+  // ref forwards the same node to both.
+  const internalBodyRef = useRef<HTMLDivElement | null>(null);
+  const setBodyRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      internalBodyRef.current = el;
+      if (bodyRef) {
+        (bodyRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+      }
+    },
+    [bodyRef],
+  );
 
   const fullHeight = Math.round(vh * 0.85);
   const effectivePeek = Math.min(peekHeight, Math.round(vh * 0.7));
@@ -133,6 +154,33 @@ export default function Sheet({
   useEffect(() => {
     onSnapChange?.(snap);
   }, [snap, onSnapChange]);
+
+  // Reset scrollTop when the sheet opens fresh, so reopening doesn't land
+  // mid-list. Without this, a user who closed mid-scroll would reopen at
+  // peek with scrollTop>0 — which would immediately re-trigger the
+  // expand-on-scroll listener and snap to full.
+  useEffect(() => {
+    if (open) {
+      const body = internalBodyRef.current;
+      if (body) body.scrollTop = 0;
+    }
+  }, [open]);
+
+  // Expand-on-scroll: at peek, the first downward scroll on the body pulls
+  // the sheet to full. After that, scrolling inside the full sheet works
+  // normally. Mobile only — desktop sidebar is always at "full".
+  useEffect(() => {
+    if (!expandOnScroll || snap !== "peek") return;
+    const body = internalBodyRef.current;
+    if (!body) return;
+    const onScroll = () => {
+      if (body.scrollTop > 4) {
+        setSnap("full");
+      }
+    };
+    body.addEventListener("scroll", onScroll, { passive: true });
+    return () => body.removeEventListener("scroll", onScroll);
+  }, [expandOnScroll, snap]);
 
   // ESC closes.
   useEffect(() => {
@@ -218,7 +266,7 @@ export default function Sheet({
         role="dialog"
         aria-modal="false"
       >
-        <div ref={bodyRef} className="venue-sheet-body">
+        <div ref={setBodyRef} className="venue-sheet-body">
           {children}
         </div>
       </div>
@@ -270,7 +318,7 @@ export default function Sheet({
             <div className="venue-sheet-handle" aria-hidden />
           </div>
         )}
-        <div ref={bodyRef} className="venue-sheet-body">
+        <div ref={setBodyRef} className="venue-sheet-body">
           {children}
         </div>
       </div>

@@ -1673,10 +1673,11 @@ html, body {
   top: 0;
   z-index: 2;
   padding: 14px 14px 12px;
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(20px) saturate(1.3);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  /* Lägre opacitet så den kraftiga bluren (sätts inline via JS) får mer
+     att jobba med — kartan/listan under läser igenom som suddig glas. */
+  background: rgba(255, 255, 255, 0.32);
   border-bottom: 0.5px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 .area-search-list {
   padding: 10px 12px 16px;
