@@ -713,13 +713,22 @@ export default function Header({
             embedded
           />
 
-          {/* Centered logo */}
+          {/* Centered logo — intrinsic size is larger than the plate height
+              by design. Negative vertical margins make the flexbox measure
+              the logo at the original 76 px (so the plate behind doesn't
+              grow), while the image itself overflows top/bottom to read
+              ~28 % larger. The drop-shadow + .theme-surface overflow
+              defaults let the overflow render cleanly. */}
           <Image
             src="/logo.png"
             alt="Soldryck"
-            width={62}
-            height={76}
-            style={{ objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(245,158,11,0.3))" }}
+            width={78}
+            height={96}
+            style={{
+              objectFit: "contain",
+              filter: "drop-shadow(0 2px 6px rgba(245,158,11,0.3))",
+              margin: "-10px 0",
+            }}
           />
 
           <FavoritesPanel venues={venues} onSelectVenue={onSelectVenue} hour={hour} dateKey={dateKey} getStatus={getStatus} getClosestDateKey={getClosestDateKey} embedded />

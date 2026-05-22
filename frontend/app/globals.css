@@ -951,16 +951,18 @@ html, body {
   }
 }
 
-/* Time-slider knob — a luminous white pearl floating in a warm amber
-   halo. The core stays clean white so the hour number reads sharply
-   in slate-black, while the surrounding glow does all the "premium"
-   work via layered shadows (tight golden ring → wide amber bloom →
-   distant warm whisper). The halo breathes in/out on a slow 2.8 s
-   cycle — box-shadow only, no layout impact. */
+/* Time-slider knob — a white-core "ember" with a fiery amber halo
+   bleeding outward. Core stays bright so the hour number reads sharply
+   in slate-black, but it warms toward the edge (#fefce8 → #fef08a)
+   so the transition into the halo feels like one continuous glow
+   rather than two materials. The halo layers tight gold → orange →
+   ember-red → distant amber whisper, all breathing on a 2.8 s cycle.
+   Bottom inset shadow is warm amber, not neutral, so the knob feels
+   lit from within. */
 .time-slider-knob {
   border-radius: 9999px;
   background:
-    radial-gradient(circle at 50% 50%, #ffffff 0%, #fefefe 65%, #fef3c7 100%);
+    radial-gradient(circle at 50% 50%, #ffffff 0%, #fefce8 55%, #fef08a 88%, #fde047 100%);
   color: #0f172a;
   font-weight: 900;
   letter-spacing: -0.02em;
@@ -973,39 +975,42 @@ html, body {
 @keyframes time-slider-knob-pulse {
   0%, 100% {
     box-shadow:
-      0 0 0 0.5px rgba(245, 158, 11, 0.35),
-      0 0 14px rgba(251, 191, 36, 0.55),
-      0 0 28px rgba(251, 146, 60, 0.42),
-      0 0 46px rgba(251, 191, 36, 0.22),
-      0 6px 18px rgba(120, 53, 15, 0.18),
+      0 0 0 0.5px rgba(217, 119, 6, 0.50),
+      0 0 12px rgba(253, 224, 71, 0.85),
+      0 0 26px rgba(251, 146, 60, 0.72),
+      0 0 46px rgba(234, 88, 12, 0.48),
+      0 0 72px rgba(251, 191, 36, 0.30),
+      0 6px 18px rgba(120, 53, 15, 0.28),
       0 2px 5px rgba(15, 23, 42, 0.10),
       inset 0 1px 1.5px rgba(255, 255, 255, 0.85),
-      inset 0 -1px 2px rgba(245, 158, 11, 0.10);
+      inset 0 -1px 2px rgba(217, 119, 6, 0.28);
   }
   50% {
     box-shadow:
-      0 0 0 0.5px rgba(245, 158, 11, 0.40),
-      0 0 22px rgba(251, 191, 36, 0.78),
-      0 0 40px rgba(251, 146, 60, 0.58),
-      0 0 64px rgba(251, 191, 36, 0.32),
-      0 6px 18px rgba(120, 53, 15, 0.20),
+      0 0 0 0.5px rgba(217, 119, 6, 0.55),
+      0 0 18px rgba(253, 224, 71, 1),
+      0 0 38px rgba(251, 146, 60, 0.92),
+      0 0 64px rgba(234, 88, 12, 0.62),
+      0 0 96px rgba(251, 191, 36, 0.40),
+      0 6px 18px rgba(120, 53, 15, 0.32),
       0 2px 5px rgba(15, 23, 42, 0.10),
       inset 0 1px 1.5px rgba(255, 255, 255, 0.85),
-      inset 0 -1px 2px rgba(245, 158, 11, 0.10);
+      inset 0 -1px 2px rgba(217, 119, 6, 0.28);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .time-slider-knob {
     animation: none;
     box-shadow:
-      0 0 0 0.5px rgba(245, 158, 11, 0.38),
-      0 0 18px rgba(251, 191, 36, 0.65),
-      0 0 34px rgba(251, 146, 60, 0.48),
-      0 0 54px rgba(251, 191, 36, 0.26),
-      0 6px 18px rgba(120, 53, 15, 0.18),
+      0 0 0 0.5px rgba(217, 119, 6, 0.52),
+      0 0 14px rgba(253, 224, 71, 0.92),
+      0 0 32px rgba(251, 146, 60, 0.80),
+      0 0 54px rgba(234, 88, 12, 0.55),
+      0 0 82px rgba(251, 191, 36, 0.35),
+      0 6px 18px rgba(120, 53, 15, 0.30),
       0 2px 5px rgba(15, 23, 42, 0.10),
       inset 0 1px 1.5px rgba(255, 255, 255, 0.85),
-      inset 0 -1px 2px rgba(245, 158, 11, 0.10);
+      inset 0 -1px 2px rgba(217, 119, 6, 0.28);
   }
 }
 
