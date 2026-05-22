@@ -1487,23 +1487,38 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     }
   }, [selected, claimedVer]);
 
-  // Pan the map so the selected marker sits in the upper portion of the
-  // visible area (above the bottom sheet). Mirrors Google Maps: the pin
-  // remains visible after the sheet rises. Re-runs when the snap changes
-  // (peek → full) so the marker stays in view if the sheet grows.
+  // Pan the map so the selected marker stays visible — mirroring Google
+  // Maps. Behaviour differs between layouts:
+  //   - Desktop sidebar (≥768px): marker centered in the visible map area
+  //     to the right of the 408 px sidebar.
+  //   - Mobile bottom sheet (peek): marker pulled toward the top third so
+  //     it's clearly above the sheet's top edge.
+  //   - Mobile full: skip — the sheet covers nearly everything anyway.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !selected) return;
     const { lat, lng } = selected.venue;
     if (typeof lat !== "number" || typeof lng !== "number") return;
+    const isWide = typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 768px)").matches;
     const size = map.getSize();
     const current = map.latLngToContainerPoint([lat, lng]);
-    // Sheet covers ~300 px (peek) or ~85% of viewport (full). At peek we
-    // aim the marker at 30 % of viewport height; at full the sheet hides
-    // the map almost entirely so we don't waste a pan there.
-    if (sheetSnap === "full") return;
-    const targetY = Math.max(80, size.y * 0.30);
-    const target = L.point(size.x / 2, targetY);
+
+    let target: L.Point;
+    if (isWide) {
+      // Sidebar covers left ~408px. Centre marker in the remaining map
+      // area horizontally; vertically slightly above middle so the pin
+      // doesn't get hidden under the time-slider panel at bottom.
+      const sidebarPx = Math.min(408, size.x);
+      const visibleMapX = sidebarPx + (size.x - sidebarPx) / 2;
+      target = L.point(visibleMapX, size.y * 0.45);
+    } else {
+      // Mobile: skip pan when fully expanded — sheet covers the map.
+      if (sheetSnap === "full") return;
+      const targetY = Math.max(80, size.y * 0.28);
+      target = L.point(size.x / 2, targetY);
+    }
+
     const dx = current.x - target.x;
     const dy = current.y - target.y;
     if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
