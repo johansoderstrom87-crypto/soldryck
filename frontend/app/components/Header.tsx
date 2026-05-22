@@ -57,7 +57,10 @@ const ALCOHOL_MODIFIER_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fi
 // Filterraden — ett modernt glas-system där varje knapp har en mjuk
 // top-down gradient (ljus i topp, mörkare nedåt) plus en inset top-
 // highlight. Det gör att knappen läser som ett tunt glas-kort som
-// fångar ljuset, inte en flat färgplatta.
+// fångar ljuset, inte en flat färgplatta. Glaset är detsamma oavsett
+// aktivt läge — det är ikonen och etiketten som tänds upp när knappen
+// väljs, inte hela ytan. På så sätt behåller raden sin lätta, neutrala
+// karaktär även när flera filter är på samtidigt.
 const FILTER_BTN_BG =
   "linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.10) 100%)";
 const FILTER_BTN_BORDER = "0.5px solid rgba(255,255,255,0.55)";
@@ -67,35 +70,23 @@ const FILTER_BTN_SHADOW =
   "inset 0 1px 0.5px rgba(255,255,255,0.65), " +
   "inset 0 -1px 0.5px rgba(15,23,42,0.05)";
 
-// Aktiv huvudkategori (Äta/Fika/Bar/Takbar). Tre-stops gradient:
-// ljus persika i topp → mättad orange mitten → djup ember-bas — ger en
-// fysiskt formad knapp som glöder från sin egen färg, inte bara från
-// halon runt om.
-const ORANGE_ACTIVE_BG =
-  "linear-gradient(170deg, rgba(254,215,170,0.92) 0%, rgba(251,146,60,0.65) 48%, rgba(234,88,12,0.55) 100%)";
-const ORANGE_ACTIVE_BORDER = "1px solid rgba(251,146,60,0.85)";
-const ORANGE_ACTIVE_SHADOW =
-  "0 0 0 0.5px rgba(194,65,12,0.40), " +
-  "0 0 14px rgba(251,146,60,0.55), " +
-  "0 0 32px rgba(251,146,60,0.28), " +
-  "0 8px 22px rgba(194,65,12,0.20), " +
-  "inset 0 1px 1px rgba(255,255,255,0.65), " +
-  "inset 0 -1px 1px rgba(120,53,15,0.18)";
+// Aktiv huvudkategori (Äta/Fika/Bar/Takbar): ikonen lyser i eldig
+// orange via två-stegs drop-shadow (tight glöd + bredare bloom).
+// Etiketten matchar i samma färg med en mjuk text-shadow så den
+// glöder lite men ändå läses skarpt.
+const ORANGE_ACTIVE_TEXT = "#ea580c";
+const ORANGE_GLOW_FILTER =
+  "drop-shadow(0 0 4px rgba(251,146,60,0.90)) " +
+  "drop-shadow(0 0 10px rgba(234,88,12,0.55))";
+const ORANGE_GLOW_TEXT_SHADOW = "0 0 6px rgba(251,146,60,0.50)";
 
-// Aktiv modifier (Glas/Öppet/T-bana). Ljusblå palett — signalerar att
-// dessa snävar in/lägger på, inte väljer kategori. Samma 3-stops
-// behandling som orange för konsekvent djupkänsla.
-const BLUE_ACTIVE_BG =
-  "linear-gradient(170deg, rgba(186,230,253,0.92) 0%, rgba(96,165,250,0.60) 48%, rgba(37,99,235,0.50) 100%)";
-const BLUE_ACTIVE_BORDER = "1px solid rgba(59,130,246,0.85)";
-const BLUE_ACTIVE_SHADOW =
-  "0 0 0 0.5px rgba(30,64,175,0.40), " +
-  "0 0 14px rgba(96,165,250,0.55), " +
-  "0 0 32px rgba(96,165,250,0.28), " +
-  "0 8px 22px rgba(30,64,175,0.20), " +
-  "inset 0 1px 1px rgba(255,255,255,0.65), " +
-  "inset 0 -1px 1px rgba(30,58,138,0.18)";
-const BLUE_ACTIVE_TEXT = "#1e40af";
+// Aktiv modifier (Glas/Öppet/T-bana): samma idé som orange men i blå
+// palett för att signalera "snäva in/lägg på" snarare än "välj kategori".
+const BLUE_ACTIVE_TEXT = "#2563eb";
+const BLUE_GLOW_FILTER =
+  "drop-shadow(0 0 4px rgba(96,165,250,0.90)) " +
+  "drop-shadow(0 0 10px rgba(37,99,235,0.55))";
+const BLUE_GLOW_TEXT_SHADOW = "0 0 6px rgba(96,165,250,0.50)";
 
 interface HeaderProps {
   filter: "all" | "sun" | "shade";
@@ -767,20 +758,39 @@ export default function Header({
                       width: 44,
                       height: 44,
                       borderRadius: 14,
-                      background: active ? ORANGE_ACTIVE_BG : FILTER_BTN_BG,
+                      background: FILTER_BTN_BG,
                       backdropFilter: "blur(18px) saturate(1.6)",
                       WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                      border: active ? ORANGE_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                      boxShadow: active ? ORANGE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
-                      color: active ? "#7c2d12" : "#475569",
+                      border: FILTER_BTN_BORDER,
+                      boxShadow: FILTER_BTN_SHADOW,
+                      color: active ? ORANGE_ACTIVE_TEXT : "#475569",
                       opacity: active ? 1 : 0.82,
                       transform: "translateZ(0)",
                       isolation: "isolate",
                       flexShrink: 0,
                     }}
                   >
-                    <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: active ? "#7c2d12" : "#334155" }}>
+                    <span
+                      dangerouslySetInnerHTML={{ __html: svg }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        lineHeight: 1,
+                        filter: active ? ORANGE_GLOW_FILTER : undefined,
+                        transition: "filter 0.2s ease",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: "0.05em",
+                        lineHeight: 1,
+                        color: active ? ORANGE_ACTIVE_TEXT : "#334155",
+                        textShadow: active ? ORANGE_GLOW_TEXT_SHADOW : undefined,
+                      }}
+                    >
                       {label}
                     </span>
                   </button>
@@ -814,11 +824,11 @@ export default function Header({
                 width: 44,
                 height: 44,
                 borderRadius: 14,
-                background: alcoholOnly ? BLUE_ACTIVE_BG : FILTER_BTN_BG,
+                background: FILTER_BTN_BG,
                 backdropFilter: "blur(18px) saturate(1.6)",
                 WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                border: alcoholOnly ? BLUE_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                boxShadow: alcoholOnly ? BLUE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                border: FILTER_BTN_BORDER,
+                boxShadow: FILTER_BTN_SHADOW,
                 color: alcoholOnly ? BLUE_ACTIVE_TEXT : "#475569",
                 opacity: alcoholOnly ? 1 : 0.82,
                 transform: "translateZ(0)",
@@ -826,8 +836,27 @@ export default function Header({
                 flexShrink: 0,
               }}
             >
-              <span dangerouslySetInnerHTML={{ __html: ALCOHOL_MODIFIER_SVG }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: alcoholOnly ? BLUE_ACTIVE_TEXT : "#334155" }}>
+              <span
+                dangerouslySetInnerHTML={{ __html: ALCOHOL_MODIFIER_SVG }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: 1,
+                  filter: alcoholOnly ? BLUE_GLOW_FILTER : undefined,
+                  transition: "filter 0.2s ease",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.05em",
+                  lineHeight: 1,
+                  color: alcoholOnly ? BLUE_ACTIVE_TEXT : "#334155",
+                  textShadow: alcoholOnly ? BLUE_GLOW_TEXT_SHADOW : undefined,
+                }}
+              >
                 Glas
               </span>
             </button>
@@ -844,11 +873,11 @@ export default function Header({
                 width: 44,
                 height: 44,
                 borderRadius: 14,
-                background: openNowFilter ? BLUE_ACTIVE_BG : FILTER_BTN_BG,
+                background: FILTER_BTN_BG,
                 backdropFilter: "blur(18px) saturate(1.6)",
                 WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                border: openNowFilter ? BLUE_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                boxShadow: openNowFilter ? BLUE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                border: FILTER_BTN_BORDER,
+                boxShadow: FILTER_BTN_SHADOW,
                 color: openNowFilter ? BLUE_ACTIVE_TEXT : "#475569",
                 opacity: openNowFilter ? 1 : 0.82,
                 transform: "translateZ(0)",
@@ -856,11 +885,33 @@ export default function Header({
                 flexShrink: 0,
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  filter: openNowFilter ? BLUE_GLOW_FILTER : undefined,
+                  transition: "filter 0.2s ease",
+                }}
+              >
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7v5l3 2" />
               </svg>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: openNowFilter ? BLUE_ACTIVE_TEXT : "#334155" }}>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.05em",
+                  lineHeight: 1,
+                  color: openNowFilter ? BLUE_ACTIVE_TEXT : "#334155",
+                  textShadow: openNowFilter ? BLUE_GLOW_TEXT_SHADOW : undefined,
+                }}
+              >
                 Öppet
               </span>
             </button>
@@ -876,11 +927,11 @@ export default function Header({
                 width: 44,
                 height: 44,
                 borderRadius: 14,
-                background: showMetro ? BLUE_ACTIVE_BG : FILTER_BTN_BG,
+                background: FILTER_BTN_BG,
                 backdropFilter: "blur(18px) saturate(1.6)",
                 WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                border: showMetro ? BLUE_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                boxShadow: showMetro ? BLUE_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                border: FILTER_BTN_BORDER,
+                boxShadow: FILTER_BTN_SHADOW,
                 color: showMetro ? BLUE_ACTIVE_TEXT : "#475569",
                 opacity: showMetro ? 1 : 0.82,
                 transform: "translateZ(0)",
@@ -888,12 +939,30 @@ export default function Header({
                 flexShrink: 0,
               }}
             >
-              <span style={{ display: "flex", alignItems: "center", gap: 2, lineHeight: 1 }}>
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                  lineHeight: 1,
+                  filter: showMetro ? BLUE_GLOW_FILTER : undefined,
+                  transition: "filter 0.2s ease",
+                }}
+              >
                 <span style={{ width: 5, height: 5, borderRadius: 999, background: "#e3000b" }} />
                 <span style={{ width: 5, height: 5, borderRadius: 999, background: "#00a14e" }} />
                 <span style={{ width: 5, height: 5, borderRadius: 999, background: "#0065bd" }} />
               </span>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: showMetro ? BLUE_ACTIVE_TEXT : "#334155" }}>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.05em",
+                  lineHeight: 1,
+                  color: showMetro ? BLUE_ACTIVE_TEXT : "#334155",
+                  textShadow: showMetro ? BLUE_GLOW_TEXT_SHADOW : undefined,
+                }}
+              >
                 T-bana
               </span>
             </button>

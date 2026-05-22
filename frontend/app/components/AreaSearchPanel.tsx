@@ -336,54 +336,93 @@ export interface AreaSearchPanelProps {
 export default function AreaSearchPanel({
   venues, hour, dateKey, onClose, onSelectVenue, getStatus, getSunHours,
 }: AreaSearchPanelProps) {
-  const [sort, setSort] = useState<SortMode>("sun-remaining");
+  // Multi-select sort. Each enabled criterion contributes its rank in the
+  // single-sort order; the combined order is the sum of ranks (lowest =
+  // best on all selected axes). At least one must stay on — toggling the
+  // last selected criterion is a no-op so the list never enters an
+  // undefined state.
+  const [sortKeys, setSortKeys] = useState<Set<SortMode>>(() => new Set(["sun-remaining"]));
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(40);
 
   useEffect(() => { setDisplayCount(40); }, [venues]);
 
-  const sorted = useMemo(() => {
-    return [...venues].sort((a, b) => {
-      if (sort === "sun-remaining") {
-        return (
-          countSunHoursFrom(b, dateKey, hour, getStatus) -
-          countSunHoursFrom(a, dateKey, hour, getStatus)
-        );
+  function toggleSort(key: SortMode) {
+    setSortKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (next.size > 1) next.delete(key);
+      } else {
+        next.add(key);
       }
-      if (sort === "rating") return (b.rating ?? -1) - (a.rating ?? -1);
-      return getSunHours(b, dateKey) - getSunHours(a, dateKey);
+      return next;
     });
-  }, [venues, sort, hour, dateKey]);
+  }
+
+  const sorted = useMemo(() => {
+    const getMetric = (v: any, key: SortMode): number => {
+      if (key === "sun-remaining") return countSunHoursFrom(v, dateKey, hour, getStatus);
+      if (key === "rating") return v.rating ?? -1;
+      return getSunHours(v, dateKey);
+    };
+
+    const keys = Array.from(sortKeys);
+    if (keys.length === 1) {
+      const k = keys[0];
+      return [...venues].sort((a, b) => getMetric(b, k) - getMetric(a, k));
+    }
+
+    // Multi-criteria: rank-sum. For each key, sort venues descending by
+    // that metric and assign rank = position. Sum ranks per venue, then
+    // sort by the sum ascending (best combined rank first).
+    const rankSum = new Map<string, number>();
+    for (const k of keys) {
+      const byK = [...venues].sort((a, b) => getMetric(b, k) - getMetric(a, k));
+      byK.forEach((v, idx) => {
+        rankSum.set(v.id, (rankSum.get(v.id) ?? 0) + idx);
+      });
+    }
+    return [...venues].sort(
+      (a, b) => (rankSum.get(a.id) ?? 0) - (rankSum.get(b.id) ?? 0),
+    );
+  }, [venues, sortKeys, hour, dateKey]);
 
   const displayed = sorted.slice(0, displayCount);
 
-  const sortBtn = (key: SortMode, label: string) => (
-    <button
-      key={key}
-      onClick={() => setSort(key)}
-      style={{
-        flex: 1, padding: "5px 0", fontSize: 11, fontWeight: 600,
-        borderRadius: 8, cursor: "pointer",
-        border: sort === key ? "1px solid rgba(251,146,60,0.65)" : "0.5px solid rgba(255,255,255,0.55)",
-        background: sort === key
-          ? "linear-gradient(135deg,rgba(251,146,60,0.22),rgba(245,158,11,0.1))"
-          : "rgba(255,255,255,0.3)",
-        color: sort === key ? "#c2410c" : "#475569",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        transition: "all 0.15s ease",
-      }}
-    >
-      {label}
-    </button>
-  );
+  const sortBtn = (key: SortMode, label: string) => {
+    const isActive = sortKeys.has(key);
+    return (
+      <button
+        key={key}
+        onClick={() => toggleSort(key)}
+        aria-pressed={isActive}
+        style={{
+          flex: 1, padding: "5px 0", fontSize: 11, fontWeight: 600,
+          borderRadius: 8, cursor: "pointer",
+          border: isActive ? "1px solid rgba(251,146,60,0.65)" : "0.5px solid rgba(255,255,255,0.55)",
+          background: isActive
+            ? "linear-gradient(135deg,rgba(251,146,60,0.22),rgba(245,158,11,0.1))"
+            : "rgba(255,255,255,0.3)",
+          color: isActive ? "#c2410c" : "#475569",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          transition: "all 0.15s ease",
+        }}
+      >
+        {label}
+      </button>
+    );
+  };
 
   return (
     <div style={{
       position: "absolute",
       top: 0, left: 0, bottom: 0,
       width: "min(220px, 100%)",
-      zIndex: 1200,
+      // Above Header (1100) and TimeSlider (1250) so the column always
+      // sits on top of the bottom panel and filter row instead of being
+      // clipped behind them.
+      zIndex: 1300,
       display: "flex",
       flexDirection: "column",
       // Same glass as TimeSlider / header
