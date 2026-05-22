@@ -951,6 +951,67 @@ html, body {
   }
 }
 
+/* Time-slider knob — the bottom panel's hour selector. Acts as the
+   product's hero control, so it gets the full "miniature sun" treatment:
+   a glossy radial highlight up top, a multi-stop sunset gradient
+   (yellow core → orange → magenta edge), a thin pink-amber rim, and a
+   two-tier halo (warm-orange aura + soft magenta bloom) that breathes
+   subtly so the knob feels alive without distracting. The pulse runs
+   on the box-shadow only — cheap, no layout impact. */
+.time-slider-knob {
+  border-radius: 9999px;
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 34%),
+    radial-gradient(circle at 50% 55%, #fef3c7 0%, #fde047 22%, #fb923c 55%, #ea580c 80%, #be185d 100%);
+  color: rgba(60, 20, 5, 0.92);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  animation: time-slider-knob-pulse 2.8s ease-in-out infinite;
+}
+.time-slider-knob--main { width: 46px; height: 46px; font-size: 18px; }
+.time-slider-knob--handle { width: 40px; height: 40px; font-size: 15px; }
+
+@keyframes time-slider-knob-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0.5px rgba(190, 24, 93, 0.45),
+      0 0 0 4px rgba(251, 146, 60, 0.16),
+      0 0 22px rgba(251, 146, 60, 0.50),
+      0 0 38px rgba(244, 63, 94, 0.28),
+      0 10px 26px rgba(190, 24, 93, 0.30),
+      0 3px 8px rgba(120, 53, 15, 0.32),
+      inset 0 2px 2px rgba(255, 255, 255, 0.6),
+      inset 0 -2px 3px rgba(120, 53, 15, 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 0 0.5px rgba(190, 24, 93, 0.45),
+      0 0 0 5px rgba(251, 146, 60, 0.22),
+      0 0 32px rgba(251, 146, 60, 0.68),
+      0 0 54px rgba(244, 63, 94, 0.42),
+      0 10px 26px rgba(190, 24, 93, 0.32),
+      0 3px 8px rgba(120, 53, 15, 0.32),
+      inset 0 2px 2px rgba(255, 255, 255, 0.6),
+      inset 0 -2px 3px rgba(120, 53, 15, 0.25);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .time-slider-knob {
+    animation: none;
+    box-shadow:
+      0 0 0 0.5px rgba(190, 24, 93, 0.45),
+      0 0 0 4px rgba(251, 146, 60, 0.18),
+      0 0 26px rgba(251, 146, 60, 0.55),
+      0 0 44px rgba(244, 63, 94, 0.32),
+      0 10px 26px rgba(190, 24, 93, 0.30),
+      0 3px 8px rgba(120, 53, 15, 0.32),
+      inset 0 2px 2px rgba(255, 255, 255, 0.6),
+      inset 0 -2px 3px rgba(120, 53, 15, 0.25);
+  }
+}
+
 /* "Bästa timmen" — the day's headline moment. Treated like a hero CTA:
    amber gradient, glowing star in its own disc, eyebrow label + hour,
    chevron arrow on the right, and a subtle shimmer that drifts across

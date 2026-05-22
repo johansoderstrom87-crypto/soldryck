@@ -501,48 +501,26 @@ export default function TimeSlider({
                 />
                 {/* From handle */}
                 <div
-                  className="absolute flex items-center justify-center rounded-full pointer-events-none tabular-nums"
+                  className="time-slider-knob time-slider-knob--handle absolute flex items-center justify-center pointer-events-none"
                   style={{
                     top: "50%",
                     left: 0,
-                    width: 40,
-                    height: 40,
                     transform: `translate3d(${((sunRange.from - 7 + 0.5) / HOURS.length) * trackWidth - 20}px, -50%, 0)`,
                     willChange: "transform",
                     transition: draggingHandle === "from" ? "none" : "transform 0.15s ease-out",
-                    background:
-                      "radial-gradient(circle at 32% 26%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 42%), linear-gradient(160deg, #fde047 0%, #fbbf24 28%, #f59e0b 62%, #c2410c 100%)",
-                    boxShadow:
-                      "0 0 0 0.5px rgba(120,53,15,0.35), 0 8px 22px rgba(194,65,12,0.38), 0 2px 6px rgba(120,53,15,0.30), inset 0 1.5px 1.5px rgba(255,255,255,0.55), inset 0 -2px 2px rgba(120,53,15,0.22)",
-                    color: "rgba(60,20,5,0.92)",
-                    textShadow: "0 1px 0 rgba(255,255,255,0.35)",
-                    fontSize: 15,
-                    fontWeight: 900,
-                    letterSpacing: "-0.02em",
                   }}
                 >
                   {sunRange.from}
                 </div>
                 {/* To handle */}
                 <div
-                  className="absolute flex items-center justify-center rounded-full pointer-events-none tabular-nums"
+                  className="time-slider-knob time-slider-knob--handle absolute flex items-center justify-center pointer-events-none"
                   style={{
                     top: "50%",
                     left: 0,
-                    width: 40,
-                    height: 40,
                     transform: `translate3d(${((sunRange.to - 7 + 0.5) / HOURS.length) * trackWidth - 20}px, -50%, 0)`,
                     willChange: "transform",
                     transition: draggingHandle === "to" ? "none" : "transform 0.15s ease-out",
-                    background:
-                      "radial-gradient(circle at 32% 26%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 42%), linear-gradient(160deg, #fde047 0%, #fbbf24 28%, #f59e0b 62%, #c2410c 100%)",
-                    boxShadow:
-                      "0 0 0 0.5px rgba(120,53,15,0.35), 0 8px 22px rgba(194,65,12,0.38), 0 2px 6px rgba(120,53,15,0.30), inset 0 1.5px 1.5px rgba(255,255,255,0.55), inset 0 -2px 2px rgba(120,53,15,0.22)",
-                    color: "rgba(60,20,5,0.92)",
-                    textShadow: "0 1px 0 rgba(255,255,255,0.35)",
-                    fontSize: 15,
-                    fontWeight: 900,
-                    letterSpacing: "-0.02em",
                   }}
                 >
                   {sunRange.to}
@@ -550,24 +528,13 @@ export default function TimeSlider({
               </>
             ) : (
               <div
-                className="absolute flex items-center justify-center rounded-full pointer-events-none tabular-nums"
+                className="time-slider-knob time-slider-knob--main absolute flex items-center justify-center pointer-events-none"
                 style={{
                   top: "50%",
                   left: 0,
-                  width: 46,
-                  height: 46,
                   transform: `translate3d(${((hour - 7 + 0.5) / HOURS.length) * trackWidth - 23}px, -50%, 0)`,
                   willChange: "transform",
                   transition: dragging ? "none" : "transform 0.22s ease-out",
-                  background:
-                    "radial-gradient(circle at 32% 26%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 42%), linear-gradient(160deg, #fde047 0%, #fbbf24 28%, #f59e0b 62%, #c2410c 100%)",
-                  boxShadow:
-                    "0 0 0 0.5px rgba(120,53,15,0.35), 0 10px 28px rgba(194,65,12,0.40), 0 3px 8px rgba(120,53,15,0.32), inset 0 1.5px 1.5px rgba(255,255,255,0.55), inset 0 -2px 2px rgba(120,53,15,0.22)",
-                  color: "rgba(60,20,5,0.92)",
-                  textShadow: "0 1px 0 rgba(255,255,255,0.35)",
-                  fontSize: 18,
-                  fontWeight: 900,
-                  letterSpacing: "-0.02em",
                 }}
               >
                 {hour}
