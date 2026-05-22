@@ -1103,7 +1103,7 @@ function buildVenuePopupHtml(
   // number reads clearly instead of fading into the muted meta colour.
   const hasRating = venue.rating != null;
   const ratingStarHtml = hasRating
-    ? `<svg width="26" height="26" viewBox="0 0 24 24" fill="#f59e0b" style="display:block" aria-hidden="true"><path d="M12 2l2.9 7.4 7.9.6-6 5.2 1.9 7.8L12 18.6 5.3 23l1.9-7.8-6-5.2 7.9-.6z"/></svg>`
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" style="display:block" aria-hidden="true"><path d="M12 2l2.9 7.4 7.9.6-6 5.2 1.9 7.8L12 18.6 5.3 23l1.9-7.8-6-5.2 7.9-.6z"/></svg>`
     : "";
   const ratingTextHtml = hasRating
     ? `<span style="color:#0f172a;font-weight:600">${venue.rating!.toFixed(1)}</span>${venue.ratingCount != null ? `<span style="color:#94a3b8;font-weight:400"> (${venue.ratingCount.toLocaleString("sv-SE")})</span>` : ""}<span style="color:#cbd5e1;margin:0 5px">&middot;</span>`
@@ -1554,10 +1554,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       const m = mapRef.current;
       const size = m.getSize();
       const current = m.latLngToContainerPoint(latlng);
-      // Target Y as a fraction of viewport height. 0.82 pushes the marker
-      // down enough that even tall popups (photo + timeline + actions)
-      // clear the header on small viewports.
-      const target = L.point(size.x / 2, size.y * 0.82);
+      // Target Y as a fraction of viewport height. 0.7 puts the marker
+      // (and the popup's tail) above the sun/temp/wind bar at the bottom
+      // — leaving the popup content clear of the time slider panel while
+      // still giving the popup room to grow upward without clipping.
+      const target = L.point(size.x / 2, size.y * 0.7);
       // panBy moves the map center by N pixels; content shifts by -N. We
       // want the marker pixel to move from `current` to `target`, i.e. the
       // content to shift by (target - current), so panBy(current - target).
