@@ -65,6 +65,7 @@ function isHappyHourActive(venueId: string | number, hour: number): boolean {
 }
 
 import { type WeatherData, getSymbolInfo } from "../lib/weather";
+import { buildClosedStatus } from "../lib/venueHours";
 import { METRO_STATIONS, type MetroStation, STATION_RADIUS_M, distanceM } from "../data/metro-stations";
 import { getFavorites, toggleFavorite } from "../lib/favorites";
 import { track } from "../lib/analytics";
@@ -843,29 +844,10 @@ function renderVenueHours(container: HTMLElement, venue: any, map?: L.Map | null
     const todayMon0 = (new Date().getDay() + 6) % 7;
     const dotColor = data.openNow ? "#10b981" : data.openNow === false ? "#ef4444" : "#94a3b8";
 
-    // Compute next opening time when closed
-    let opensAt: string | null = null;
-    if (data.openNow === false && data.week) {
-      const now = new Date();
-      const todayMon0 = (now.getDay() + 6) % 7;
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const currentTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-      const DAYS_SHORT = ["mån", "tis", "ons", "tor", "fre", "lör", "sön"];
-      outer: for (let d = 0; d <= 7; d++) {
-        const dayIdx = (todayMon0 + d) % 7;
-        const segs = data.week[dayIdx] || [];
-        for (const seg of segs) {
-          if (d === 0 && seg.open <= currentTime) continue;
-          opensAt = d === 0 ? `kl. ${seg.open}` : d === 1 ? `imorgon kl. ${seg.open}` : `${DAYS_SHORT[dayIdx]} kl. ${seg.open}`;
-          break outer;
-        }
-      }
-    }
-
     const statusText = data.openNow
       ? `Öppet${data.closesAt ? ` — stänger ${data.closesAt}` : ""}`
       : data.openNow === false
-        ? `Stängt${opensAt ? ` — öppnar ${opensAt}` : " just nu"}`
+        ? buildClosedStatus(data.week)
         : "Öppettider";
 
     const weekRows = data.week?.map((segments, i) => {

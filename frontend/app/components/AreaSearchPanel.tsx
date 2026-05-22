@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { buildClosedStatus } from "../lib/venueHours";
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
 type SortMode = "sun-remaining" | "rating" | "sun-count";
@@ -160,7 +161,7 @@ function VenueCard({
   const isOpen = hoursData?.openNow;
   const openText = isOpen === true
     ? `Öppet${hoursData.closesAt ? ` — stänger ${hoursData.closesAt}` : ""}`
-    : isOpen === false ? "Stängt" : null;
+    : isOpen === false ? buildClosedStatus(hoursData?.week) : null;
 
   const DAYS = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
   const todayMon0 = (new Date().getDay() + 6) % 7;
