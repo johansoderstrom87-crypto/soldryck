@@ -902,7 +902,7 @@ export default function Header({
                     style={{
                       width: 50,
                       height: 50,
-                      borderRadius: 16,
+                      borderRadius: 9999,
                       background: active ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
                       backdropFilter: "blur(18px) saturate(1.6)",
                       WebkitBackdropFilter: "blur(18px) saturate(1.6)",
