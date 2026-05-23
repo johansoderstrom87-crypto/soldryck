@@ -647,10 +647,10 @@ export default function TimeSlider({
                     background: isCenter
                       ? "linear-gradient(160deg, #f98040 0%, #f06830 100%)"
                       : "rgba(255, 255, 255, 0.3)",
-                    border: isCenter ? "none" : "0.5px solid rgba(255, 255, 255, 0.5)",
+                    border: isCenter ? "none" : "0.5px solid rgba(255, 255, 255, 0.55)",
                     boxShadow: isCenter
                       ? "0 2px 10px rgba(120,53,15,0.22)"
-                      : "0 3px 8px rgba(15,23,42,0.10), 0 1px 2px rgba(15,23,42,0.06)",
+                      : "0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10)",
                     color: isCenter ? "#fff" : "#000",
                     opacity: dist === 0 ? 1 : dist === 1 ? 0.75 : 0.45,
                     transform: `scale(${isCenter ? 1 : 0.9})`,
