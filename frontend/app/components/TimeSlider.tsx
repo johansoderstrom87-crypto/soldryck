@@ -651,7 +651,7 @@ export default function TimeSlider({
                     boxShadow: isCenter
                       ? "0 0 0 2px rgba(217,119,6,0.80), 0 0 5px rgba(251,191,36,0.38), 0 2px 6px rgba(120,53,15,0.20)"
                       : "0 3px 8px rgba(15,23,42,0.10), 0 1px 2px rgba(15,23,42,0.06)",
-                    color: "#000",
+                    color: isCenter ? "#fff" : "#000",
                     opacity: dist === 0 ? 1 : dist === 1 ? 0.75 : 0.45,
                     transform: `scale(${isCenter ? 1 : 0.9})`,
                     transition: "opacity 0.2s ease, transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease",
@@ -660,7 +660,7 @@ export default function TimeSlider({
                   <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", lineHeight: 1 }}>
                     {dayName}
                   </span>
-                  <span style={{ fontSize: 8.5, marginTop: 2, fontWeight: 500, lineHeight: 1, color: isCenter ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.6)" }}>
+                  <span style={{ fontSize: 8.5, marginTop: 2, fontWeight: 500, lineHeight: 1, color: isCenter ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.6)" }}>
                     {dateLabel}
                   </span>
                 </button>
