@@ -12,6 +12,10 @@
      server-render och första klient-render ser identiska ut innan
      applyTimeTheme hinner köra. */
   --theme-map-overlay: rgba(255, 255, 255, 0);
+  /* mix-blend-mode på .map-ambient skiftas av timeTheme.ts: `multiply` när
+     overlay-alphan faktiskt syns (morgon/golden/dusk/natt), `normal` i
+     dag-fasen så GPU:n slipper blanda mot tile-pixlarna i onödan. */
+  --theme-map-overlay-blend: normal;
   --theme-surface-bg: rgba(255, 255, 255, 0.30);
   --theme-surface-border: rgba(255, 255, 255, 0.55);
   --theme-surface-shadow: 0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
@@ -1301,7 +1305,11 @@ html, body {
   pointer-events: none;
   z-index: 495;
   background: var(--theme-map-overlay);
-  mix-blend-mode: multiply;
+  /* Blend-mode togglas av timeTheme.ts via --theme-map-overlay-blend:
+     `multiply` när overlayens alpha bidrar med synlig tonning, `normal`
+     i dag-fasen. mix-blend-mode tvingar GPU:n att läsa tile-pixlarna och
+     blanda — onödigt när det inte syns. */
+  mix-blend-mode: var(--theme-map-overlay-blend, multiply);
   transition: background 1.1s ease;
 }
 

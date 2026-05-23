@@ -189,6 +189,11 @@ export function applyTimeTheme(theme: TimeTheme): void {
   const root = document.documentElement;
   const { r, g, b, a } = theme.mapOverlay;
   root.style.setProperty("--theme-map-overlay", `rgba(${r}, ${g}, ${b}, ${a})`);
+  // Stäng av .map-ambient:s mix-blend-mode i dag-fas (alpha ≈ 0). Blandning
+  // mot tile-pixlarna kostar GPU-fillrate per frame även när overlayens
+  // alpha gör skillnaden mellan "med" och "utan" osynlig — under hela
+  // arbetstiden då solen står högt får vi alltså tillbaka pan-FPS gratis.
+  root.style.setProperty("--theme-map-overlay-blend", a < 0.02 ? "normal" : "multiply");
   root.style.setProperty("--theme-surface-bg", theme.surfaceBg);
   root.style.setProperty("--theme-surface-border", theme.surfaceBorder);
   root.style.setProperty("--theme-surface-shadow", theme.surfaceShadow);

@@ -721,6 +721,42 @@ async function fetchOpenNow(venue: any): Promise<boolean | null> {
 }
 
 /**
+ * "Statiska" filter — de som inte ändras under en hour-scrub utan bara
+ * när användaren klickar en filterknapp eller byter datum/T-bana. Vi
+ * bryter ut dem så build-effekten inte längre behöver riva och bygga
+ * upp 2 843 markörer varje gång användaren togglar en filterknapp;
+ * istället loopar en fast-path-effekt över befintliga markörer och
+ * togglar bara visibility.
+ */
+function passesStaticFilters(
+  venue: ComputedVenue,
+  typeFilter: Set<VenueType>,
+  sunRange: SunRange,
+  metroStation: MetroStation | null | undefined,
+  alcoholOnly: boolean,
+  wheelchairOnly: boolean,
+  dateKey: string,
+): boolean {
+  if (metroStation) {
+    const dist = distanceM(venue.lat, venue.lng, metroStation.lat, metroStation.lng);
+    if (dist > STATION_RADIUS_M) return false;
+  }
+  if (!matchesTypeFilter(venue, typeFilter)) return false;
+  if (alcoholOnly && !venue.servesAlcohol) return false;
+  if (wheelchairOnly) {
+    const wc = venue.wheelchair;
+    if (wc !== "yes" && wc !== "designated") return false;
+  }
+  if (sunRange) {
+    for (let h = sunRange.from; h <= sunRange.to; h++) {
+      const s = normalize(getStatus(venue, dateKey, h));
+      if (s !== "sun") return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Single source of truth for "what should this marker look like for the
  * current (hour, filter, weather)" — used both by the hour-update effect
  * (mutating ~2 500 existing markers) and by viewport culling (applying
@@ -1380,6 +1416,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // Parallel array of (marker, venue) so the hour-update effect can recompute
   // status without rebuilding markers. Kept in lockstep with markersRef.
   const markerVenuesRef = useRef<{ marker: L.Marker; venue: ComputedVenue }[]>([]);
+  // Set av venue.id som klarar de statiska filtren (typeFilter/sunRange/
+  // metroStation/alcoholOnly/wheelchairOnly). Skrivs av static-filter-
+  // effekten och läses av cullToViewport så att markörer som faller bort
+  // p.g.a. ett filter inte attachas till kartan ens om de är i viewport.
+  const staticPassRef = useRef<Set<string>>(new Set());
   // Weather snapshot read by the hour-update effect (avoids making `weather`
   // a dep of the cheap update path — only the build effect rebuilds on weather).
   const weatherRef = useRef<WeatherData | null>(null);
@@ -1529,15 +1570,22 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // Memoized so VenueSheet's useLayoutEffect only re-injects HTML when
   // something it cares about actually changed (venue, hour, weather,
   // claimedVer). Without memo it would rebuild on every parent render.
+  //
+  // `hour` (= useDeferredValue(hourProp), se ovan) istället för `hourProp`
+  // — under aktivt scrub byggs popup-HTML:en bara om när React har "tid"
+  // över. buildVenuePopupHtml() är inte gratis: timeline-celler + bästa-
+  // timmen-knapp + status-emoji byggs om, och VenueSheet rycker hela
+  // <body>:n via innerHTML på varje rebuild. Med deferred-värdet följer
+  // den committade timmen — inte varje pointermove-tick.
   const sheetHtml = useMemo(() => {
     if (!selected) return "";
     if (selected.kind === "confirmed") {
-      return buildVenuePopupHtml(selected.venue, dateKey, hourProp, weather ?? null);
+      return buildVenuePopupHtml(selected.venue, dateKey, hour, weather ?? null);
     }
     return buildUnconfirmedSheetHtml(selected.venue);
     // claimedVer included so happy-hour panel refreshes when /api/claimed-venues lands.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, dateKey, hourProp, weather, claimedVer]);
+  }, [selected, dateKey, hour, weather, claimedVer]);
 
   /**
    * Re-attaches click/event handlers to elements inside the sheet body.
@@ -2257,38 +2305,16 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     markerVenuesRef.current = [];
 
     allVenues.forEach((venue: ComputedVenue) => {
-      // Filter by metro station proximity
-      if (metroStation) {
-        const dist = distanceM(venue.lat, venue.lng, metroStation.lat, metroStation.lng);
-        if (dist > STATION_RADIUS_M) return;
-      }
+      // Statiska filter (typeFilter/sunRange/metroStation/alcoholOnly/
+      // wheelchairOnly) appliceras INTE här längre — vi bygger alltid
+      // markörer för alla venues så filter-togglar slipper riva DOM:en.
+      // Filtertillämpningen sker i applyStaticFilterPass-effekten nedan
+      // (toggla CSS-klass + cull), och cullToViewport respekterar
+      // staticPassRef när den bestämmer vilka markörer som ska attachas.
 
-      // Filter by type
-      if (!matchesTypeFilter(venue, typeFilter)) return;
-
-      // Filter by serveringstillstånd — AND-modifier, snävar in urvalet.
-      if (alcoholOnly && !venue.servesAlcohol) return;
-
-      // Filter by wheelchair-accessibility. OSM tag values: yes / no /
-      // limited / designated. We treat "yes" and "designated" as positive.
-      if (wheelchairOnly) {
-        const wc = venue.wheelchair;
-        if (wc !== "yes" && wc !== "designated") return;
-      }
-
-      // Sun/shade filter intentionally NOT applied here — the update effect
-      // below toggles visibility based on the live (hour, filter) pair so
-      // scrubbing the timeline doesn't rebuild markers.
-
-      // Filter by sun range — venue must have sun for every hour in the range
-      if (sunRange) {
-        let hasSunAllHours = true;
-        for (let h = sunRange.from; h <= sunRange.to; h++) {
-          const s = normalize(getStatus(venue, dateKey, h));
-          if (s !== "sun") { hasSunAllHours = false; break; }
-        }
-        if (!hasSunAllHours) return;
-      }
+      // Sun/shade filter intentionally NOT applied here either — the
+      // update effect below toggles visibility based on the live (hour,
+      // filter) pair so scrubbing the timeline doesn't rebuild markers.
 
       // Initial state seeded into the divIcon HTML — overwritten by
       // applyMarkerVisualState the moment the cull function adds this marker
@@ -2341,9 +2367,15 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     // objects in memory but contribute zero DOM nodes / zero zoom-recompute
     // cost. The buffer is wide enough that fast pans don't reveal blank
     // tiles before moveend fires.
+    //
+    // Respekterar `staticPassRef`: markörer som inte klarar de statiska
+    // filtren (typeFilter/sunRange/etc.) attachas inte även om de är i
+    // viewport. Det innebär att filter-togglar inte behöver riva DOM:en —
+    // det räcker att uppdatera setet och kalla cullToViewport().
     function cullToViewport() {
       const m = mapRef.current;
       if (!m) return;
+      const pass = staticPassRef.current;
       const bounds = m.getBounds();
       const latBuf = (bounds.getNorth() - bounds.getSouth()) * 0.3;
       const lngBuf = (bounds.getEast() - bounds.getWest()) * 0.3;
@@ -2353,21 +2385,35 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       const east = bounds.getEast() + lngBuf;
 
       for (const { marker: mk, venue: v } of markerVenuesRef.current) {
+        const passesStatic = pass.has(v.id);
         const ll = mk.getLatLng();
         const inside = ll.lat >= south && ll.lat <= north && ll.lng >= west && ll.lng <= east;
+        const shouldAttach = passesStatic && inside;
         const onMap = !!((mk as any)._map);
-        if (inside && !onMap) {
+        if (shouldAttach && !onMap) {
           mk.addTo(m);
           // Newly-attached marker: paint its current (hour, filter, weather) state.
           applyMarkerVisualState(
             mk,
             computeMarkerState(v, dateKey, hourRef.current, filterRef.current, weatherRef.current, openNowFilterRef.current),
           );
-        } else if (!inside && onMap) {
+        } else if (!shouldAttach && onMap) {
           mk.remove();
         }
       }
     }
+
+    // Seeda staticPassRef direkt så första cullen ser rätt filter (utan
+    // detta hade fast-path-effekten nedan tagit över på nästa render
+    // och vi hade fått ett frame där fel uppsättning markörer var
+    // attachade — märkbart som flicker vid initial mount).
+    const initialPass = new Set<string>();
+    for (const venue of allVenues) {
+      if (passesStaticFilters(venue, typeFilter, sunRange, metroStation, alcoholOnly, wheelchairOnly, dateKey)) {
+        initialPass.add(venue.id);
+      }
+    }
+    staticPassRef.current = initialPass;
 
     cullToViewport();
     resolveBadgeCollisions(map, markersRef.current);
@@ -2381,7 +2427,61 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     return () => {
       map.off("zoomend moveend", handleViewportChange);
     };
-  }, [dateKey, typeFilter, sunRange, weather, metroStation, wheelchairOnly, alcoholOnly, allVenues]);
+    // Build-effekten beror NU bara på dateKey/weather/allVenues. Statiska
+    // filter (typeFilter/sunRange/metroStation/alcoholOnly/wheelchairOnly)
+    // hanteras av static-filter-effekten nedan utan att riva markörerna.
+    // typeFilter/sunRange/metroStation/alcoholOnly/wheelchairOnly läses
+    // ändå i den initiala passes-loopen ovan — disable för deps-warning.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateKey, weather, allVenues]);
+
+  // Static-filter fast path — när användaren togglar typeFilter, sunRange,
+  // metroStation, alcoholOnly eller wheelchairOnly räknar vi om setet av
+  // venues som klarar filtren och kallar cull. Markörerna lever vidare i
+  // markerVenuesRef.current; vi attachar/detachar bara de som ska visas.
+  // Spar ~200-500 ms per filter-toggle (jfr. full rebuild av 2 843 markörer).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (markerVenuesRef.current.length === 0) return; // build-effekten har inte kört än
+
+    const pass = new Set<string>();
+    for (const venue of allVenues) {
+      if (passesStaticFilters(venue, typeFilter, sunRange, metroStation, alcoholOnly, wheelchairOnly, dateKey)) {
+        pass.add(venue.id);
+      }
+    }
+    staticPassRef.current = pass;
+
+    // Ompröva attach-status för varje markör. cullToViewport-ekvivalent men
+    // inlined här eftersom build-effektens closure inte är åtkomlig härifrån.
+    const bounds = map.getBounds();
+    const latBuf = (bounds.getNorth() - bounds.getSouth()) * 0.3;
+    const lngBuf = (bounds.getEast() - bounds.getWest()) * 0.3;
+    const south = bounds.getSouth() - latBuf;
+    const north = bounds.getNorth() + latBuf;
+    const west = bounds.getWest() - lngBuf;
+    const east = bounds.getEast() + lngBuf;
+
+    for (const { marker, venue } of markerVenuesRef.current) {
+      const passesStatic = pass.has(venue.id);
+      const ll = marker.getLatLng();
+      const inside = ll.lat >= south && ll.lat <= north && ll.lng >= west && ll.lng <= east;
+      const shouldAttach = passesStatic && inside;
+      const onMap = !!((marker as L.Marker & { _map?: L.Map })._map);
+      if (shouldAttach && !onMap) {
+        marker.addTo(map);
+        applyMarkerVisualState(
+          marker,
+          computeMarkerState(venue, dateKey, hourRef.current, filterRef.current, weatherRef.current, openNowFilterRef.current),
+        );
+      } else if (!shouldAttach && onMap) {
+        marker.remove();
+      }
+    }
+
+    if (map.getZoom() >= 17) resolveBadgeCollisions(map, markersRef.current);
+  }, [typeFilter, sunRange, metroStation, alcoholOnly, wheelchairOnly, dateKey, allVenues]);
 
   // Hour & sun/shade-filter update — fast path. Retoggles `.marker-dot`'s
   // class and visibility on existing markers.
