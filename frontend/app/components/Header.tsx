@@ -965,13 +965,11 @@ export default function Header({
               style={{
                 width: 50,
                 height: 50,
-                borderRadius: 16,
-                background: FILTER_BTN_BG,
-                backdropFilter: "blur(18px) saturate(1.6)",
-                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                border: FILTER_BTN_BORDER,
-                boxShadow: FILTER_BTN_SHADOW,
-                color: alcoholOnly ? BLUE_ACTIVE_TEXT : "#475569",
+                borderRadius: 9999,
+                background: alcoholOnly ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+                border: alcoholOnly ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
+                boxShadow: alcoholOnly ? FILTER_BTN_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                color: alcoholOnly ? "#fff" : "#475569",
                 opacity: alcoholOnly ? 1 : 0.82,
                 transform: "translateZ(0)",
                 isolation: "isolate",
@@ -980,25 +978,9 @@ export default function Header({
             >
               <span
                 dangerouslySetInnerHTML={{ __html: ALCOHOL_MODIFIER_SVG }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  lineHeight: 1,
-                  filter: alcoholOnly ? BLUE_GLOW_FILTER : undefined,
-                  transition: "filter 0.2s ease",
-                }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
               />
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.05em",
-                  lineHeight: 1,
-                  color: alcoholOnly ? BLUE_ACTIVE_TEXT : "#334155",
-                  textShadow: alcoholOnly ? BLUE_GLOW_TEXT_SHADOW : undefined,
-                }}
-              >
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: alcoholOnly ? "#fff" : "#111827" }}>
                 Glas
               </span>
             </button>
@@ -1014,46 +996,22 @@ export default function Header({
               style={{
                 width: 50,
                 height: 50,
-                borderRadius: 16,
-                background: FILTER_BTN_BG,
-                backdropFilter: "blur(18px) saturate(1.6)",
-                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                border: FILTER_BTN_BORDER,
-                boxShadow: FILTER_BTN_SHADOW,
-                color: openNowFilter ? BLUE_ACTIVE_TEXT : "#475569",
+                borderRadius: 9999,
+                background: openNowFilter ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+                border: openNowFilter ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
+                boxShadow: openNowFilter ? FILTER_BTN_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                color: openNowFilter ? "#fff" : "#475569",
                 opacity: openNowFilter ? 1 : 0.82,
                 transform: "translateZ(0)",
                 isolation: "isolate",
                 flexShrink: 0,
               }}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{
-                  filter: openNowFilter ? BLUE_GLOW_FILTER : undefined,
-                  transition: "filter 0.2s ease",
-                }}
-              >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7v5l3 2" />
               </svg>
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.05em",
-                  lineHeight: 1,
-                  color: openNowFilter ? BLUE_ACTIVE_TEXT : "#334155",
-                  textShadow: openNowFilter ? BLUE_GLOW_TEXT_SHADOW : undefined,
-                }}
-              >
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: openNowFilter ? "#fff" : "#111827" }}>
                 Öppet
               </span>
             </button>
@@ -1068,43 +1026,23 @@ export default function Header({
               style={{
                 width: 50,
                 height: 50,
-                borderRadius: 16,
-                background: FILTER_BTN_BG,
-                backdropFilter: "blur(18px) saturate(1.6)",
-                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                border: FILTER_BTN_BORDER,
-                boxShadow: FILTER_BTN_SHADOW,
-                color: showMetro ? BLUE_ACTIVE_TEXT : "#475569",
+                borderRadius: 9999,
+                background: showMetro ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+                border: showMetro ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
+                boxShadow: showMetro ? FILTER_BTN_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                color: showMetro ? "#fff" : "#475569",
                 opacity: showMetro ? 1 : 0.82,
                 transform: "translateZ(0)",
                 isolation: "isolate",
                 flexShrink: 0,
               }}
             >
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                  lineHeight: 1,
-                  filter: showMetro ? BLUE_GLOW_FILTER : undefined,
-                  transition: "filter 0.2s ease",
-                }}
-              >
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#e3000b" }} />
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#00a14e" }} />
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: "#0065bd" }} />
+              <span style={{ display: "flex", alignItems: "center", gap: 2, lineHeight: 1 }}>
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#e3000b" }} />
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#00a14e" }} />
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#0065bd" }} />
               </span>
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.05em",
-                  lineHeight: 1,
-                  color: showMetro ? BLUE_ACTIVE_TEXT : "#334155",
-                  textShadow: showMetro ? BLUE_GLOW_TEXT_SHADOW : undefined,
-                }}
-              >
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: showMetro ? "#fff" : "#111827" }}>
                 T-bana
               </span>
             </button>
