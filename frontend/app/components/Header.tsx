@@ -65,16 +65,11 @@ const ALCOHOL_MODIFIER_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fi
 const FILTER_BTN_BG =
   "linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.10) 100%)";
 const FILTER_BTN_BORDER = "0.5px solid rgba(255,255,255,0.55)";
-const FILTER_BTN_ACTIVE_BORDER = "0.5px solid rgba(249,115,22,0.65)";
-const FILTER_BTN_ACTIVE_SHADOW =
-  "inset 0 0.5px 0 rgba(255,255,255,0.96), " +
-  "0 0 0 0.5px rgba(249,115,22,0.30), " +
-  "0 4px 14px rgba(120,53,15,0.20), " +
-  "0 1px 3px rgba(15,23,42,0.08)";
-const FILTER_BTN_ACTIVE_ICON_COLOR = "#f97316";
-const FILTER_BTN_ACTIVE_ICON_FILTER =
-  "drop-shadow(0 0 4px rgba(249,115,22,0.95)) " +
-  "drop-shadow(0 0 9px rgba(234,88,12,0.55))";
+const FILTER_BTN_ACTIVE_BG = "linear-gradient(145deg, #fb923c 0%, #f59e0b 100%)";
+const FILTER_BTN_ACTIVE_BORDER = "none";
+const FILTER_BTN_ACTIVE_SHADOW = "0 2px 10px rgba(120,53,15,0.22)";
+const FILTER_BTN_ACTIVE_ICON_COLOR = "#fff";
+const FILTER_BTN_ACTIVE_ICON_FILTER = undefined;
 const FILTER_BTN_SHADOW =
   "0 8px 22px rgba(15,23,42,0.14), " +
   "0 1px 3px rgba(15,23,42,0.08), " +
@@ -908,7 +903,7 @@ export default function Header({
                       width: 44,
                       height: 44,
                       borderRadius: 14,
-                      background: FILTER_BTN_BG,
+                      background: active ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
                       backdropFilter: "blur(18px) saturate(1.6)",
                       WebkitBackdropFilter: "blur(18px) saturate(1.6)",
                       border: active ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
@@ -920,40 +915,22 @@ export default function Header({
                       flexShrink: 0,
                     }}
                   >
-                    <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {active && (
-                        <span
-                          dangerouslySetInnerHTML={{ __html: svg }}
-                          style={{
-                            position: "absolute",
-                            color: "#f97316",
-                            filter: "blur(6px) saturate(2.5)",
-                            opacity: 0.85,
-                            transform: "scale(1.5)",
-                            pointerEvents: "none",
-                          }}
-                        />
-                      )}
-                      <span
-                        dangerouslySetInnerHTML={{ __html: svg }}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          lineHeight: 1,
-                          position: "relative",
-                          filter: active ? FILTER_BTN_ACTIVE_ICON_FILTER : undefined,
-                          transition: "filter 0.2s ease",
-                        }}
-                      />
-                    </div>
+                    <span
+                      dangerouslySetInnerHTML={{ __html: svg }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        lineHeight: 1,
+                      }}
+                    />
                     <span
                       style={{
                         fontSize: 10,
                         fontWeight: 700,
                         letterSpacing: "0.05em",
                         lineHeight: 1,
-                        color: "#111827",
+                        color: active ? "#fff" : "#111827",
                       }}
                     >
                       {label}

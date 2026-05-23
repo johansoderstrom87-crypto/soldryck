@@ -649,7 +649,7 @@ export default function TimeSlider({
                       : "rgba(255, 255, 255, 0.3)",
                     border: isCenter ? "none" : "0.5px solid rgba(255, 255, 255, 0.5)",
                     boxShadow: isCenter
-                      ? "0 0 0 2px rgba(217,119,6,0.80), 0 0 5px rgba(251,191,36,0.38), 0 2px 6px rgba(120,53,15,0.20)"
+                      ? "0 2px 10px rgba(120,53,15,0.22)"
                       : "0 3px 8px rgba(15,23,42,0.10), 0 1px 2px rgba(15,23,42,0.06)",
                     color: isCenter ? "#fff" : "#000",
                     opacity: dist === 0 ? 1 : dist === 1 ? 0.75 : 0.45,
