@@ -3443,19 +3443,27 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       {/* GPS locate button — bottom of right-side stack.
           Row layout so the GPS-hint tooltip sits to the LEFT of the button. */}
       <div data-onboarding="locate-btn" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {/* Tooltip — fades in then out, only when idle */}
+        {/* Tooltip — fades in then out, only when idle. onAnimationEnd
+            avmonterar tooltipen efter fade-out så den inte ligger kvar i
+            DOM:en (opacity:0 via animation-fill-mode:forwards är osynlig
+            men fortfarande klickbar — bredden ~210 px gjorde att hela
+            höger-knapp-stacken expanderade vänsterut och blockerade
+            kart-pan i en stor osynlig zon mitt i viewporten). */}
         {showTooltip && geoState === "idle" && (
-          <div style={{
-            ...glassStyle,
-            borderRadius: 12,
-            padding: "7px 12px",
-            fontSize: 12,
-            fontWeight: 500,
-            color: "#0f172a",
-            whiteSpace: "nowrap",
-            animation: "gps-tip 4.5s ease forwards",
-            fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
-          }}>
+          <div
+            onAnimationEnd={() => setShowTooltip(false)}
+            style={{
+              ...glassStyle,
+              borderRadius: 12,
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#0f172a",
+              whiteSpace: "nowrap",
+              animation: "gps-tip 4.5s ease forwards",
+              fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+            }}
+          >
             Aktivera GPS för att se din position
           </div>
         )}
