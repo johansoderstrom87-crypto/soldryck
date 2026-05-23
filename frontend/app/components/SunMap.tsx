@@ -3408,7 +3408,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
               ? "rgba(239,68,68,0.88)"
               : findSunState === "none"
               ? "rgba(100,116,139,0.45)"
-              : "radial-gradient(ellipse at 50% 38%, #ffc4ae 0%, #f98c72 48%, #f27260 100%)",
+              : "radial-gradient(ellipse at 50% 38%, #ffc090 0%, #f98040 48%, #f06830 100%)",
             backdropFilter: findSunState === "none" ? "blur(14px) saturate(1.3)" : undefined,
             WebkitBackdropFilter: findSunState === "none" ? "blur(14px) saturate(1.3)" : undefined,
             boxShadow: findSunState === "idle"

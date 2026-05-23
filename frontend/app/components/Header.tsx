@@ -65,7 +65,7 @@ const ALCOHOL_MODIFIER_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fi
 const FILTER_BTN_BG =
   "linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.10) 100%)";
 const FILTER_BTN_BORDER = "0.5px solid rgba(255,255,255,0.55)";
-const FILTER_BTN_ACTIVE_BG = "radial-gradient(ellipse at 50% 38%, #ffc4ae 0%, #f98c72 48%, #f27260 100%)";
+const FILTER_BTN_ACTIVE_BG = "radial-gradient(ellipse at 50% 38%, #ffc090 0%, #f98040 48%, #f06830 100%)";
 const FILTER_BTN_ACTIVE_BORDER = "none";
 const FILTER_BTN_ACTIVE_SHADOW = "0 2px 10px rgba(120,53,15,0.22)";
 const FILTER_BTN_ACTIVE_ICON_COLOR = "#fff";
@@ -900,9 +900,9 @@ export default function Header({
                     aria-pressed={typeFilter.has(type)}
                     className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
                     style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 14,
+                      width: 50,
+                      height: 50,
+                      borderRadius: 16,
                       background: active ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
                       backdropFilter: "blur(18px) saturate(1.6)",
                       WebkitBackdropFilter: "blur(18px) saturate(1.6)",
@@ -963,9 +963,9 @@ export default function Header({
               aria-pressed={alcoholOnly}
               className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 14,
+                width: 50,
+                height: 50,
+                borderRadius: 16,
                 background: FILTER_BTN_BG,
                 backdropFilter: "blur(18px) saturate(1.6)",
                 WebkitBackdropFilter: "blur(18px) saturate(1.6)",
@@ -1012,9 +1012,9 @@ export default function Header({
               aria-pressed={openNowFilter}
               className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 14,
+                width: 50,
+                height: 50,
+                borderRadius: 16,
                 background: FILTER_BTN_BG,
                 backdropFilter: "blur(18px) saturate(1.6)",
                 WebkitBackdropFilter: "blur(18px) saturate(1.6)",
@@ -1066,9 +1066,9 @@ export default function Header({
               aria-pressed={showMetro}
               className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 14,
+                width: 50,
+                height: 50,
+                borderRadius: 16,
                 background: FILTER_BTN_BG,
                 backdropFilter: "blur(18px) saturate(1.6)",
                 WebkitBackdropFilter: "blur(18px) saturate(1.6)",
