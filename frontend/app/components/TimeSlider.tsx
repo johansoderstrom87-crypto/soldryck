@@ -138,7 +138,7 @@ function Calendar({ value, onSelect, onClose }: CalendarProps) {
                 fontWeight: isSelected || isToday ? 700 : 500,
                 cursor: "pointer",
                 background: isSelected
-                  ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
+                  ? "linear-gradient(160deg, #f98c72 0%, #f27260 100%)"
                   : isToday
                   ? "rgba(251, 146, 60, 0.25)"
                   : "rgba(255,255,255,0.65)",
@@ -645,7 +645,7 @@ export default function TimeSlider({
                     alignItems: "center",
                     justifyContent: "center",
                     background: isCenter
-                      ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
+                      ? "linear-gradient(160deg, #f98c72 0%, #f27260 100%)"
                       : "rgba(255, 255, 255, 0.3)",
                     border: isCenter ? "none" : "0.5px solid rgba(255, 255, 255, 0.5)",
                     boxShadow: isCenter

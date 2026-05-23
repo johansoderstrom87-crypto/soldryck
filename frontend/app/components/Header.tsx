@@ -65,7 +65,7 @@ const ALCOHOL_MODIFIER_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fi
 const FILTER_BTN_BG =
   "linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.10) 100%)";
 const FILTER_BTN_BORDER = "0.5px solid rgba(255,255,255,0.55)";
-const FILTER_BTN_ACTIVE_BG = "linear-gradient(145deg, #fb923c 0%, #f59e0b 100%)";
+const FILTER_BTN_ACTIVE_BG = "radial-gradient(ellipse at 50% 38%, #ffc4ae 0%, #f98c72 48%, #f27260 100%)";
 const FILTER_BTN_ACTIVE_BORDER = "none";
 const FILTER_BTN_ACTIVE_SHADOW = "0 2px 10px rgba(120,53,15,0.22)";
 const FILTER_BTN_ACTIVE_ICON_COLOR = "#fff";
