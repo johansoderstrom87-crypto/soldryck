@@ -66,6 +66,7 @@ const FILTER_BTN_BG =
   "linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.10) 100%)";
 const FILTER_BTN_BORDER = "0.5px solid rgba(255,255,255,0.55)";
 const FILTER_BTN_ACTIVE_BG = "radial-gradient(ellipse at 50% 38%, #ffc090 0%, #f98040 48%, #f06830 100%)";
+const MODIFIER_BTN_ACTIVE_BG = "linear-gradient(145deg, #c0cdf0 0%, #7080c8 100%)";
 const FILTER_BTN_ACTIVE_BORDER = "none";
 const FILTER_BTN_ACTIVE_SHADOW = "0 2px 10px rgba(120,53,15,0.22)";
 const FILTER_BTN_ACTIVE_ICON_COLOR = "#fff";
@@ -949,7 +950,7 @@ export default function Header({
                 width: 1,
                 alignSelf: "stretch",
                 marginInline: 2,
-                background: "rgba(15,23,42,0.18)",
+                background: "rgba(15,23,42,0.38)",
               }}
             />
 
@@ -966,9 +967,11 @@ export default function Header({
                 width: 50,
                 height: 50,
                 borderRadius: 9999,
-                background: alcoholOnly ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+                background: alcoholOnly ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+                backdropFilter: "blur(18px) saturate(1.6)",
+                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
                 border: alcoholOnly ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                boxShadow: alcoholOnly ? FILTER_BTN_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                boxShadow: alcoholOnly ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
                 color: alcoholOnly ? "#fff" : "#475569",
                 opacity: alcoholOnly ? 1 : 0.82,
                 transform: "translateZ(0)",
@@ -997,9 +1000,11 @@ export default function Header({
                 width: 50,
                 height: 50,
                 borderRadius: 9999,
-                background: openNowFilter ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+                background: openNowFilter ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+                backdropFilter: "blur(18px) saturate(1.6)",
+                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
                 border: openNowFilter ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                boxShadow: openNowFilter ? FILTER_BTN_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                boxShadow: openNowFilter ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
                 color: openNowFilter ? "#fff" : "#475569",
                 opacity: openNowFilter ? 1 : 0.82,
                 transform: "translateZ(0)",
@@ -1027,9 +1032,11 @@ export default function Header({
                 width: 50,
                 height: 50,
                 borderRadius: 9999,
-                background: showMetro ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+                background: showMetro ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+                backdropFilter: "blur(18px) saturate(1.6)",
+                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
                 border: showMetro ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                boxShadow: showMetro ? FILTER_BTN_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                boxShadow: showMetro ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
                 color: showMetro ? "#fff" : "#475569",
                 opacity: showMetro ? 1 : 0.82,
                 transform: "translateZ(0)",
