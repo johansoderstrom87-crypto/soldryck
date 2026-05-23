@@ -62,12 +62,13 @@ export default function Home() {
   const [showMetro, setShowMetro] = useState(false);
   const [showRain, setShowRain] = useState(false);
   const [wheelchairOnly, setWheelchairOnly] = useState(false);
-  // Default — alla fyra typer påslagna så användaren ser hela datasetet
-  // när appen öppnas. Tom uppsättning betyder "inget av kategorierna är på"
-  // och döljer alla venues; det är knapparnas själva urval, inte en
-  // extramodifier ovanpå "allt".
+  // Default — Äta, Bar och Takbar påslagna (Fika av). Användartesterna
+  // visade att caféer dominerade datasetet och skymde de mer aktiva
+  // ute-/kvällsplatserna som flest letar efter. Tom uppsättning betyder
+  // "inget av kategorierna är på" och döljer alla venues; det är
+  // knapparnas själva urval, inte en extramodifier ovanpå "allt".
   const [typeFilter, setTypeFilter] = useState<Set<VenueType>>(
-    () => new Set<VenueType>(["restaurant", "cafe", "bar", "rooftop"]),
+    () => new Set<VenueType>(["restaurant", "bar", "rooftop"]),
   );
   const [sunRange, setSunRange] = useState<SunRange>(null);
   const [focusVenueId, setFocusVenueId] = useState<string | null>(initialVenue);

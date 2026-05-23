@@ -236,12 +236,13 @@ function SettingsButton({
     }
   }
 
-  // Default-tillståndet är "alla fyra typer på", så badgen ska inte räkna
-  // det som "aktivt filter" — bara avvikelser från default (något bortvalt,
-  // helt tomt urval, eller bara fast utvalt subset) flaggas.
+  // Default-tillståndet är Äta + Bar + Takbar (Fika av — caféer dominerade
+  // datasetet och skymde mer aktiva ställen). Badgen ska inte räkna det
+  // som "aktivt filter" — bara avvikelser från default (något bortvalt,
+  // tom uppsättning, eller annat subset än default) flaggas.
   const typeFilterIsDefault =
-    typeFilter.size === 4 &&
-    typeFilter.has("restaurant") && typeFilter.has("cafe") &&
+    typeFilter.size === 3 &&
+    typeFilter.has("restaurant") &&
     typeFilter.has("bar") && typeFilter.has("rooftop");
 
   const activeCount =
