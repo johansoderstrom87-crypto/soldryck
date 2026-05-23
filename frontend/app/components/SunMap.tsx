@@ -1793,8 +1793,22 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     // animeras med transform/background-position — billigt i isolation men
     // dyrt att kombinera med tile-repaints på äldre iPhones. CSS-regeln för
     // `.weather-fx.is-panning` sätter `animation-play-state: paused`.
-    const pausePanning = () => weatherFxRef.current?.classList.add("is-panning");
-    const resumePanning = () => weatherFxRef.current?.classList.remove("is-panning");
+    //
+    // Samma `.is-panning`-klass läggs även på leaflet-containern så CSS:en
+    // kan slå PÅ `will-change: transform` på marker/shadow/overlay-panes
+    // bara under aktivt drag. Permanent will-change med 2 800+ marker-
+    // noder är dyrare än det är värt (VRAM-svält på mobil); under själva
+    // panen är promotionen däremot motiverad eftersom panen translaterar
+    // hela pane:n som en enhet.
+    const leafletContainer = map.getContainer();
+    const pausePanning = () => {
+      weatherFxRef.current?.classList.add("is-panning");
+      leafletContainer.classList.add("is-panning");
+    };
+    const resumePanning = () => {
+      weatherFxRef.current?.classList.remove("is-panning");
+      leafletContainer.classList.remove("is-panning");
+    };
     map.on("movestart zoomstart", pausePanning);
     map.on("moveend zoomend", resumePanning);
 
@@ -1855,15 +1869,28 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     // Anledning: transform på en förälder skapar en ny "containing block"
     // som blockerar backdrop-filter på alla descendents — popupen kunde
     // alltså aldrig få glasig blur över kartan. top/left har ingen sådan
-    // effekt. Reflow-kostnaden är minimal eftersom panelen är tom när
-    // ingen popup är öppen, och en öppen popup har inga djupa children.
+    // effekt.
+    //
+    // Bind lyssnaren BARA medan en popup är öppen. `move` fyrar ~60 ggr/sek
+    // under pan; att skriva top/left på ett body-level element per frame
+    // utan att någon faktiskt behöver det är den enskilt dyraste pan-
+    // kostnaden (reflow på document på varje frame). När ingen popup är
+    // öppen behöver panelen aldrig synkroniseras — den syns inte.
     const syncPanePosition = () => {
       const mapPanePos = (map as any)._getMapPanePos?.() ?? { x: 0, y: 0 };
       appPopupPane.style.left = `${mapPanePos.x}px`;
       appPopupPane.style.top = `${mapPanePos.y}px`;
     };
     syncPanePosition();
-    map.on("move zoom viewreset zoomanim", syncPanePosition);
+    const startMirroring = () => {
+      syncPanePosition();
+      map.on("move zoom viewreset zoomanim", syncPanePosition);
+    };
+    const stopMirroring = () => {
+      map.off("move zoom viewreset zoomanim", syncPanePosition);
+    };
+    map.on("popupopen", startMirroring);
+    map.on("popupclose", stopMirroring);
 
     // Pan so the marker sits in the lower-middle of the viewport when its
     // popup opens. panTo() would centre the marker, but our popups can be
@@ -1892,6 +1919,8 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     return () => {
       map.off("move zoom viewreset zoomanim", syncPanePosition);
+      map.off("popupopen", startMirroring);
+      map.off("popupclose", stopMirroring);
       appPopupPane.remove();
       map.remove();
       mapRef.current = null;
@@ -3013,7 +3042,14 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     const brightness = Math.max(0.35, 1 - effectiveDarkness * 0.9);
     const saturate = 1 - effectiveDarkness * 0.25;
 
-    const tileFilter = `brightness(${brightness}) saturate(${saturate})`;
+    // Skippa filter när det är visuellt no-op (dag-fas, brightness/saturate
+    // ≈ 1). `filter: brightness(1) saturate(1)` är synligt identiskt med
+    // `filter: none`, men ett satt filter tvingar GPU:n att kompositera om
+    // hela tile-panen i ett separat lager varje frame under pan. Att ta
+    // bort filtret helt i dag-fasen ger tillbaka pan-FPS i 90% av
+    // användningsfallen.
+    const filterIsNoop = effectiveDarkness < 0.02;
+    const tileFilter = filterIsNoop ? "none" : `brightness(${brightness}) saturate(${saturate})`;
     tilePane.style.filter = tileFilter;
     tilePane.style.transition = "filter 0.8s ease";
     overlayPane.style.filter = tileFilter;

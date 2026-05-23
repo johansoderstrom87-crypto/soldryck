@@ -123,15 +123,21 @@ html, body {
   pointer-events: auto;
 }
 
-/* Promote the marker pane to its own GPU layer so pan-translates ride the
-   compositor instead of triggering a CPU paint of every marker every frame.
-   Notably effective on older mobile Safari, where painting hundreds of
-   markers per frame is the dominant cost during pan. */
+/* Promote the marker pane to its own GPU layer så pan-translates åker på
+   compositorn istället för CPU-paint per marker per frame. `will-change`
+   togglas dynamiskt på `.is-panning` (sätts på movestart/zoomstart, tas
+   bort på moveend/zoomend) — permanent `will-change` håller 2 800+ marker-
+   DOM-noder i ett eget GPU-lager hela tiden, vilket äter VRAM på mobil.
+   `translateZ(0)` lämnas kvar som baseline-promotion utan minneshit. */
 .leaflet-marker-pane,
 .leaflet-shadow-pane,
 .leaflet-overlay-pane {
-  will-change: transform;
   transform: translateZ(0);
+}
+.leaflet-container.is-panning .leaflet-marker-pane,
+.leaflet-container.is-panning .leaflet-shadow-pane,
+.leaflet-container.is-panning .leaflet-overlay-pane {
+  will-change: transform;
 }
 
 /* Popup matchar Header-kortet exakt: theme-surface-vars (bg/border/shadow
