@@ -388,6 +388,8 @@ interface SunMapProps {
   alcoholOnly?: boolean;
   showRain?: boolean;
   wheelchairOnly?: boolean;
+  dogFriendlyOnly?: boolean;
+  glutenFreeOnly?: boolean;
 }
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
@@ -735,6 +737,8 @@ function passesStaticFilters(
   metroStation: MetroStation | null | undefined,
   alcoholOnly: boolean,
   wheelchairOnly: boolean,
+  dogFriendlyOnly: boolean,
+  glutenFreeOnly: boolean,
   dateKey: string,
 ): boolean {
   if (metroStation) {
@@ -747,6 +751,8 @@ function passesStaticFilters(
     const wc = venue.wheelchair;
     if (wc !== "yes" && wc !== "designated") return false;
   }
+  if (dogFriendlyOnly && !venue.dogFriendly) return false;
+  if (glutenFreeOnly && !venue.glutenFree) return false;
   if (sunRange) {
     for (let h = sunRange.from; h <= sunRange.to; h++) {
       const s = normalize(getStatus(venue, dateKey, h));
@@ -1386,7 +1392,7 @@ function buildUnconfirmedSheetHtml(venue: any): string {
   `;
 }
 
-export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, onSetHour, showShadows, showMetro, showRain = false, focusVenueId, onFocusHandled, metroStation, openNowFilter = false, alcoholOnly = false, wheelchairOnly = false }: SunMapProps) {
+export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRange, weather, onFeedback, onSetHour, showShadows, showMetro, showRain = false, focusVenueId, onFocusHandled, metroStation, openNowFilter = false, alcoholOnly = false, wheelchairOnly = false, dogFriendlyOnly = false, glutenFreeOnly = false }: SunMapProps) {
   // Defer expensive map rebuild while the user is actively scrubbing the timeline
   const hour = useDeferredValue(hourProp);
 
@@ -2438,7 +2444,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     // attachade — märkbart som flicker vid initial mount).
     const initialPass = new Set<string>();
     for (const venue of allVenues) {
-      if (passesStaticFilters(venue, typeFilter, sunRange, metroStation, alcoholOnly, wheelchairOnly, dateKey)) {
+      if (passesStaticFilters(venue, typeFilter, sunRange, metroStation, alcoholOnly, wheelchairOnly, dogFriendlyOnly, glutenFreeOnly, dateKey)) {
         initialPass.add(venue.id);
       }
     }
@@ -2476,7 +2482,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     const pass = new Set<string>();
     for (const venue of allVenues) {
-      if (passesStaticFilters(venue, typeFilter, sunRange, metroStation, alcoholOnly, wheelchairOnly, dateKey)) {
+      if (passesStaticFilters(venue, typeFilter, sunRange, metroStation, alcoholOnly, wheelchairOnly, dogFriendlyOnly, glutenFreeOnly, dateKey)) {
         pass.add(venue.id);
       }
     }
@@ -2510,7 +2516,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     }
 
     if (map.getZoom() >= 17) resolveBadgeCollisions(map, markersRef.current);
-  }, [typeFilter, sunRange, metroStation, alcoholOnly, wheelchairOnly, dateKey, allVenues]);
+  }, [typeFilter, sunRange, metroStation, alcoholOnly, wheelchairOnly, dogFriendlyOnly, glutenFreeOnly, dateKey, allVenues]);
 
   // Hour & sun/shade-filter update — fast path. Retoggles `.marker-dot`'s
   // class and visibility on existing markers.
@@ -2711,6 +2717,10 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         // Glas-modifier: obekräftade venues har per definition inte bekräftad
         // alkoholservering, så de göms när användaren snävar in på Glas.
         if (alcoholOnly) continue;
+        // Samma princip för hund/gluten/tillgänglighet — vi har ingen data
+        // för obekräftade så vi kan inte påstå att de matchar.
+        if (dogFriendlyOnly) continue;
+        if (glutenFreeOnly) continue;
 
         const icon = L.divIcon({
           className: "marker-root marker-unconfirmed",
@@ -2741,7 +2751,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       unconfirmedMarkersRef.current.forEach((mk) => mk.remove());
       unconfirmedMarkersRef.current = [];
     };
-  }, [metroStation, typeFilter, alcoholOnly]);
+  }, [metroStation, typeFilter, alcoholOnly, dogFriendlyOnly, glutenFreeOnly]);
 
   // Rain radar overlay — RainViewer's free public tile service. Extracted
   // to a hook so SunMap can incrementally shrink (#49). Same pattern fits

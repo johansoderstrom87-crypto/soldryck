@@ -104,6 +104,10 @@ interface HeaderProps {
   onToggleRain: () => void;
   wheelchairOnly: boolean;
   onWheelchairOnlyChange: (v: boolean) => void;
+  dogFriendlyOnly: boolean;
+  onDogFriendlyOnlyChange: (v: boolean) => void;
+  glutenFreeOnly: boolean;
+  onGlutenFreeOnlyChange: (v: boolean) => void;
   metroStation: MetroStation | null;
   onMetroStationChange: (station: MetroStation | null) => void;
   openNowFilter: boolean;
@@ -129,6 +133,8 @@ function SettingsButton({
   metroStation, onMetroStationChange, showShadows, onToggleShadows, showMetro, onToggleMetro,
   showRain, onToggleRain,
   wheelchairOnly, onWheelchairOnlyChange,
+  dogFriendlyOnly, onDogFriendlyOnlyChange,
+  glutenFreeOnly, onGlutenFreeOnlyChange,
   onOpenFavorites,
   favoritesCount,
 }: {
@@ -148,6 +154,10 @@ function SettingsButton({
   onToggleRain: () => void;
   wheelchairOnly: boolean;
   onWheelchairOnlyChange: (v: boolean) => void;
+  dogFriendlyOnly: boolean;
+  onDogFriendlyOnlyChange: (v: boolean) => void;
+  glutenFreeOnly: boolean;
+  onGlutenFreeOnlyChange: (v: boolean) => void;
   /** Opens the favorites panel — replaces the old standalone favorites button. */
   onOpenFavorites?: () => void;
   /** Number of saved favorites — shown as a small badge on the menu item. */
@@ -241,7 +251,9 @@ function SettingsButton({
     (showShadows ? 1 : 0) +
     (showMetro ? 1 : 0) +
     (showRain ? 1 : 0) +
-    (wheelchairOnly ? 1 : 0);
+    (wheelchairOnly ? 1 : 0) +
+    (dogFriendlyOnly ? 1 : 0) +
+    (glutenFreeOnly ? 1 : 0);
 
   return (
     <div ref={ref} className="relative">
@@ -430,6 +442,65 @@ function SettingsButton({
             </span>
             <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${wheelchairOnly ? "bg-white/30" : "bg-slate-200"}`}>
               <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${wheelchairOnly ? "translate-x-3" : "translate-x-0"}`} />
+            </span>
+          </button>
+
+          {/* Hundvänligt-toggle. Filter på venue.dogFriendly som sätts av
+              pipeline steg 04 baserat på OSM `dog=*` ELLER Google `allowsDogs`.
+              Samma "false positives är värre än inga träffar"-resonemang som
+              Tillgängligt — när filtret är på döljs venues utan bekräftad
+              hundvänlighet. */}
+          <button
+            onClick={() => onDogFriendlyOnlyChange(!dogFriendlyOnly)}
+            aria-pressed={dogFriendlyOnly}
+            aria-label={dogFriendlyOnly ? "Visa alla ställen" : "Visa bara hundvänliga ställen"}
+            className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
+              dogFriendlyOnly ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              {/* Paw — fyra tår + dyna */}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <ellipse cx="6" cy="9" rx="1.8" ry="2.4" />
+                <ellipse cx="10" cy="6" rx="1.8" ry="2.4" />
+                <ellipse cx="14" cy="6" rx="1.8" ry="2.4" />
+                <ellipse cx="18" cy="9" rx="1.8" ry="2.4" />
+                <path d="M12 11c-3 0-5.5 2.4-5.5 5 0 2 1.5 3 3.5 3 1 0 1.3-.5 2-.5s1 .5 2 .5c2 0 3.5-1 3.5-3 0-2.6-2.5-5-5.5-5z" />
+              </svg>
+              Hundvänligt
+            </span>
+            <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${dogFriendlyOnly ? "bg-white/30" : "bg-slate-200"}`}>
+              <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${dogFriendlyOnly ? "translate-x-3" : "translate-x-0"}`} />
+            </span>
+          </button>
+
+          {/* Glutenfritt-toggle. Filter på venue.glutenFree från pipeline steg
+              04 — sant om OSM `diet:gluten_free=yes/limited/only` eller om ≥2
+              Google-reviews nämner glutenfri-keywords. */}
+          <button
+            onClick={() => onGlutenFreeOnlyChange(!glutenFreeOnly)}
+            aria-pressed={glutenFreeOnly}
+            aria-label={glutenFreeOnly ? "Visa alla ställen" : "Visa bara glutenfria ställen"}
+            className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
+              glutenFreeOnly ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              {/* Vetex — överstruken */}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v20" />
+                <path d="M8 5l4 3" />
+                <path d="M16 5l-4 3" />
+                <path d="M7 9l5 3" />
+                <path d="M17 9l-5 3" />
+                <path d="M7 13l5 3" />
+                <path d="M17 13l-5 3" />
+                <line x1="4" y1="20" x2="20" y2="4" />
+              </svg>
+              Glutenfritt
+            </span>
+            <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${glutenFreeOnly ? "bg-white/30" : "bg-slate-200"}`}>
+              <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${glutenFreeOnly ? "translate-x-3" : "translate-x-0"}`} />
             </span>
           </button>
 
@@ -686,6 +757,8 @@ export default function Header({
   filter, onFilterChange, typeFilter, onTypeFilterChange, sunRange, onSunRangeChange,
   showShadows, onToggleShadows, showMetro, onToggleMetro, showRain, onToggleRain,
   wheelchairOnly, onWheelchairOnlyChange,
+  dogFriendlyOnly, onDogFriendlyOnlyChange,
+  glutenFreeOnly, onGlutenFreeOnlyChange,
   metroStation, onMetroStationChange,
   openNowFilter, onOpenNowFilterChange,
   alcoholOnly, onAlcoholOnlyChange,
@@ -746,6 +819,10 @@ export default function Header({
           onToggleRain={onToggleRain}
           wheelchairOnly={wheelchairOnly}
           onWheelchairOnlyChange={onWheelchairOnlyChange}
+          dogFriendlyOnly={dogFriendlyOnly}
+          onDogFriendlyOnlyChange={onDogFriendlyOnlyChange}
+          glutenFreeOnly={glutenFreeOnly}
+          onGlutenFreeOnlyChange={onGlutenFreeOnlyChange}
           onOpenFavorites={() => setFavoritesOpen(true)}
           favoritesCount={favCount}
         />

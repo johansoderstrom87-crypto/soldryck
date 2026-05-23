@@ -16,6 +16,12 @@ VENUES_FILE = os.path.join(DATA_DIR, "venues.geojson")
 RATINGS_FILE = os.path.join(DATA_DIR, "ratings.json")
 VERIFICATION_FILE = os.path.join(DATA_DIR, "outdoor_verification.json")
 VERIFICATION_NEG_FILE = os.path.join(DATA_DIR, "outdoor_verification_negative.json")
+OSM_DIETARY_FILE = os.path.join(DATA_DIR, "osm_dietary_tags.json")
+DOG_GLUTEN_BACKFILL_FILE = os.path.join(DATA_DIR, "dog_gluten_backfill.json")
+# Minsta antal reviews som måste nämna glutenfri-keyword för att flagga
+# `glutenFree: true`. Två oberoende omnämnanden tar bort enstaka brusiga
+# false positives (typ "vi har inga glutenfria alternativ").
+GLUTENFREE_REVIEW_THRESHOLD = 2
 # Datan ligger numera som ren JSON under public/ (#29 i refactor-rundan).
 # Den manuellt underhållna `frontend/app/data/venues-computed.ts` exporterar
 # bara typer + helpers + en client-side store — pipeline rör inte filen.
@@ -114,6 +120,8 @@ def main():
 
     # Build alcohol lookup from verification files (covers all google-verified venues)
     alcohol_lookup = {}
+    # Google `allowsDogs` lookup (steg 07 sparar det numera + steg 11 backfillar)
+    google_dog_lookup: dict[str, bool] = {}
     for vfile in (VERIFICATION_FILE, VERIFICATION_NEG_FILE):
         if os.path.exists(vfile):
             with open(vfile, "r", encoding="utf-8") as f:
@@ -121,8 +129,31 @@ def main():
             for osm_id, result in vdata.items():
                 if result.get("serves_alcohol") is True:
                     alcohol_lookup[osm_id] = True
+                ad = result.get("allows_dogs")
+                if ad is True or ad is False:
+                    google_dog_lookup[osm_id] = ad
     print(f"  {len(alcohol_lookup)} venues med bekräftat serveringstillstånd (Google)")
     print(f"  {len(website_lookup)} venues med website")
+
+    # OSM dietary/pet-tags (steg 10) — dog=*, diet:gluten_free=*
+    osm_dietary: dict[str, dict[str, str]] = {}
+    if os.path.exists(OSM_DIETARY_FILE):
+        with open(OSM_DIETARY_FILE, "r", encoding="utf-8") as f:
+            osm_dietary = json.load(f)
+        print(f"  {len(osm_dietary)} venues med OSM dietary/pet-tagg")
+
+    # Google backfill (steg 11) — allowsDogs + review glutenfri-mentions
+    backfill: dict[str, dict] = {}
+    if os.path.exists(DOG_GLUTEN_BACKFILL_FILE):
+        with open(DOG_GLUTEN_BACKFILL_FILE, "r", encoding="utf-8") as f:
+            backfill = json.load(f)
+        # Backfill överskrider verification-filen för allows_dogs eftersom
+        # steg 11 är specifikt designat för det fältet.
+        for osm_id, entry in backfill.items():
+            ad = entry.get("allows_dogs")
+            if ad is True or ad is False:
+                google_dog_lookup[osm_id] = ad
+        print(f"  {len(backfill)} venues backfillade med Google reviews/allowsDogs")
 
     # Load ratings if available
     ratings_lookup: dict = {}
@@ -137,6 +168,8 @@ def main():
     # Bygg venues-array
     venues = []
     rooftop_count = 0
+    dog_count = 0
+    gf_count = 0
     for venue_id, data in results.items():
         level = level_lookup.get(venue_id, "")
         rooftop = is_rooftop(data["name"], level)
@@ -144,6 +177,23 @@ def main():
             rooftop_count += 1
         venue_type = data["type"]
         serves_alcohol = alcohol_lookup.get(venue_id) or (venue_type in ALCOHOL_AMENITY_TYPES) or None
+
+        # Hundvänlig — OSM dog=yes/outside/leashed ELLER Google allowsDogs=true
+        dog_osm = osm_dietary.get(venue_id, {}).get("dog")
+        dog_google = google_dog_lookup.get(venue_id)
+        dog_friendly = (
+            dog_osm in ("yes", "outside", "leashed", "limited")
+            or dog_google is True
+        )
+
+        # Glutenfritt — OSM diet:gluten_free=yes/limited/only ELLER ≥2 reviews nämner det
+        gf_osm = osm_dietary.get(venue_id, {}).get("gluten_free")
+        gf_review_mentions = backfill.get(venue_id, {}).get("review_glutenfree_mentions", 0)
+        gluten_free = (
+            gf_osm in ("yes", "limited", "only")
+            or gf_review_mentions >= GLUTENFREE_REVIEW_THRESHOLD
+        )
+
         venue = {
             "id": venue_id,
             "name": data["name"],
@@ -157,6 +207,12 @@ def main():
             venue["rooftop"] = True
         if serves_alcohol is True:
             venue["servesAlcohol"] = True
+        if dog_friendly:
+            venue["dogFriendly"] = True
+            dog_count += 1
+        if gluten_free:
+            venue["glutenFree"] = True
+            gf_count += 1
         rating_entry = ratings_lookup.get(venue_id, {})
         if rating_entry.get("rating") is not None:
             venue["rating"] = rating_entry["rating"]
@@ -171,6 +227,8 @@ def main():
         venues.append(venue)
 
     print(f"  {rooftop_count} takbarer/takrestauranger")
+    print(f"  {dog_count} hundvänliga")
+    print(f"  {gf_count} glutenfria")
 
     # Skriv som ren JSON-array. Helpers + typer underhålls separat i
     # frontend/app/data/venues-computed.ts — den filen rör pipeline inte.

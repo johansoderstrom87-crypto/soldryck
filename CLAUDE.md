@@ -45,6 +45,8 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
   07_verify_outdoor_seating.py    Verifierar uteservering via Google Places API
   08_merge_verified_venues.py     Slår ihop Google-verifierade venues med huvudlistan
   09_fetch_metro.py               Hämtar tunnelbanespår + perronger från OSM
+  10_fetch_osm_dietary.py         Hämtar OSM dog=* + diet:gluten_free=* taggar
+  11_backfill_dog_gluten.py       Backfillar Google allowsDogs + reviews för glutenfri-scan
   requirements.txt                Python-beroenden
   /data                           Genererad data (gitignored)
     /raw                          Nedladdade råfiler
@@ -133,6 +135,20 @@ Webapp som visar vilka uteserveringar i Stockholm som har sol — timme för tim
 - **Resultat:** ~519 spårsegment, 57 perronger (~144 KB)
 - **Output:** `frontend/app/data/metro-network.ts` (TypeScript export, statisk data)
 - **Toggle:** Visas via "Tunnelbana"-toggle i Header — av som default
+
+### Steg 10: OSM dietary/pet-tags (`10_fetch_osm_dietary.py`)
+- **Källa:** OpenStreetMap via Overpass API (gratis)
+- **Hämtar:** `dog=*` och `diet:gluten_free=*` för alla amenity-typer + `leisure=outdoor_seating` inom Stockholm-bboxen
+- **Output:** `data/osm_dietary_tags.json` — schema `{osm_id: {dog?, gluten_free?}}`
+- **Användning:** Konsumeras av steg 04 för att sätta `dogFriendly` resp. `glutenFree` på venues. OSM-täckning är tunn (~5–10%) men gratis och tillförlitlig där den finns.
+
+### Steg 11: Google backfill — allowsDogs + reviews (`11_backfill_dog_gluten.py`)
+- **Källa:** Google Places API (New) — Place Details by `place_id` (cheapare än Text Search-anropet i steg 07)
+- **Fält:** `allowsDogs` + `reviews` (Atmosphere-tier ≈ $0.030/anrop, ~$75 för full backfill)
+- **Glutenfri-detektion:** Räknar reviews som matchar regex `glutenfri(tt|a)?` eller `gluten[\s-]?free` (case-insensitive). ≥2 träffar → `glutenFree: true` i steg 04.
+- **Flaggor:** `--no-reviews` (bara `allowsDogs`, ~$42), `--dry-run` (rapportera utan att kalla API)
+- **Resumable** — sparar inkrementellt i `data/dog_gluten_backfill.json`
+- **När köras:** En gång efter steg 07 är klart. Inte automatiskt i full pipeline pga kostnad — kör manuellt när du vill backfilla.
 
 ## Venue-täckning
 
@@ -232,6 +248,8 @@ python 07_verify_outdoor_seating.py         # ~5h (env: GOOGLE_PLACES_API_KEY)
 python 07b_verify_negative_seating.py       # ~30s, dubbelkollar OSM-no via Google
 python 08_merge_verified_venues.py          # ~5s, slår ihop verifierade
 python 09_fetch_metro.py                    # ~30s, tunnelbanespår + perronger
+python 10_fetch_osm_dietary.py              # ~10s, OSM dog/glutenfri-taggar
+python 11_backfill_dog_gluten.py            # ~5h, Google reviews (~$75) — kör manuellt vid behov
 
 # Om du bara lagt till nya venues (t.ex. takbarer):
 python 03b_compute_shadows_incremental.py   # Räknar bara venues utan befintlig data

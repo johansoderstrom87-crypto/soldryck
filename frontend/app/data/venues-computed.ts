@@ -28,6 +28,12 @@ export interface ComputedVenue {
   priceLevel?: number;
   /** OSM wheelchair tag: "yes" | "no" | "limited". */
   wheelchair?: string;
+  /** True om OSM `dog=yes/outside/leashed/limited` eller Google `allowsDogs=true`.
+   *  Populeras av pipeline steg 04 — emitteras bara när true. */
+  dogFriendly?: boolean;
+  /** True om OSM `diet:gluten_free=yes/limited/only` eller ≥2 Google-reviews
+   *  nämner glutenfri. Populeras av pipeline steg 04 — emitteras bara när true. */
+  glutenFree?: boolean;
   /** Hemsida — primärt från OSM `website`-tagg, annars Google Places
    *  `websiteUri`. Normaliserad med `https://`-prefix. */
   website?: string;

@@ -74,6 +74,8 @@ export default function Home() {
   const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
   const [openNowFilter, setOpenNowFilter] = useState(false);
   const [alcoholOnly, setAlcoholOnly] = useState(false);
+  const [dogFriendlyOnly, setDogFriendlyOnly] = useState(false);
+  const [glutenFreeOnly, setGlutenFreeOnly] = useState(false);
   // Splash is skipped for users who already added Soldryck to the home
   // screen — they saw it on first install. Initial state must be false so
   // the server render matches the first client render (no hydration
@@ -183,6 +185,10 @@ export default function Home() {
         onToggleRain={() => setShowRain((s) => !s)}
         wheelchairOnly={wheelchairOnly}
         onWheelchairOnlyChange={setWheelchairOnly}
+        dogFriendlyOnly={dogFriendlyOnly}
+        onDogFriendlyOnlyChange={setDogFriendlyOnly}
+        glutenFreeOnly={glutenFreeOnly}
+        onGlutenFreeOnlyChange={setGlutenFreeOnly}
         metroStation={metroStation}
         onMetroStationChange={setMetroStation}
         openNowFilter={openNowFilter}
@@ -197,7 +203,7 @@ export default function Home() {
         getClosestDateKey={getDateKey}
       />
 
-      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} onSetHour={setHour} showShadows={showShadows} showMetro={showMetro} showRain={showRain} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} openNowFilter={openNowFilter} alcoholOnly={alcoholOnly} wheelchairOnly={wheelchairOnly} />
+      <SunMap hour={hour} date={date} filter={filter} typeFilter={typeFilter} sunRange={sunRange} weather={weatherForDate} onFeedback={setFeedbackVenue} onSetHour={setHour} showShadows={showShadows} showMetro={showMetro} showRain={showRain} focusVenueId={focusVenueId} onFocusHandled={() => setFocusVenueId(null)} metroStation={metroStation} openNowFilter={openNowFilter} alcoholOnly={alcoholOnly} wheelchairOnly={wheelchairOnly} dogFriendlyOnly={dogFriendlyOnly} glutenFreeOnly={glutenFreeOnly} />
 
       <TimeSlider
         hour={hour}

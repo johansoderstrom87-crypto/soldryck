@@ -44,7 +44,7 @@ def search_place(name: str, lat: float, lng: float) -> dict | None:
         headers={
             "Content-Type": "application/json",
             "X-Goog-Api-Key": API_KEY,
-            "X-Goog-FieldMask": "places.id,places.displayName,places.outdoorSeating,places.dineIn,places.location,places.servesBeer,places.servesWine,places.servesCocktails,places.websiteUri",
+            "X-Goog-FieldMask": "places.id,places.displayName,places.outdoorSeating,places.dineIn,places.location,places.servesBeer,places.servesWine,places.servesCocktails,places.websiteUri,places.allowsDogs",
         },
     )
 
@@ -148,6 +148,7 @@ def main():
                 "name": venue["name"],
                 "outdoor_seating": outdoor,
                 "serves_alcohol": serves_alcohol,
+                "allows_dogs": place.get("allowsDogs"),
                 "google_id": place.get("id"),
                 "google_name": place.get("displayName", {}).get("text"),
                 "website": place.get("websiteUri") or "",
