@@ -258,6 +258,37 @@ python 04_export_frontend.py
 
 Behöver köras ca 1 gång/år — byggnader och terräng ändras sällan.
 
+## Hund/Glutenfri — paused (2026-05)
+
+**Status:** Hela infrastrukturen är byggd och commitad men UI-knapparna är dolda bakom feature-flaggan `DOG_GLUTEN_FILTERS_ENABLED = false` i [Header.tsx](frontend/app/components/Header.tsx). Anledningen är att vi inte kunde köra Google-backfillen (steg 11) inom Google Cloud-trialens kvarvarande 322 kr.
+
+### Vad som är gjort
+- **Pipeline:** Steg 07 sparar nu `allows_dogs`. Steg 10 (`10_fetch_osm_dietary.py`) drar OSM dog/glutenfri-taggar gratis via Overpass. Steg 11 (`11_backfill_dog_gluten.py`) finns redo med `--no-reviews`/`--dry-run`-flaggor men har inte körts.
+- **Steg 04** läser båda källorna och emitterar `dogFriendly` / `glutenFree` på venues.
+- **Frontend:** `ComputedVenue.dogFriendly?`/`glutenFree?` typer, filterlogik i `passesStaticFilters` (SunMap.tsx), state + props-wiring i page.tsx → Header.tsx, två toggles i settings-dropdownen (wrappade i flaggan).
+
+### Nuvarande data (efter steg 10 körd)
+- **Hundvänlig:** 1 venue av 2 844 (bara OSM)
+- **Glutenfri:** 18 venues av 2 844 (bara OSM)
+
+Det räcker inte för att aktivera filtren — för få träffar gör dem missvisande snarare än hjälpsamma.
+
+### Vad som blockerar
+Steg 11 backfill mot Google Places API (New) Place Details:
+- 3 401 venues har `google_id` (från steg 07 + 07b)
+- Full backfill (allowsDogs + reviews): ~$102 / ~1 071 kr
+- Bara hundvänlig (`--no-reviews`): ~$58 / ~609 kr
+- Trial-krediten räcker till ~$29 = restaurant-only `--no-reviews` (1 700 anrop)
+
+### Plan för att återuppta
+1. **När:** Efter Google Cloud-trial:n löper ut (kvar 54 dagar per 2026-05-23, dvs runt 2026-07-16). Då uppgraderas billing-kontot och Maps Platform free tier (~$200/månad i krediter) aktiveras.
+2. **Hur:** Kör `python 11_backfill_dog_gluten.py` (full) eller `--no-reviews` om man bara vill ha hund.
+3. **Återaktivera UI:** Flippa `DOG_GLUTEN_FILTERS_ENABLED = true` i [Header.tsx](frontend/app/components/Header.tsx). Allt övrigt är redan på plats.
+4. **Verifiera:** Räknarna i steg 04:s slutprint bör visa minst några hundra hundvänliga + glutenfria innan UI:t släpps på.
+
+### Möjligt mellanläge
+Bar+pub+biergarten med reviews kostar bara ~$7 / 76 kr och ryms i trial-krediten. Det skulle ge ~240 venues med både hund + glutenfri-data — för smalt för att aktivera filtren på hela appen men användbart som proof-of-concept. Inte gjort än.
+
 ## Kända begränsningar
 
 - **Träd** skuggar men finns inte i byggnadsdata

@@ -145,7 +145,7 @@ def main():
 
     if args.dry_run:
         cost_per = 0.030 if include_reviews else 0.017
-        print(f"\n[DRY-RUN] Skulle göra {len(to_fetch)} anrop ≈ ${len(to_fetch) * cost_per:.2f}")
+        print(f"\n[DRY-RUN] Skulle gora {len(to_fetch)} anrop ~ ${len(to_fetch) * cost_per:.2f}")
         return
 
     if not API_KEY:

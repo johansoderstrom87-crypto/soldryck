@@ -65,6 +65,16 @@ const ALCOHOL_MODIFIER_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fi
 const FILTER_BTN_BG =
   "linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.10) 100%)";
 const FILTER_BTN_BORDER = "0.5px solid rgba(255,255,255,0.55)";
+const FILTER_BTN_ACTIVE_BORDER = "0.5px solid rgba(249,115,22,0.65)";
+const FILTER_BTN_ACTIVE_SHADOW =
+  "inset 0 0.5px 0 rgba(255,255,255,0.96), " +
+  "0 0 0 0.5px rgba(249,115,22,0.30), " +
+  "0 4px 14px rgba(120,53,15,0.20), " +
+  "0 1px 3px rgba(15,23,42,0.08)";
+const FILTER_BTN_ACTIVE_ICON_COLOR = "#f97316";
+const FILTER_BTN_ACTIVE_ICON_FILTER =
+  "drop-shadow(0 0 4px rgba(249,115,22,0.95)) " +
+  "drop-shadow(0 0 9px rgba(234,88,12,0.55))";
 const FILTER_BTN_SHADOW =
   "0 8px 22px rgba(15,23,42,0.14), " +
   "0 1px 3px rgba(15,23,42,0.08), " +
@@ -88,6 +98,14 @@ const BLUE_GLOW_FILTER =
   "drop-shadow(0 0 4px rgba(96,165,250,0.90)) " +
   "drop-shadow(0 0 10px rgba(37,99,235,0.55))";
 const BLUE_GLOW_TEXT_SHADOW = "0 0 6px rgba(96,165,250,0.50)";
+
+// Feature flag — Hund/Glutenfri-filter är paused tills vi kan köra steg 11
+// (Google Places backfill). OSM-täckningen i steg 10 ger bara 1 hund + 18
+// glutenfri av 2 844 venues, vilket gör filtren meningslösa. Hela
+// infrastrukturen (props, state, pipeline, typer, filterlogik) är på plats
+// — flippa till `true` när Google-datan finns. Se CLAUDE.md sektionen
+// "Hund/Glutenfri — paused" för planen att återuppta.
+const DOG_GLUTEN_FILTERS_ENABLED = false;
 
 interface HeaderProps {
   filter: "all" | "sun" | "shade";
@@ -253,13 +271,13 @@ function SettingsButton({
     (showMetro ? 1 : 0) +
     (showRain ? 1 : 0) +
     (wheelchairOnly ? 1 : 0) +
-    (dogFriendlyOnly ? 1 : 0) +
-    (glutenFreeOnly ? 1 : 0);
+    (DOG_GLUTEN_FILTERS_ENABLED && dogFriendlyOnly ? 1 : 0) +
+    (DOG_GLUTEN_FILTERS_ENABLED && glutenFreeOnly ? 1 : 0);
 
   return (
     <div ref={ref} className="relative">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => { vibrate(); setOpen(!open); }}
         aria-label={open ? "Stäng meny" : `Meny${activeCount > 0 ? ` (${activeCount} aktiva filter)` : ""}`}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -359,7 +377,7 @@ function SettingsButton({
             {FILTER_OPTIONS.map((o) => (
               <button
                 key={o.value}
-                onClick={() => onFilterChange(o.value)}
+                onClick={() => { vibrate(); onFilterChange(o.value); }}
                 aria-pressed={filter === o.value}
                 aria-label={`Visa ${o.label.toLowerCase()}`}
                 className={`px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center gap-1.5 transition-all ${
@@ -376,7 +394,7 @@ function SettingsButton({
 
           {/* Shadows toggle */}
           <button
-            onClick={() => { onToggleShadows(); }}
+            onClick={() => { vibrate(); onToggleShadows(); }}
             aria-pressed={showShadows}
             aria-label={showShadows ? "Dölj skuggor på kartan" : "Visa skuggor på kartan"}
             className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
@@ -397,7 +415,7 @@ function SettingsButton({
 
           {/* Regnradar toggle */}
           <button
-            onClick={() => { onToggleRain(); }}
+            onClick={() => { vibrate(); onToggleRain(); }}
             aria-pressed={showRain}
             aria-label={showRain ? "Dölj regnradar" : "Visa regnradar"}
             className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
@@ -425,7 +443,7 @@ function SettingsButton({
               for accessibility tools (false positives are worse than no
               results). */}
           <button
-            onClick={() => onWheelchairOnlyChange(!wheelchairOnly)}
+            onClick={() => { vibrate(); onWheelchairOnlyChange(!wheelchairOnly); }}
             aria-pressed={wheelchairOnly}
             aria-label={wheelchairOnly ? "Visa alla ställen" : "Visa bara tillgängliga ställen"}
             className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
@@ -450,7 +468,12 @@ function SettingsButton({
               pipeline steg 04 baserat på OSM `dog=*` ELLER Google `allowsDogs`.
               Samma "false positives är värre än inga träffar"-resonemang som
               Tillgängligt — när filtret är på döljs venues utan bekräftad
-              hundvänlighet. */}
+              hundvänlighet.
+
+              Just nu wrappad i DOG_GLUTEN_FILTERS_ENABLED-flagga eftersom
+              OSM-datan är för tunn för att vara meningsfull (1 hund av 2844).
+              Se CLAUDE.md "Hund/Glutenfri — paused". */}
+          {DOG_GLUTEN_FILTERS_ENABLED && (
           <button
             onClick={() => onDogFriendlyOnlyChange(!dogFriendlyOnly)}
             aria-pressed={dogFriendlyOnly}
@@ -474,10 +497,13 @@ function SettingsButton({
               <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${dogFriendlyOnly ? "translate-x-3" : "translate-x-0"}`} />
             </span>
           </button>
+          )}
 
           {/* Glutenfritt-toggle. Filter på venue.glutenFree från pipeline steg
               04 — sant om OSM `diet:gluten_free=yes/limited/only` eller om ≥2
-              Google-reviews nämner glutenfri-keywords. */}
+              Google-reviews nämner glutenfri-keywords. Wrappad i samma flagga
+              som hundvänligt — se kommentar ovan. */}
+          {DOG_GLUTEN_FILTERS_ENABLED && (
           <button
             onClick={() => onGlutenFreeOnlyChange(!glutenFreeOnly)}
             aria-pressed={glutenFreeOnly}
@@ -504,10 +530,11 @@ function SettingsButton({
               <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${glutenFreeOnly ? "translate-x-3" : "translate-x-0"}`} />
             </span>
           </button>
+          )}
 
           {/* Tunnelbana toggle */}
           <button
-            onClick={() => { onToggleMetro(); }}
+            onClick={() => { vibrate(); onToggleMetro(); }}
             aria-pressed={showMetro}
             aria-label={showMetro ? "Dölj tunnelbanenät" : "Visa tunnelbanenät"}
             className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between gap-1.5 transition-all ${
@@ -612,7 +639,7 @@ function SettingsButton({
                     return (
                       <button
                         key={s.name}
-                        onClick={() => { onMetroStationChange(s); setMetroOpen(false); setMetroSearch(""); }}
+                        onClick={() => { vibrate(); onMetroStationChange(s); setMetroOpen(false); setMetroSearch(""); }}
                         className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition ${isSelected ? "bg-amber-100/80 text-amber-800 font-semibold" : "text-slate-600 hover:bg-white/60"}`}
                       >
                         <LineDots lines={s.lines} />
@@ -779,7 +806,12 @@ export default function Header({
     return () => window.removeEventListener("soldryck-favorites-changed", read);
   }, []);
 
+  const vibrate = (ms = 6) => {
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ms);
+  };
+
   function toggleType(type: VenueType) {
+    vibrate();
     const next = new Set(typeFilter);
     if (next.has(type)) next.delete(type); else next.add(type);
     onTypeFilterChange(next);
@@ -879,34 +911,49 @@ export default function Header({
                       background: FILTER_BTN_BG,
                       backdropFilter: "blur(18px) saturate(1.6)",
                       WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                      border: FILTER_BTN_BORDER,
-                      boxShadow: FILTER_BTN_SHADOW,
-                      color: active ? ORANGE_ACTIVE_TEXT : "#475569",
+                      border: active ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
+                      boxShadow: active ? FILTER_BTN_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                      color: active ? FILTER_BTN_ACTIVE_ICON_COLOR : "#475569",
                       opacity: active ? 1 : 0.82,
                       transform: "translateZ(0)",
                       isolation: "isolate",
                       flexShrink: 0,
                     }}
                   >
-                    <span
-                      dangerouslySetInnerHTML={{ __html: svg }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        lineHeight: 1,
-                        filter: active ? ORANGE_GLOW_FILTER : undefined,
-                        transition: "filter 0.2s ease",
-                      }}
-                    />
+                    <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {active && (
+                        <span
+                          dangerouslySetInnerHTML={{ __html: svg }}
+                          style={{
+                            position: "absolute",
+                            color: "#f97316",
+                            filter: "blur(6px) saturate(2.5)",
+                            opacity: 0.85,
+                            transform: "scale(1.5)",
+                            pointerEvents: "none",
+                          }}
+                        />
+                      )}
+                      <span
+                        dangerouslySetInnerHTML={{ __html: svg }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          lineHeight: 1,
+                          position: "relative",
+                          filter: active ? FILTER_BTN_ACTIVE_ICON_FILTER : undefined,
+                          transition: "filter 0.2s ease",
+                        }}
+                      />
+                    </div>
                     <span
                       style={{
                         fontSize: 10,
                         fontWeight: 700,
                         letterSpacing: "0.05em",
                         lineHeight: 1,
-                        color: active ? ORANGE_ACTIVE_TEXT : "#334155",
-                        textShadow: active ? ORANGE_GLOW_TEXT_SHADOW : undefined,
+                        color: active ? FILTER_BTN_ACTIVE_ICON_COLOR : "#334155",
                       }}
                     >
                       {label}

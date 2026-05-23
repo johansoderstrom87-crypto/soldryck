@@ -190,6 +190,8 @@ export default function TimeSlider({
   // per pointermove tvingar Safari att synka style/layout-trädet, vilket är
   // synligt på reglagets latens när användaren scrubbar snabbt.
   const trackRectRef = useRef<DOMRect | null>(null);
+  const pointerDownXRef = useRef<number | null>(null);
+  const hasMovedRef = useRef(false);
   const [dragging, setDragging] = useState(false);
   const [draggingHandle, setDraggingHandle] = useState<"from" | "to" | null>(null);
   const [trackWidth, setTrackWidth] = useState(0);
@@ -296,16 +298,21 @@ export default function TimeSlider({
   // Wrapper: knoppens lokala state uppdateras synkront (knoppen följer fingret),
   // parent-staten skickas via transition så React kan avbryta det tunga arbetet
   // (Header, DirectionGauges, SunMap-rebuild) när nästa pointermove kommer in.
+  const vibrate = (ms = 6) => {
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ms);
+  };
+
   const dispatchHour = (h: number) => {
+    if (h !== displayHour) vibrate(4);
     setLocalHour(h);
     startHourTransition(() => onHourChange(h));
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    // Cacha rect:et för hela dragets längd. Pointermove läser det utan att
-    // tvinga en ny layout-pass per frame.
     trackRectRef.current = e.currentTarget.getBoundingClientRect();
+    pointerDownXRef.current = e.clientX;
+    hasMovedRef.current = false;
     setDragging(true);
     const h = clientXToHour(e.clientX);
     if (rangeMode && sunRange) {
@@ -327,6 +334,9 @@ export default function TimeSlider({
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragging) return;
+    if (pointerDownXRef.current !== null && Math.abs(e.clientX - pointerDownXRef.current) > 6) {
+      hasMovedRef.current = true;
+    }
     const h = clientXToHour(e.clientX);
     if (rangeMode && sunRange && draggingHandle) {
       if (draggingHandle === "from") {
@@ -343,12 +353,28 @@ export default function TimeSlider({
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+    const wasTap = !hasMovedRef.current;
+    if (wasTap) {
+      const h = clientXToHour(pointerDownXRef.current ?? e.clientX);
+      if (rangeMode && sunRange) {
+        // Tap på en handle → kollapsa tillbaka till enkelt-läge
+        const distFrom = Math.abs(h - sunRange.from);
+        const distTo = Math.abs(h - sunRange.to);
+        const collapseHour = distFrom <= distTo ? sunRange.from : sunRange.to;
+        onSunRangeChange(null);
+        dispatchHour(collapseHour);
+        vibrate(10);
+      } else if (h === displayHour) {
+        // Tap på knappen → dela upp i två handtag
+        const to = Math.min(displayHour + 3, 22);
+        onSunRangeChange({ from: displayHour, to });
+        vibrate(10);
+      }
+    }
     setDragging(false);
     setDraggingHandle(null);
-    // Släpp local-state — parent-`hour` är nu autoritativt igen. Om transition-
-    // kön fortfarande har en in-flight uppdatering kommer den att landa via
-    // propen och displayHour faller tillbaka till `hour` automatiskt.
     setLocalHour(null);
+    pointerDownXRef.current = null;
   };
 
   const handleCalendarSelect = (picked: Date) => {
@@ -378,6 +404,7 @@ export default function TimeSlider({
       const el = dayScrollRef.current;
       if (!el) return;
       const idx = Math.max(0, Math.min(days.length - 1, Math.round(el.scrollLeft / (PILL_W + PILL_GAP))));
+      if (idx !== centeredIdx) vibrate(6);
       setCenteredIdx(idx);
       setCalendarOpen(false);
       const d = days[idx];
@@ -407,46 +434,9 @@ export default function TimeSlider({
         paddingRight: "calc(12px + var(--safe-right))",
       }}
     >
-      {/* Sun / temp / wind bar + range toggle button */}
-      <div className="max-w-md mx-auto mt-2 mb-1 flex items-center gap-2">
-        <button
-          onClick={() => {
-            if (rangeMode) {
-              onSunRangeChange(null);
-            } else {
-              const from = hour;
-              const to = Math.min(hour + 3, 22);
-              onSunRangeChange({ from, to });
-            }
-          }}
-          title={rangeMode ? "Visa enstaka timme" : "Filtrera på soltimmar"}
-          aria-label={rangeMode ? "Stäng tidsintervall, visa enstaka timme" : "Aktivera tidsintervall för soltimmar"}
-          aria-pressed={rangeMode}
-          className="pointer-events-auto flex-shrink-0 rounded-xl flex items-center justify-center transition-all"
-          style={{
-            width: 36,
-            height: 36,
-            background: rangeMode
-              ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
-              : "rgba(255,255,255,0.28)",
-            backdropFilter: rangeMode ? undefined : "blur(14px) saturate(1.3)",
-            WebkitBackdropFilter: rangeMode ? undefined : "blur(14px) saturate(1.3)",
-            border: rangeMode ? "0.5px solid rgba(255,180,80,0.6)" : "0.5px solid rgba(255,255,255,0.55)",
-            boxShadow: rangeMode
-              ? "0 0 18px rgba(251,146,60,0.55), 0 3px 8px rgba(251,146,60,0.4), inset 0 1px 1px rgba(255,255,255,0.3)"
-              : "0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)",
-            color: rangeMode ? "#000" : "#64748b",
-          }}
-        >
-          <svg width="18" height="10" viewBox="0 0 18 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="3" cy="5" r="3" fill="currentColor" />
-            <line x1="6" y1="5" x2="12" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            <circle cx="15" cy="5" r="3" fill="currentColor" />
-          </svg>
-        </button>
-        <div className="flex-1 pointer-events-none">
-          <DirectionGauges hour={displayHour} date={date} currentWeather={currentWeather} />
-        </div>
+      {/* Sun / temp / wind bar */}
+      <div className="max-w-md mx-auto mt-2 mb-1 pointer-events-none">
+        <DirectionGauges hour={displayHour} date={date} currentWeather={currentWeather} />
       </div>
 
       {/* Weather icons — pixel-aligned with slider via trackWidth to match each hour exactly */}
@@ -479,8 +469,8 @@ export default function TimeSlider({
                 filter: past
                   ? "grayscale(0.8) drop-shadow(0 1px 3px rgba(0,0,0,0.35))"
                   : isSelected
-                  ? "drop-shadow(0 2px 8px rgba(0,0,0,0.55)) drop-shadow(0 0 12px rgba(255,200,50,0.55))"
-                  : "drop-shadow(0 0 4px rgba(255,255,255,0.9)) drop-shadow(0 2px 6px rgba(0,0,0,0.6))",
+                  ? "brightness(1.15) drop-shadow(0 2px 8px rgba(0,0,0,0.60)) drop-shadow(0 0 12px rgba(255,200,50,0.60))"
+                  : "brightness(1.10) drop-shadow(0 0 5px rgba(255,255,255,0.95)) drop-shadow(0 2px 7px rgba(0,0,0,0.65))",
                 willChange: "transform",
                 transition: "transform 0.22s ease-out, opacity 0.22s ease-out",
               }}
@@ -659,7 +649,7 @@ export default function TimeSlider({
                       : "rgba(255, 255, 255, 0.3)",
                     border: isCenter ? "none" : "0.5px solid rgba(255, 255, 255, 0.5)",
                     boxShadow: isCenter
-                      ? "0 0 18px rgba(251,146,60,0.5), 0 3px 12px rgba(251,146,60,0.4)"
+                      ? "0 0 0 2px rgba(217,119,6,0.80), 0 0 5px rgba(251,191,36,0.38), 0 2px 6px rgba(120,53,15,0.20)"
                       : "0 3px 8px rgba(15,23,42,0.10), 0 1px 2px rgba(15,23,42,0.06)",
                     color: "#000",
                     opacity: dist === 0 ? 1 : dist === 1 ? 0.75 : 0.45,
