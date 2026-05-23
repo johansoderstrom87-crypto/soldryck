@@ -108,6 +108,10 @@ html, body {
   background: rgba(255, 255, 255, 0.94) !important;
 }
 
+.day-scroll-carousel::-webkit-scrollbar {
+  display: none;
+}
+
 /* Leaflet overrides */
 .leaflet-container {
   width: 100%;
@@ -208,7 +212,7 @@ html, body {
   height: 100%;
   border-radius: 50%;
   box-sizing: border-box;
-  filter: var(--marker-dot-filter, none);
+  filter: saturate(1.25) var(--marker-dot-filter, brightness(1));
   transition: filter 0.8s ease;
 }
 
@@ -245,18 +249,18 @@ html, body {
 /* Hollow ring — "filled = sun, empty ring = no sun". Cold blue tint creates
    thermal contrast against warm sun markers without stealing visual weight. */
 .marker-dot.marker-shade {
-  background: rgba(130, 150, 210, 0.12);
-  border: 1.5px solid rgba(100, 120, 180, 0.60);
+  background: rgba(130, 150, 210, 0.22);
+  border: 1.5px solid rgba(100, 120, 180, 0.70);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
 }
 .show-badges .marker-dot.marker-shade {
-  background: rgba(130, 150, 210, 0.15);
-  border: 1.5px solid rgba(100, 120, 180, 0.70);
+  background: rgba(130, 150, 210, 0.25);
+  border: 1.5px solid rgba(100, 120, 180, 0.80);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
 }
 
 .marker-dot.marker-partial {
-  background: linear-gradient(135deg, #fbbf24 0%, #fbbf24 50%, rgba(130, 150, 210, 0.12) 50%, rgba(130, 150, 210, 0.12) 100%);
+  background: linear-gradient(135deg, #fbbf24 0%, #fbbf24 50%, rgba(130, 150, 210, 0.22) 50%, rgba(130, 150, 210, 0.22) 100%);
   border: 1px solid rgba(100, 120, 180, 0.30);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }

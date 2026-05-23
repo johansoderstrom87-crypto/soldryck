@@ -26,6 +26,8 @@ const MONTH_NAMES_SHORT = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug
 const MONTH_NAMES_FULL = ["Januari", "Februari", "Mars", "April", "Maj", "Juni", "Juli", "Augusti", "September", "Oktober", "November", "December"];
 
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 7); // 7–22
+const PILL_W = 62;
+const PILL_GAP = 8;
 
 // --- Custom calendar popup ---
 interface CalendarProps {
@@ -201,6 +203,10 @@ export default function TimeSlider({
   const [localHour, setLocalHour] = useState<number | null>(null);
   const displayHour = localHour ?? hour;
 
+  const dayScrollRef = useRef<HTMLDivElement>(null);
+  const [centeredIdx, setCenteredIdx] = useState(0);
+  const scrollEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const rangeMode = sunRange !== null;
 
   // baseDate determines the start of the 7-day window. Normally "today", but
@@ -351,6 +357,43 @@ export default function TimeSlider({
     onDateChange(picked);
   };
 
+  // Sync carousel scroll when selected date changes (e.g. calendar pick)
+  useEffect(() => {
+    const el = dayScrollRef.current;
+    if (!el) return;
+    const idx = days.findIndex(d => toLocalDateStr(d) === selectedDateStr);
+    if (idx === -1) return;
+    if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current);
+    el.scrollTo({ left: idx * (PILL_W + PILL_GAP), behavior: "smooth" });
+    setCenteredIdx(idx);
+  }, [selectedDateStr, days]);
+
+  useEffect(() => {
+    return () => { if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current); };
+  }, []);
+
+  const handleDayScroll = () => {
+    if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current);
+    scrollEndTimer.current = setTimeout(() => {
+      const el = dayScrollRef.current;
+      if (!el) return;
+      const idx = Math.max(0, Math.min(days.length - 1, Math.round(el.scrollLeft / (PILL_W + PILL_GAP))));
+      setCenteredIdx(idx);
+      setCalendarOpen(false);
+      const d = days[idx];
+      if (d) onDateChange(d);
+    }, 80);
+  };
+
+  const handleDayPillClick = (idx: number) => {
+    if (idx === centeredIdx) {
+      setCalendarOpen(o => !o);
+    } else {
+      const el = dayScrollRef.current;
+      if (el) el.scrollTo({ left: idx * (PILL_W + PILL_GAP), behavior: "smooth" });
+    }
+  };
+
   return (
     <div
       className="absolute bottom-0 left-0 right-0 z-[1250] pointer-events-none"
@@ -451,12 +494,8 @@ export default function TimeSlider({
       <div
         ref={panelRef}
         data-onboarding="time-slider"
-        className="theme-surface pointer-events-auto max-w-md mx-auto rounded-2xl"
+        className="pointer-events-auto max-w-md mx-auto"
         style={{
-          backdropFilter: "blur(14px) saturate(1.3)",
-          WebkitBackdropFilter: "blur(14px) saturate(1.3)",
-          borderWidth: "0.5px",
-          borderStyle: "solid",
           overflow: "visible",
           transform: "translateZ(0)",
           isolation: "isolate",
@@ -575,57 +614,63 @@ export default function TimeSlider({
             )}
           </div>
 
-          {/* Day pills */}
-          <div className="flex items-stretch gap-1 mt-3">
+          {/* Day scroll carousel */}
+          <div
+            ref={dayScrollRef}
+            className="day-scroll-carousel"
+            onScroll={handleDayScroll}
+            style={{
+              overflowX: "auto",
+              scrollSnapType: "x mandatory",
+              display: "flex",
+              gap: `${PILL_GAP}px`,
+              paddingInline: `calc(50% - ${PILL_W / 2}px)`,
+              marginTop: 12,
+              scrollbarWidth: "none",
+              WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 16%, black 84%, transparent 100%)",
+              maskImage: "linear-gradient(to right, transparent 0%, black 16%, black 84%, transparent 100%)",
+            }}
+          >
             {days.map((d, i) => {
               const dStr = toLocalDateStr(d);
-              const isSelected = selectedDateStr === dStr;
-              const isFirstPill = i === 0;
-              const dayName = isFirstPill
+              const isCenter = i === centeredIdx;
+              const dist = Math.abs(i - centeredIdx);
+              const dayName = i === 0
                 ? baseDateIsToday ? "IDAG" : DAY_NAMES[d.getDay()] ?? ""
                 : DAY_NAMES[d.getDay()] ?? "";
               const dateLabel = `${d.getDate()} ${MONTH_NAMES_SHORT[d.getMonth()]}`;
               return (
                 <button
                   key={dStr}
-                  onClick={() => {
-                    if (isFirstPill) {
-                      setCalendarOpen(o => !o);
-                    } else {
-                      setCalendarOpen(false);
-                      onDateChange(d);
-                    }
-                  }}
-                  className="flex-1 rounded-full px-1 py-2 transition-all duration-200 flex flex-col items-center justify-center"
+                  onClick={() => handleDayPillClick(i)}
                   style={{
-                    background: isSelected
+                    flexShrink: 0,
+                    width: PILL_W,
+                    scrollSnapAlign: "center",
+                    borderRadius: 999,
+                    paddingTop: 8,
+                    paddingBottom: 8,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: isCenter
                       ? "linear-gradient(135deg, #fb923c 0%, #f59e0b 100%)"
-                      : calendarOpen && isFirstPill
-                      ? "rgba(251, 146, 60, 0.25)"
                       : "rgba(255, 255, 255, 0.3)",
-                    backdropFilter: isSelected ? undefined : "blur(14px) saturate(1.3)",
-                    WebkitBackdropFilter: isSelected ? undefined : "blur(14px) saturate(1.3)",
-                    border: isSelected ? "none" : "0.5px solid rgba(255, 255, 255, 0.5)",
-                    boxShadow: isSelected
-                      ? "0 0 18px rgba(251,146,60,0.5), 0 3px 12px rgba(251, 146, 60, 0.4)"
+                    border: isCenter ? "none" : "0.5px solid rgba(255, 255, 255, 0.5)",
+                    boxShadow: isCenter
+                      ? "0 0 18px rgba(251,146,60,0.5), 0 3px 12px rgba(251,146,60,0.4)"
                       : "0 3px 8px rgba(15,23,42,0.10), 0 1px 2px rgba(15,23,42,0.06)",
                     color: "#000",
-                    minWidth: 0,
+                    opacity: dist === 0 ? 1 : dist === 1 ? 0.75 : 0.45,
+                    transform: `scale(${isCenter ? 1 : 0.9})`,
+                    transition: "opacity 0.2s ease, transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease",
                   }}
                 >
-                  <span
-                    className="text-[9px] font-bold leading-none"
-                    style={{ letterSpacing: "0.08em" }}
-                  >
+                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", lineHeight: 1 }}>
                     {dayName}
                   </span>
-                  <span
-                    className="text-[8.5px] leading-tight mt-0.5 tabular-nums"
-                    style={{
-                      color: isSelected ? "rgba(0, 0, 0, 0.85)" : "rgba(0, 0, 0, 0.6)",
-                      fontWeight: 500,
-                    }}
-                  >
+                  <span style={{ fontSize: 8.5, marginTop: 2, fontWeight: 500, lineHeight: 1, color: isCenter ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.6)" }}>
                     {dateLabel}
                   </span>
                 </button>
