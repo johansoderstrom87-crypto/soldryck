@@ -3408,11 +3408,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
               ? "rgba(239,68,68,0.88)"
               : findSunState === "none"
               ? "rgba(100,116,139,0.45)"
-              : "linear-gradient(145deg, #fb923c 0%, #f59e0b 100%)",
+              : "radial-gradient(ellipse at 50% 38%, #ffc4ae 0%, #f98c72 48%, #f27260 100%)",
             backdropFilter: findSunState === "none" ? "blur(14px) saturate(1.3)" : undefined,
             WebkitBackdropFilter: findSunState === "none" ? "blur(14px) saturate(1.3)" : undefined,
             boxShadow: findSunState === "idle"
-              ? "0 4px 20px rgba(245,158,11,0.5), 0 2px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25)"
+              ? "0 4px 20px rgba(242,114,96,0.50), 0 2px 8px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.25)"
               : "0 2px 8px rgba(0,0,0,0.12)",
             color: "#fff",
             transition: "background 0.3s ease, box-shadow 0.3s ease",
