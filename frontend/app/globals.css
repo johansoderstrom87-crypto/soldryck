@@ -1021,11 +1021,11 @@ html, body {
     radial-gradient(
       circle at 50% 50%,
       #ffffff 0%,
-      #fff0e0 10%,
-      #fdba74 26%,
-      #f97316 50%,
-      #ea580c 74%,
-      #dc4514 100%
+      #fff4e8 14%,
+      #fec48a 33%,
+      #f97316 56%,
+      #f06020 78%,
+      #e04c18 100%
     );
   color: #0f172a;
   font-weight: 900;
