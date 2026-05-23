@@ -953,7 +953,7 @@ export default function Header({
                         fontWeight: 700,
                         letterSpacing: "0.05em",
                         lineHeight: 1,
-                        color: active ? FILTER_BTN_ACTIVE_ICON_COLOR : "#334155",
+                        color: "#111827",
                       }}
                     >
                       {label}
