@@ -220,35 +220,48 @@ html, body {
 /* Base shadows are cheap (single drop shadow) at zoomed-out view where
    hundreds of markers paint at once. Fancy glow only at badge-zoom (>= 17)
    where ~20 markers are visible — affordable there.
-   Sun = warm orange gradient (bright/filled). Shade = dark semi-transparent
-   with inner ring (dark glass). Distinct without color via luminance contrast. */
+   Sun = ember gradient matching the time-slider knob (white core → gold → orange).
+   Shade = dark blue semi-transparent glass with inner ring. */
 .marker-dot.marker-sun {
-  background: radial-gradient(circle at 35% 30%, #ffe17a 0%, #f97316 62%, #ea580c 100%);
-  box-shadow: 0 2px 7px rgba(249, 115, 22, 0.50), 0 1px 3px rgba(0, 0, 0, 0.12);
+  background: radial-gradient(circle at 50% 50%,
+    #ffffff 0%, #fffbeb 28%, #fef9c3 52%, #fde047 70%, #fbbf24 86%, #f97316 100%);
+  box-shadow:
+    0 0 6px rgba(251, 146, 60, 0.65),
+    0 0 12px rgba(251, 191, 36, 0.40),
+    0 2px 4px rgba(120, 53, 15, 0.22);
 }
 .show-badges .marker-dot.marker-sun {
-  box-shadow: 0 0 18px rgba(249, 115, 22, 0.65), 0 0 7px rgba(255, 200, 55, 0.45), 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow:
+    0 0 10px rgba(253, 224, 71, 0.80),
+    0 0 22px rgba(251, 146, 60, 0.65),
+    0 0 38px rgba(234, 88, 12, 0.38),
+    0 3px 8px rgba(120, 53, 15, 0.28);
 }
 .marker-root:not(.marker-unconfirmed) .marker-dot.marker-sun {
-  width: 15px;
-  height: 15px;
+  width: 12px;
+  height: 12px;
 }
 
+/* Hollow ring — "filled = sun, empty ring = no sun". Cold blue tint creates
+   thermal contrast against warm sun markers without stealing visual weight. */
 .marker-dot.marker-shade {
-  background: rgba(15, 23, 42, 0.70);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.20), 0 1px 4px rgba(0, 0, 0, 0.30);
+  background: rgba(130, 150, 210, 0.12);
+  border: 1.5px solid rgba(100, 120, 180, 0.60);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
 }
 .show-badges .marker-dot.marker-shade {
-  background: rgba(15, 23, 42, 0.76);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28), 0 2px 8px rgba(0, 0, 0, 0.40);
+  background: rgba(130, 150, 210, 0.15);
+  border: 1.5px solid rgba(100, 120, 180, 0.70);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
 }
 
 .marker-dot.marker-partial {
-  background: linear-gradient(135deg, #f97316 0%, #f97316 50%, rgba(15, 23, 42, 0.70) 50%, rgba(15, 23, 42, 0.70) 100%);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+  background: linear-gradient(135deg, #fbbf24 0%, #fbbf24 50%, rgba(130, 150, 210, 0.12) 50%, rgba(130, 150, 210, 0.12) 100%);
+  border: 1px solid rgba(100, 120, 180, 0.30);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
 .show-badges .marker-dot.marker-partial {
-  box-shadow: 0 0 10px rgba(249, 115, 22, 0.35), 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.40), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .marker-dot.marker-rain {
@@ -266,49 +279,58 @@ html, body {
   opacity: 0.6;
 }
 
-/* Rooftop venues — floating neon glass. Purple ring + tall drop shadow
-   creates the illusion the marker hovers above street level.
-   Only ~22 rooftop venues exist so the richer shadow stack is affordable. */
+/* Rooftop venues — purple ember: same gradient as sun markers but violet.
+   Always shows full color regardless of sun/shade (elevated venues read
+   differently from street level). ~22 rooftop venues so rich shadows are fine. */
 .marker-rooftop .marker-dot {
+  background: radial-gradient(circle at 50% 50%,
+    #ffffff 0%, #fdf4ff 28%, #ede9fe 52%, #c4b5fd 70%, #8b5cf6 86%, #7c3aed 100%);
+  border: none;
+  width: 12px;
+  height: 12px;
   box-shadow:
-    0 0 0 2px rgba(139, 92, 246, 0.75),
-    0 4px 12px rgba(0, 0, 0, 0.30);
+    0 0 6px rgba(139, 92, 246, 0.65),
+    0 0 12px rgba(167, 139, 250, 0.40),
+    0 2px 4px rgba(76, 29, 149, 0.22);
 }
 .show-badges .marker-rooftop .marker-dot {
   box-shadow:
-    0 0 0 2px rgba(167, 139, 250, 0.90),
-    0 0 12px rgba(139, 92, 246, 0.55),
-    0 8px 22px rgba(0, 0, 0, 0.35);
+    0 0 10px rgba(167, 139, 250, 0.80),
+    0 0 22px rgba(139, 92, 246, 0.65),
+    0 0 38px rgba(109, 40, 217, 0.38),
+    0 3px 8px rgba(76, 29, 149, 0.28);
 }
 
-/* Rooftop + sun: warm glow merges with purple ring */
+/* Rooftop + sun: full brightness */
 .marker-rooftop .marker-dot.marker-sun {
   box-shadow:
-    0 0 0 2px rgba(139, 92, 246, 0.75),
-    0 2px 10px rgba(249, 115, 22, 0.45),
-    0 4px 12px rgba(0, 0, 0, 0.28);
+    0 0 8px rgba(167, 139, 250, 0.80),
+    0 0 18px rgba(139, 92, 246, 0.55),
+    0 2px 4px rgba(76, 29, 149, 0.22);
 }
 .show-badges .marker-rooftop .marker-dot.marker-sun {
   box-shadow:
-    0 0 0 2px rgba(167, 139, 250, 0.90),
-    0 0 18px rgba(249, 115, 22, 0.55),
-    0 0 10px rgba(139, 92, 246, 0.40),
-    0 8px 22px rgba(0, 0, 0, 0.30);
+    0 0 12px rgba(167, 139, 250, 0.90),
+    0 0 28px rgba(139, 92, 246, 0.70),
+    0 0 50px rgba(109, 40, 217, 0.40),
+    0 3px 8px rgba(76, 29, 149, 0.28);
 }
 
-/* Rooftop + shade: dark glass with purple ring */
+/* Rooftop + shade: same gradient, slightly dimmer glow, no outline border */
 .marker-rooftop .marker-dot.marker-shade {
+  border: none;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
-    0 0 0 2px rgba(139, 92, 246, 0.75),
-    0 4px 12px rgba(0, 0, 0, 0.30);
+    0 0 4px rgba(139, 92, 246, 0.45),
+    0 0 10px rgba(167, 139, 250, 0.28),
+    0 1px 3px rgba(76, 29, 149, 0.18);
 }
 .show-badges .marker-rooftop .marker-dot.marker-shade {
+  border: none;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.30),
-    0 0 0 2px rgba(167, 139, 250, 0.90),
-    0 0 10px rgba(139, 92, 246, 0.45),
-    0 8px 22px rgba(0, 0, 0, 0.38);
+    0 0 8px rgba(167, 139, 250, 0.65),
+    0 0 20px rgba(139, 92, 246, 0.45),
+    0 0 36px rgba(109, 40, 217, 0.28),
+    0 3px 8px rgba(76, 29, 149, 0.22);
 }
 
 /* Subtle violet tint in the rooftop badge */
