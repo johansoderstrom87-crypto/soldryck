@@ -1763,7 +1763,6 @@ html, body {
   bottom: 9px;
   left: 50%;
   pointer-events: none;
-  z-index: 10;
   animation: selected-pin-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 @keyframes selected-pin-pop {
