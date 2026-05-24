@@ -1757,8 +1757,8 @@ html, body {
 .marker-selected::after {
   content: '';
   position: absolute;
-  width: 46px;
-  height: 54px;
+  width: 37px;
+  height: 43px;
   background: url('/soldryck_logo_pin.png') no-repeat center / contain;
   bottom: 9px;
   left: 50%;
