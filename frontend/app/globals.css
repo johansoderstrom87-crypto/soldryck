@@ -1744,29 +1744,31 @@ html, body {
   padding: 10px 12px 16px;
 }
 
-/* Vald markör — pulserande ring som visar vilken pin sheet:en hör till.
-   Sätts från SunMap via .marker-selected på marker-root. */
+/* Vald markör — Soldryck logo-pin animeras upp ovanför punkten.
+   Spetsen av pinen är placerad vid venues koordinatpunkt (bottom: 9px = halva icon-höjden).
+   Dot-ringen tas bort — logon är den visuella markören. */
 .marker-selected .marker-dot {
-  box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.9),
-    0 0 0 6px rgba(245, 158, 11, 0.75),
-    0 4px 14px rgba(245, 158, 11, 0.45) !important;
-  transform: scale(1.25);
+  transform: scale(1.15);
   transition: transform 0.18s ease;
   z-index: 2;
+  box-shadow: 0 0 0 2.5px rgba(255,255,255,0.85) !important;
 }
-.marker-selected.marker-unconfirmed .marker-dot {
-  box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.9),
-    0 0 0 5px rgba(245, 158, 11, 0.75) !important;
+.marker-selected::after {
+  content: '';
+  position: absolute;
+  width: 46px;
+  height: 54px;
+  background: url('/soldryck_logo_pin.png') no-repeat center / contain;
+  bottom: 9px;
+  left: 50%;
+  pointer-events: none;
+  z-index: 10;
+  animation: selected-pin-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
-
-@keyframes venue-sheet-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(255,255,255,0.9), 0 0 0 6px rgba(245,158,11,0.75), 0 4px 14px rgba(245,158,11,0.45); }
-  50%      { box-shadow: 0 0 0 3px rgba(255,255,255,0.9), 0 0 0 10px rgba(245,158,11,0.35), 0 4px 14px rgba(245,158,11,0.45); }
-}
-.marker-selected:not(.marker-unconfirmed) .marker-dot {
-  animation: venue-sheet-pulse 1.8s ease-in-out infinite;
+@keyframes selected-pin-pop {
+  0%   { transform: translateX(-50%) translateY(18px) scale(0.2); opacity: 0; }
+  65%  { transform: translateX(-50%) translateY(-5px) scale(1.06); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(0)    scale(1);    opacity: 1; }
 }
 
 /* Respect users who've asked for less motion. Almost everything fades to a
