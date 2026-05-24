@@ -103,6 +103,10 @@ const BLUE_GLOW_TEXT_SHADOW = "0 0 6px rgba(96,165,250,0.50)";
 // "Hund/Glutenfri — paused" för planen att återuppta.
 const DOG_GLUTEN_FILTERS_ENABLED = false;
 
+const vibrate = (ms = 6) => {
+  if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ms);
+};
+
 interface HeaderProps {
   filter: "all" | "sun" | "shade";
   onFilterChange: (filter: "all" | "sun" | "shade") => void;
@@ -801,10 +805,6 @@ export default function Header({
     window.addEventListener("soldryck-favorites-changed", read);
     return () => window.removeEventListener("soldryck-favorites-changed", read);
   }, []);
-
-  const vibrate = (ms = 6) => {
-    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ms);
-  };
 
   function toggleType(type: VenueType) {
     vibrate();
