@@ -1745,30 +1745,30 @@ html, body {
   padding: 10px 12px 16px;
 }
 
-/* Vald markör — Soldryck logo-pin animeras upp ovanför punkten.
-   Spetsen av pinen är placerad vid venues koordinatpunkt (bottom: 9px = halva icon-höjden).
-   Dot-ringen tas bort — logon är den visuella markören. */
+/* Vald markör — dot skalas upp lätt med en vit ring.
+   Logo-pinen renderas i ett separat Leaflet-pane (z:550) via JS
+   så den aldrig hamnar ovanför area-search-chips (z:1085+). */
 .marker-selected .marker-dot {
   transform: scale(1.15);
   transition: transform 0.18s ease;
   z-index: 2;
   box-shadow: 0 0 0 2.5px rgba(255,255,255,0.85) !important;
 }
-.marker-selected::after {
-  content: '';
-  position: absolute;
-  width: 37px;
-  height: 43px;
-  background: url('/soldryck_logo_pin.png') no-repeat center / contain;
-  bottom: 9px;
-  left: 50%;
-  pointer-events: none;
+
+/* Logo-pin-markören injiceras som ett divIcon i selectedPin-panen */
+.selected-logo-pin {
+  background: transparent !important;
+  border: none !important;
+  overflow: visible !important;
+}
+.selected-logo-pin img {
+  display: block;
   animation: selected-pin-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 @keyframes selected-pin-pop {
-  0%   { transform: translateX(-50%) translateY(18px) scale(0.2); opacity: 0; }
-  65%  { transform: translateX(-50%) translateY(-5px) scale(1.06); opacity: 1; }
-  100% { transform: translateX(-50%) translateY(0)    scale(1);    opacity: 1; }
+  0%   { transform: translateY(18px) scale(0.2); opacity: 0; }
+  65%  { transform: translateY(-5px) scale(1.06); opacity: 1; }
+  100% { transform: translateY(0)    scale(1);    opacity: 1; }
 }
 
 /* Respect users who've asked for less motion. Almost everything fades to a

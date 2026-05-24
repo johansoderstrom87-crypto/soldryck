@@ -1418,6 +1418,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   );
 
   const mapRef = useRef<L.Map | null>(null);
+  const selectedPinMarkerRef = useRef<L.Marker | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   // Parallel array of (marker, venue) so the hour-update effect can recompute
   // status without rebuilding markers. Kept in lockstep with markersRef.
@@ -1519,8 +1520,32 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // Visual marker selection — toggles `.marker-selected` on the icon root
   // for whichever venue is currently shown in the sheet. Cleared when sheet
   // closes. Looks at both confirmed and unconfirmed marker arrays.
+  // Also adds/removes the Soldryck logo-pin in the low-z-index selectedPin
+  // pane so it never overlaps area-search chips or other UI overlays.
   useEffect(() => {
     const id = selected?.venue?.id;
+    const map = mapRef.current;
+
+    // Remove old logo-pin marker
+    if (selectedPinMarkerRef.current) {
+      selectedPinMarkerRef.current.remove();
+      selectedPinMarkerRef.current = null;
+    }
+
+    // Add new logo-pin marker if a venue is selected
+    if (id != null && selected?.venue && map) {
+      const pinIcon = L.divIcon({
+        className: "selected-logo-pin",
+        html: `<img src="/soldryck_logo_pin.png" width="37" height="43" alt="" />`,
+        iconSize: [37, 43],
+        iconAnchor: [19, 43],
+      });
+      selectedPinMarkerRef.current = L.marker(
+        [selected.venue.lat, selected.venue.lng],
+        { icon: pinIcon, pane: "selectedPin", interactive: false, zIndexOffset: 0 }
+      ).addTo(map);
+    }
+
     const toggle = (mk: L.Marker, on: boolean) => {
       const el = (mk as L.Marker & { _icon?: HTMLElement })._icon;
       if (el) el.classList.toggle("marker-selected", on);
@@ -1763,6 +1788,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     // ambient darkness crosses ~0.4 — wasting tile decodes during pan on a
     // pane that the user can't currently see was a meaningful chunk of the
     // pan-frame budget on older iPhones.
+    // Logo-pin for selected venue — below marker-pane (600) and area-search chips (1085+)
+    const selectedPinPane = map.createPane("selectedPin");
+    selectedPinPane.style.zIndex = "550";
+    selectedPinPane.style.pointerEvents = "none";
+
     const darkPane = map.createPane("darkTiles");
     darkPane.style.zIndex = "201"; // tilePane=200, overlayPane=400
     darkPane.style.opacity = "0";
