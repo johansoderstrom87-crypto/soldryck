@@ -249,13 +249,13 @@ html, body {
 /* Hollow ring — "filled = sun, empty ring = no sun". Cold blue tint creates
    thermal contrast against warm sun markers without stealing visual weight. */
 .marker-dot.marker-shade {
-  background: rgba(130, 150, 210, 0.40);
-  border: 2px solid rgba(100, 120, 180, 0.70);
+  background: rgba(130, 150, 210, 0.52);
+  border: 2px solid rgba(100, 120, 180, 0.58);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10);
 }
 .show-badges .marker-dot.marker-shade {
-  background: rgba(130, 150, 210, 0.44);
-  border: 2px solid rgba(100, 120, 180, 0.80);
+  background: rgba(130, 150, 210, 0.56);
+  border: 2px solid rgba(100, 120, 180, 0.66);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
 }
 
