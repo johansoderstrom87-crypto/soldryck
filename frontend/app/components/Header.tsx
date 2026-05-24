@@ -281,10 +281,11 @@ function SettingsButton({
         aria-label={open ? "Stäng meny" : `Meny${activeCount > 0 ? ` (${activeCount} aktiva filter)` : ""}`}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="rounded-2xl flex items-center justify-center transition-all relative active:scale-95"
+        className="flex items-center justify-center transition-all relative active:scale-95"
         style={{
           width: 52,
           height: 52,
+          borderRadius: 9999,
           background: "rgba(255,255,255,0.55)",
           border: "0.5px solid rgba(255,255,255,0.7)",
           boxShadow: "0 6px 20px rgba(245,158,11,0.18), 0 2px 6px rgba(0,0,0,0.08)",
@@ -826,7 +827,7 @@ export default function Header({
       <div
         className="absolute pointer-events-auto select-none"
         style={{
-          top: "calc(var(--safe-top, 0px) + 70px)",
+          top: "calc(var(--safe-top, 0px) + 76px)",
           left: "calc(var(--safe-left, 0px) + 12px)",
           zIndex: 20,
         }}
@@ -870,9 +871,9 @@ export default function Header({
         onControlledClose={() => setFavoritesOpen(false)}
       />
 
-      {/* Centered filter row + collapse toggle */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto select-none" style={{ top: "calc(var(--safe-top, 0px) + 14px)" }}>
-        <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+      {/* Left-aligned filter row + collapse toggle */}
+      <div className="absolute flex flex-col items-start gap-1.5 pointer-events-auto select-none" style={{ top: "calc(var(--safe-top, 0px) + 14px)", left: "calc(var(--safe-left, 0px) + 12px)" }}>
+        <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
           {/* marginBottom collapse — no overflow:hidden so backdrop-filter has no ghost box and buttons aren't clipped */}
           <div
             data-onboarding="filter-row"
