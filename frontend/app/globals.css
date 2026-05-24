@@ -1758,7 +1758,7 @@ html, body {
 .selected-logo-pin-img {
   position: absolute;
   top: calc(50% - 17px);
-  left: calc(50% - 15px);
+  left: calc(50% - 12px);
   width: 30px;
   height: 34px;
   pointer-events: none;
