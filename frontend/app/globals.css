@@ -1757,7 +1757,7 @@ html, body {
    .marker-badge, så den syns ovanför punkten men bakom namnlappen. */
 .selected-logo-pin-img {
   position: absolute;
-  bottom: 9px;
+  top: calc(50% - 17px);
   left: calc(50% - 15px);
   width: 30px;
   height: 34px;

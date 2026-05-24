@@ -519,7 +519,7 @@ const getSunHrs = venueModule.getSunHours;
 // and reassign positions (above/right/left/below) to minimize overlap
 const BADGE_W = 130;
 const BADGE_H = 32;
-const POSITIONS = ["badge-above", "badge-right", "badge-left", "badge-below"] as const;
+const POSITIONS = ["badge-right", "badge-left", "badge-below"] as const;
 
 function resolveBadgeCollisions(map: L.Map, markers: L.Marker[]) {
   if (map.getZoom() < 17) return;
@@ -529,11 +529,10 @@ function resolveBadgeCollisions(map: L.Map, markers: L.Marker[]) {
   function getRect(px: L.Point, pos: number): Omit<Rect, "idx"> {
     const w = BADGE_W, h = BADGE_H;
     switch (pos) {
-      case 0: return { x: px.x - w / 2, y: px.y - h - 12, w, h, pos }; // above
-      case 1: return { x: px.x + 14, y: px.y - h / 2, w, h, pos };     // right
-      case 2: return { x: px.x - w - 14, y: px.y - h / 2, w, h, pos }; // left
-      case 3: return { x: px.x - w / 2, y: px.y + 14, w, h, pos };     // below
-      default: return { x: px.x - w / 2, y: px.y - h - 12, w, h, pos };
+      case 0: return { x: px.x + 14, y: px.y - h / 2, w, h, pos };     // right (default)
+      case 1: return { x: px.x - w - 14, y: px.y - h / 2, w, h, pos }; // left
+      case 2: return { x: px.x - w / 2, y: px.y + 14, w, h, pos };     // below
+      default: return { x: px.x + 14, y: px.y - h / 2, w, h, pos };    // right fallback
     }
   }
 
@@ -553,20 +552,20 @@ function resolveBadgeCollisions(map: L.Map, markers: L.Marker[]) {
     items.push({ px, el });
   }
 
-  // Greedily assign positions, preferring above, then right, left, below
+  // Greedily assign positions: right → left → below. Never above.
   const placed: Omit<Rect, "idx">[] = [];
   for (const item of items) {
-    let best = 0;
-    for (let p = 0; p < 4; p++) {
+    let best = 0; // default: right
+    for (let p = 0; p < 3; p++) {
       const rect = getRect(item.px, p);
       const hasCollision = placed.some((r) => overlaps(rect, r));
       if (!hasCollision) { best = p; break; }
-      if (p === 0) best = p; // fallback to above if all collide
     }
     const finalRect = getRect(item.px, best);
     placed.push(finalRect);
 
-    // Apply position class
+    // Apply position class (also remove legacy badge-above if present)
+    item.el.classList.remove("badge-above");
     for (const cls of POSITIONS) item.el.classList.remove(cls);
     item.el.classList.add(POSITIONS[best]);
   }
@@ -2381,7 +2380,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       const shortName = venue.name.length > 20 ? venue.name.slice(0, 18) + "…" : venue.name;
       const sunPeriod = getSunPeriod(venue, dateKey);
       const badgeHtml = svgIcon ? `
-        <div class="marker-badge badge-above">
+        <div class="marker-badge badge-right">
           <div class="marker-badge-icon">${svgIcon}</div>
           <div class="marker-badge-text">
             <div class="marker-badge-name">${shortName}</div>
