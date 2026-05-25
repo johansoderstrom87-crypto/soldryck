@@ -714,22 +714,6 @@ function walkingMinutes(venue: { lat: number; lng: number }): string | null {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
-async function fetchOpenNow(venue: any): Promise<boolean | null> {
-  if (venueHoursCache.has(venue.id)) {
-    return venueHoursCache.get(venue.id)?.openNow ?? null;
-  }
-  const params = new URLSearchParams({
-    id: venue.id, name: venue.name, lat: String(venue.lat), lng: String(venue.lng), type: venue.type,
-  });
-  try {
-    const r = await fetch(`/api/venue-hours?${params}`);
-    const data: VenueHoursPayload = r.ok ? await r.json() : null;
-    venueHoursCache.set(venue.id, data);
-    return data?.openNow ?? null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * "Statiska" filter — de som inte ändras under en hour-scrub utan bara
@@ -1495,6 +1479,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // Area search panel state
   const [areaSearchOpen, setAreaSearchOpen] = useState(false);
   const [areaSearchVenues, setAreaSearchVenues] = useState<any[]>([]);
+  // When true, handleFindSun set the venues directly — the area-bounds effect must not overwrite them.
+  const nearbyModeRef = useRef<boolean>(false);
+  const [nearbyUserLocation, setNearbyUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const dateKey = useMemo(() => getDateKey(date), [date]);
 
@@ -2898,8 +2885,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       searchAreaRectRef.current?.remove();
       searchAreaRectRef.current = null;
       searchBoundsRef.current = null;
+      nearbyModeRef.current = false;
       return;
     }
+
+    // In nearby mode venues were already set by handleFindSun — don't overwrite with bounds-based list
+    if (nearbyModeRef.current) return;
 
     // Capture bounds and draw rectangle only on first open (not on filter/dateKey re-runs)
     if (!searchBoundsRef.current) {
@@ -2958,44 +2949,38 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         const { latitude, longitude } = pos.coords;
         const cosLat = Math.cos((latitude * Math.PI) / 180);
 
-        const sunnyVenues = allVenues.filter((v: ComputedVenue) => {
-          // getStatus returns the compressed code ("s") from the JSON store;
-          // mock-venues uses the legacy "sun" form, hence the OR.
-          const s = getStatus(v, dateKey, hourRef.current) as string;
-          return s === "sun" || s === "s";
-        });
+        // Find all sunny venues within 200m, sorted by distance
+        const nearby = allVenues
+          .map((v: ComputedVenue) => {
+            const s = getStatus(v, dateKey, hourRef.current) as string;
+            if (s !== "sun" && s !== "s") return null;
+            const dlat = (v.lat - latitude) * 111_000;
+            const dlng = (v.lng - longitude) * 111_000 * cosLat;
+            const d = Math.sqrt(dlat * dlat + dlng * dlng);
+            if (d > 200) return null;
+            return { v, d };
+          })
+          .filter((x): x is { v: ComputedVenue; d: number } => x !== null)
+          .sort((a, b) => a.d - b.d)
+          .map(({ v }) => v);
 
-        if (sunnyVenues.length === 0) {
+        if (nearby.length === 0) {
           setFindSunState("none");
-          setFindSunMsg("Inga uteserveringar har sol just nu — prova en annan timme.");
+          setFindSunMsg("Inga uteserveringar med sol inom 200m just nu.");
           setTimeout(() => { setFindSunState("idle"); setFindSunMsg(null); }, 4500);
           return;
         }
 
-        // Sort by distance, take nearest 10, then prefer open venues
-        const nearest10 = sunnyVenues
-          .map((v: any) => {
-            const dlat = (v.lat - latitude) * 111_000;
-            const dlng = (v.lng - longitude) * 111_000 * cosLat;
-            return { v, d: dlat * dlat + dlng * dlng };
-          })
-          .sort((a: any, b: any) => a.d - b.d)
-          .slice(0, 10)
-          .map((x: any) => x.v);
-
-        const openNowResults = await Promise.all(nearest10.map(fetchOpenNow));
-        const openVenues = nearest10.filter((_: any, i: number) => openNowResults[i] === true);
-        const unknownVenues = nearest10.filter((_: any, i: number) => openNowResults[i] === null);
-
-        const target = openVenues[0] ?? unknownVenues[0];
-        if (!target) {
-          setFindSunState("none");
-          setFindSunMsg("Inga öppna ställen med sol nära dig");
-          setTimeout(() => { setFindSunState("idle"); setFindSunMsg(null); }, 4000);
-          return;
+        // Pan to user's position, then open the nearby list
+        const map = mapRef.current;
+        if (map) {
+          map.flyTo([latitude, longitude], Math.max(map.getZoom(), 16), { duration: 1.0, easeLinearity: 0.4 });
         }
 
-        flyToVenue(target);
+        nearbyModeRef.current = true;
+        setNearbyUserLocation({ lat: latitude, lng: longitude });
+        setAreaSearchVenues(nearby);
+        setAreaSearchOpen(true);
         setFindSunState("idle");
       },
       (err) => {
@@ -3604,13 +3589,18 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         venues={areaSearchVenues}
         hour={hourProp}
         dateKey={dateKey}
-        onClose={() => setAreaSearchOpen(false)}
+        onClose={() => {
+          setAreaSearchOpen(false);
+          setNearbyUserLocation(null);
+        }}
         onSelectVenue={(venue) => {
           setAreaSearchOpen(false);
+          setNearbyUserLocation(null);
           flyToVenue(venue);
         }}
         getStatus={getStatus}
         getSunHours={getSunHrs}
+        userLocation={nearbyUserLocation}
       />
 
       {/* Venue bottom sheet — Google Maps-stil. Glider upp underifrån när

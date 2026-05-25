@@ -5,7 +5,7 @@ import { buildClosedStatus } from "../lib/venueHours";
 import Sheet from "./Sheet";
 
 type NormalizedStatus = "sun" | "shade" | "partial" | "night";
-type SortMode = "sun-remaining" | "rating" | "sun-count";
+type SortMode = "sun-remaining" | "rating" | "sun-count" | "distance";
 
 const photoCache = new Map<string, string | null>();
 const hoursCache = new Map<string, any>();
@@ -335,10 +335,12 @@ export interface AreaSearchPanelProps {
   onSelectVenue: (venue: any) => void;
   getStatus: (v: any, dk: string, h: number) => string | undefined;
   getSunHours: (v: any, dk: string) => number;
+  /** When set, switches the panel to "nearby mode" — shows distance sort and adjusted title. */
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 export default function AreaSearchPanel({
-  open, venues, hour, dateKey, onClose, onSelectVenue, getStatus, getSunHours,
+  open, venues, hour, dateKey, onClose, onSelectVenue, getStatus, getSunHours, userLocation,
 }: AreaSearchPanelProps) {
   // Inline backdrop-filter på header — globalt `* { backdrop-filter: none
   // !important }` strippar annars all blur från alla element. setProperty
@@ -357,11 +359,23 @@ export default function AreaSearchPanel({
   // best on all selected axes). At least one must stay on — toggling the
   // last selected criterion is a no-op so the list never enters an
   // undefined state.
-  const [sortKeys, setSortKeys] = useState<Set<SortMode>>(() => new Set(["sun-remaining"]));
+  const [sortKeys, setSortKeys] = useState<Set<SortMode>>(() =>
+    new Set<SortMode>(userLocation ? ["distance"] : ["sun-remaining"]),
+  );
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(40);
 
   useEffect(() => { setDisplayCount(40); }, [venues]);
+
+  // Reset sort when switching between nearby and area mode
+  const prevNearby = useRef<boolean>(!!userLocation);
+  useEffect(() => {
+    const isNearby = !!userLocation;
+    if (isNearby !== prevNearby.current) {
+      prevNearby.current = isNearby;
+      setSortKeys(new Set([isNearby ? "distance" : "sun-remaining"]));
+    }
+  }, [userLocation]);
 
   function toggleSort(key: SortMode) {
     setSortKeys((prev) => {
@@ -379,6 +393,12 @@ export default function AreaSearchPanel({
     const getMetric = (v: any, key: SortMode): number => {
       if (key === "sun-remaining") return countSunHoursFrom(v, dateKey, hour, getStatus);
       if (key === "rating") return v.rating ?? -1;
+      if (key === "distance" && userLocation) {
+        const cosLat = Math.cos(userLocation.lat * Math.PI / 180);
+        const dlat = (v.lat - userLocation.lat) * 111_000;
+        const dlng = (v.lng - userLocation.lng) * 111_000 * cosLat;
+        return -(dlat * dlat + dlng * dlng); // closer = higher metric = sorted first
+      }
       return getSunHours(v, dateKey);
     };
 
@@ -446,9 +466,12 @@ export default function AreaSearchPanel({
       <div ref={headerRef} className="area-search-header">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>I detta område</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+              {userLocation ? "Nära dig" : "I detta område"}
+            </div>
             <div style={{ fontSize: 11, color: "#475569", marginTop: 1 }}>
               {venues.length} {venues.length === 1 ? "ställe" : "ställen"}
+              {userLocation ? " inom 200m" : ""}
             </div>
           </div>
           <button
@@ -470,6 +493,7 @@ export default function AreaSearchPanel({
           </button>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
+          {userLocation && sortBtn("distance", "Närmaste")}
           {sortBtn("sun-remaining", "Sol kvar")}
           {sortBtn("rating", "Betyg")}
           {sortBtn("sun-count", "Mest sol")}
@@ -494,7 +518,9 @@ export default function AreaSearchPanel({
               Inga ställen här
             </div>
             <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, maxWidth: 240, margin: "0 auto" }}>
-              Pannar du utåt på kartan och söker igen hittar du fler — eller släpp filtren ovan.
+              {userLocation
+                ? "Inga uteserveringar med sol inom 200m just nu — prova en annan timme."
+                : "Pannar du utåt på kartan och söker igen hittar du fler — eller släpp filtren ovan."}
             </div>
           </div>
         ) : (
