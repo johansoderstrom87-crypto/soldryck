@@ -3568,7 +3568,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       {/* "Sök i detta område" — appears below category filters after first pan (Google Maps pattern) */}
       {showSearchInArea && !areaSearchOpen && (
         <div style={{
-          position: "absolute", top: "calc(164px + var(--safe-top, 0px))", left: "50%",
+          position: "absolute", top: "calc(204px + var(--safe-top, 0px))", left: "50%",
           transform: "translateX(-50%)", zIndex: 1090, pointerEvents: "auto",
         }}>
           <button
