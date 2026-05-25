@@ -868,9 +868,29 @@ export default function Header({
         onControlledClose={() => setFavoritesOpen(false)}
       />
 
-      {/* Left-aligned filter row + collapse toggle + DirectionGauges */}
-      <div className="absolute flex flex-col items-start gap-1.5 pointer-events-auto select-none" style={{ top: "calc(var(--safe-top, 0px) + 66px)", left: "calc(var(--safe-left, 0px) + 12px)" }}>
-        <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
+      {/* Bottom area — filter row + DirectionGauges above TimeSlider.
+          Anchored from bottom so the chevron stays just above the slider
+          regardless of filter open/collapsed state. */}
+      <div
+        className="absolute flex flex-col items-start pointer-events-none select-none"
+        style={{
+          bottom: "calc(var(--safe-bottom, 0px) + 162px)",
+          left: "calc(var(--safe-left, 0px) + 12px)",
+          zIndex: 20,
+          gap: 8,
+        }}
+      >
+        {/* Sol/temp/vind — ovanför filterknapparna */}
+        <div className="pointer-events-none">
+          <DirectionGauges
+            hour={hour}
+            date={date}
+            currentWeather={(weather?.hourly?.[hour] ?? null) as HourlyWeather | null}
+          />
+        </div>
+
+        {/* Filter row + collapse chevron */}
+        <div className="pointer-events-auto" style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
           {/* marginBottom collapse — no overflow:hidden so backdrop-filter has no ghost box and buttons aren't clipped */}
           <div
             data-onboarding="filter-row"
@@ -880,7 +900,7 @@ export default function Header({
               fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
               opacity: filtersOpen ? 1 : 0,
               visibility: filtersOpen ? "visible" : "hidden",
-              transform: filtersOpen ? "translateY(0)" : "translateY(-4px)",
+              transform: filtersOpen ? "translateY(0)" : "translateY(4px)",
               marginBottom: filtersOpen ? 0 : -50,
               pointerEvents: filtersOpen ? "auto" : "none",
               transition:
@@ -1053,7 +1073,7 @@ export default function Header({
             </button>
           </div>
 
-          {/* Collapse / expand toggle — chevron ∧ when open (pointing up = hide), ∨ when closed (pointing down = show) */}
+          {/* Collapse / expand toggle — ∧ when open (collapse), ∨ when closed (expand upward) */}
           <button
             onClick={() => setFiltersOpen((v) => !v)}
             title={filtersOpen ? "Dölj filter" : "Visa filter"}
@@ -1093,15 +1113,6 @@ export default function Header({
               <path d="M1 1l4 4 4-4" />
             </svg>
           </button>
-
-          {/* Sol/temp/vind — visas under filterraden */}
-          <div className="pointer-events-none mt-1">
-            <DirectionGauges
-              hour={hour}
-              date={date}
-              currentWeather={(weather?.hourly?.[hour] ?? null) as HourlyWeather | null}
-            />
-          </div>
         </div>
       </div>
     </div>
