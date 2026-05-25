@@ -872,7 +872,7 @@ export default function Header({
       <div
         className="absolute flex flex-row items-center pointer-events-none select-none"
         style={{
-          top: "calc(var(--safe-top, 0px) + 66px)",
+          bottom: "calc(var(--safe-bottom, 0px) + 225px)",
           left: "calc(var(--safe-left, 0px) + 12px)",
           zIndex: 20,
           gap: 6,
@@ -898,64 +898,27 @@ export default function Header({
               "visibility 0s linear " + (filtersOpen ? "0s" : "0.24s"),
           }}
         >
-          {TYPE_BUTTONS.map(({ type, label, svg }) => {
-            const active = typeFilter.has(type);
-            return (
-              <button
-                key={type}
-                onClick={() => toggleType(type)}
-                title={label}
-                aria-label={`Filter ${label}`}
-                aria-pressed={typeFilter.has(type)}
-                className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
-                style={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: 9999,
-                  background: active ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
-                  backdropFilter: "blur(18px) saturate(1.6)",
-                  WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                  border: active ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                  boxShadow: active ? FILTER_BTN_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
-                  color: active ? FILTER_BTN_ACTIVE_ICON_COLOR : "#475569",
-                  opacity: active ? 1 : 0.82,
-                  transform: "translateZ(0)",
-                  isolation: "isolate",
-                  flexShrink: 0,
-                }}
-              >
-                <span
-                  dangerouslySetInnerHTML={{ __html: svg }}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
-                />
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: active ? "#fff" : "#111827" }}>
-                  {label}
-                </span>
-              </button>
-            );
-          })}
-
-          {/* Horizontal divider between category and modifier buttons */}
-          <div aria-hidden style={{ height: 1, width: 36, marginBlock: 2, background: "rgba(15,23,42,0.38)" }} />
-
+          {/* Modifier buttons — T-bana, Öppet, Glas (top) */}
           <button
-            onClick={() => onAlcoholOnlyChange(!alcoholOnly)}
-            title="Bara ställen med serveringstillstånd"
-            aria-label="Filter Glas — serveringstillstånd"
-            aria-pressed={alcoholOnly}
+            onClick={() => onToggleMetro()}
+            title="Tunnelbana" aria-label="Visa tunnelbanenät" aria-pressed={showMetro}
             className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
             style={{
               width: 50, height: 50, borderRadius: 9999,
-              background: alcoholOnly ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+              background: showMetro ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
               backdropFilter: "blur(18px) saturate(1.6)", WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-              border: alcoholOnly ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
-              boxShadow: alcoholOnly ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
-              color: alcoholOnly ? "#fff" : "#475569", opacity: alcoholOnly ? 1 : 0.82,
+              border: showMetro ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
+              boxShadow: showMetro ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
+              color: showMetro ? "#fff" : "#475569", opacity: showMetro ? 1 : 0.82,
               transform: "translateZ(0)", isolation: "isolate", flexShrink: 0,
             }}
           >
-            <span dangerouslySetInnerHTML={{ __html: ALCOHOL_MODIFIER_SVG }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: alcoholOnly ? "#fff" : "#111827" }}>Glas</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 2, lineHeight: 1 }}>
+              <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#e3000b" }} />
+              <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#00a14e" }} />
+              <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#0065bd" }} />
+            </span>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: showMetro ? "#fff" : "#111827" }}>T-bana</span>
           </button>
 
           <button
@@ -979,26 +942,55 @@ export default function Header({
           </button>
 
           <button
-            onClick={() => onToggleMetro()}
-            title="Tunnelbana" aria-label="Visa tunnelbanenät" aria-pressed={showMetro}
+            onClick={() => onAlcoholOnlyChange(!alcoholOnly)}
+            title="Bara ställen med serveringstillstånd"
+            aria-label="Filter Glas — serveringstillstånd"
+            aria-pressed={alcoholOnly}
             className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
             style={{
               width: 50, height: 50, borderRadius: 9999,
-              background: showMetro ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+              background: alcoholOnly ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
               backdropFilter: "blur(18px) saturate(1.6)", WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-              border: showMetro ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
-              boxShadow: showMetro ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
-              color: showMetro ? "#fff" : "#475569", opacity: showMetro ? 1 : 0.82,
+              border: alcoholOnly ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
+              boxShadow: alcoholOnly ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
+              color: alcoholOnly ? "#fff" : "#475569", opacity: alcoholOnly ? 1 : 0.82,
               transform: "translateZ(0)", isolation: "isolate", flexShrink: 0,
             }}
           >
-            <span style={{ display: "flex", alignItems: "center", gap: 2, lineHeight: 1 }}>
-              <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#e3000b" }} />
-              <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#00a14e" }} />
-              <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#0065bd" }} />
-            </span>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: showMetro ? "#fff" : "#111827" }}>T-bana</span>
+            <span dangerouslySetInnerHTML={{ __html: ALCOHOL_MODIFIER_SVG }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: alcoholOnly ? "#fff" : "#111827" }}>Glas</span>
           </button>
+
+          {/* Horizontal divider between modifier and category buttons */}
+          <div aria-hidden style={{ height: 1, width: 36, marginBlock: 2, background: "rgba(15,23,42,0.38)" }} />
+
+          {/* Category buttons — Takbar, Bar, Fika, Äta (bottom) */}
+          {[...TYPE_BUTTONS].reverse().map(({ type, label, svg }) => {
+            const active = typeFilter.has(type);
+            return (
+              <button
+                key={type}
+                onClick={() => toggleType(type)}
+                title={label}
+                aria-label={`Filter ${label}`}
+                aria-pressed={typeFilter.has(type)}
+                className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+                style={{
+                  width: 50, height: 50, borderRadius: 9999,
+                  background: active ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+                  backdropFilter: "blur(18px) saturate(1.6)", WebkitBackdropFilter: "blur(18px) saturate(1.6)",
+                  border: active ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
+                  boxShadow: active ? FILTER_BTN_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                  color: active ? FILTER_BTN_ACTIVE_ICON_COLOR : "#475569",
+                  opacity: active ? 1 : 0.82,
+                  transform: "translateZ(0)", isolation: "isolate", flexShrink: 0,
+                }}
+              >
+                <span dangerouslySetInnerHTML={{ __html: svg }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: active ? "#fff" : "#111827" }}>{label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Collapse arrow — always visible, centered vertically by flex parent.
