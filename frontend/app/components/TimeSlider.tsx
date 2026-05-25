@@ -3,7 +3,6 @@
 import { useMemo, useRef, useState, useCallback, useEffect, useTransition } from "react";
 import { type WeatherData, type HourlyWeather, getSymbolInfo, toLocalDateStr } from "../lib/weather";
 import { snapToSeason } from "../lib/season";
-import DirectionGauges from "./DirectionGauges";
 
 type SunRange = { from: number; to: number } | null;
 
@@ -286,8 +285,6 @@ export default function TimeSlider({
     [weather]
   );
 
-  const currentWeather = getHourWeather(displayHour);
-
   const clientXToHour = useCallback((clientX: number): number => {
     const rect = trackRectRef.current;
     if (!rect) return displayHour;
@@ -434,11 +431,6 @@ export default function TimeSlider({
         paddingRight: "calc(12px + var(--safe-right))",
       }}
     >
-      {/* Sun / temp / wind bar */}
-      <div className="max-w-md mx-auto mt-2 mb-1 pointer-events-none">
-        <DirectionGauges hour={displayHour} date={date} currentWeather={currentWeather} />
-      </div>
-
       {/* Weather icons — pixel-aligned with slider via trackWidth to match each hour exactly */}
       <div className="relative max-w-md mx-auto" style={{ height: 34, overflow: "visible" }}>
         {HOURS.map((h) => {

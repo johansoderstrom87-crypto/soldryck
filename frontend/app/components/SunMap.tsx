@@ -2121,7 +2121,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     const trackPolylines: L.Polyline[] = [];
     for (const track of platformized) {
       const poly = L.polyline(track.coords, {
-        color: lineColors[track.color], weight: trackWeightForZoom(map.getZoom()), opacity: 0.85,
+        color: lineColors[track.color], weight: trackWeightForZoom(map.getZoom()), opacity: 0.5,
         lineCap: "round", lineJoin: "round", smoothFactor: 0, interactive: false,
       }).addTo(layer);
       trackPolylines.push(poly);

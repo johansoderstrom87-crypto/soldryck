@@ -6,6 +6,8 @@ import { type VenueType, type SunRange } from "./SunMap";
 import { METRO_STATIONS, type MetroStation } from "../data/metro-stations";
 import FavoritesPanel from "./FavoritesPanel";
 import { getFavorites } from "../lib/favorites";
+import { type WeatherData, type HourlyWeather } from "../lib/weather";
+import DirectionGauges from "./DirectionGauges";
 
 const LINE_COLORS: Record<string, string> = {
   red: "#e3000b",
@@ -135,7 +137,9 @@ interface HeaderProps {
   venues: { id: string; name: string; type: string; address: string; lat: number; lng: number }[];
   onSelectVenue: (id: string) => void;
   hour: number;
+  date: Date;
   dateKey: string;
+  weather: WeatherData | null;
   getStatus: (venue: any, dateKey: string, hour: number) => string | undefined;
   getClosestDateKey: (date: Date) => string;
 }
@@ -283,8 +287,8 @@ function SettingsButton({
         aria-haspopup="menu"
         className="flex items-center justify-center transition-all relative active:scale-95"
         style={{
-          width: 52,
-          height: 52,
+          width: 44,
+          height: 44,
           borderRadius: 9999,
           background: "rgba(255,255,255,0.55)",
           border: "0.5px solid rgba(255,255,255,0.7)",
@@ -791,7 +795,7 @@ export default function Header({
   metroStation, onMetroStationChange,
   openNowFilter, onOpenNowFilterChange,
   alcoholOnly, onAlcoholOnlyChange,
-  venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey,
+  venues, onSelectVenue, hour, date, dateKey, weather, getStatus, getClosestDateKey,
 }: HeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(true);
   // Favoriter-panelen styrs nu från SettingsButton-dropdown (menyposten
@@ -816,18 +820,11 @@ export default function Header({
 
   return (
     <div className="absolute top-0 left-0 right-0 z-[1100] pointer-events-none">
-      {/* Top-left meny-knapp — kombinerad Soldryck-logo + hamburger.
-          Ersätter den tidigare centrerade plattan med separat logo +
-          hamburger + favoriter. Allt har flyttats hit; Favoriter når man
-          som menypost i dropdown:en.
-
-          Top-värdet placerar knappen UNDER filter-raden (~14 top + 44 hög
-          + 8 marginal ≈ 66 px från safe-top) så de inte överlappar på
-          smala skärmar där filter-raden sträcker sig nära vänsterkanten. */}
+      {/* Top-left meny-knapp — standard övre vänster hörn, ovanför filterraden. */}
       <div
         className="absolute pointer-events-auto select-none"
         style={{
-          top: "calc(var(--safe-top, 0px) + 76px)",
+          top: "calc(var(--safe-top, 0px) + 14px)",
           left: "calc(var(--safe-left, 0px) + 12px)",
           zIndex: 20,
         }}
@@ -871,8 +868,8 @@ export default function Header({
         onControlledClose={() => setFavoritesOpen(false)}
       />
 
-      {/* Left-aligned filter row + collapse toggle */}
-      <div className="absolute flex flex-col items-start gap-1.5 pointer-events-auto select-none" style={{ top: "calc(var(--safe-top, 0px) + 14px)", left: "calc(var(--safe-left, 0px) + 12px)" }}>
+      {/* Left-aligned filter row + collapse toggle + DirectionGauges */}
+      <div className="absolute flex flex-col items-start gap-1.5 pointer-events-auto select-none" style={{ top: "calc(var(--safe-top, 0px) + 66px)", left: "calc(var(--safe-left, 0px) + 12px)" }}>
         <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
           {/* marginBottom collapse — no overflow:hidden so backdrop-filter has no ghost box and buttons aren't clipped */}
           <div
@@ -1096,6 +1093,15 @@ export default function Header({
               <path d="M1 1l4 4 4-4" />
             </svg>
           </button>
+
+          {/* Sol/temp/vind — visas under filterraden */}
+          <div className="pointer-events-none mt-1">
+            <DirectionGauges
+              hour={hour}
+              date={date}
+              currentWeather={(weather?.hourly?.[hour] ?? null) as HourlyWeather | null}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -199,7 +199,9 @@ export default function Home() {
         venues={allVenues}
         onSelectVenue={(id) => setFocusVenueId(id)}
         hour={hour}
+        date={date}
         dateKey={dateKey}
+        weather={weatherForDate}
         getStatus={getStatus}
         getClosestDateKey={getDateKey}
       />
