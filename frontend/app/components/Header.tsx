@@ -807,13 +807,18 @@ export default function Header({
     return () => window.removeEventListener("soldryck-favorites-changed", read);
   }, []);
 
-  const [filterToast, setFilterToast] = useState<{ text: string; key: number } | null>(null);
+  const [filterToast, setFilterToast] = useState<{ text: string; key: number; y: number } | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const filterContainerRef = useRef<HTMLDivElement>(null);
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
-  const showToast = (text: string) => {
+  const showToast = (text: string, btn: HTMLElement) => {
+    const container = filterContainerRef.current;
+    const containerTop = container ? container.getBoundingClientRect().top : 0;
+    const btnRect = btn.getBoundingClientRect();
+    const y = btnRect.top + btnRect.height / 2 - containerTop;
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setFilterToast({ text, key: Date.now() });
+    setFilterToast({ text, key: Date.now(), y });
     toastTimerRef.current = setTimeout(() => setFilterToast(null), 2200);
   };
 
@@ -824,14 +829,14 @@ export default function Header({
     rooftop: "Visar takbarer",
   };
 
-  function toggleType(type: VenueType) {
+  function toggleType(type: VenueType, btn: HTMLElement) {
     vibrate();
     const next = new Set(typeFilter);
     if (next.has(type)) {
       next.delete(type);
     } else {
       next.add(type);
-      showToast(TYPE_TOAST[type] ?? "Filter aktiverat");
+      showToast(TYPE_TOAST[type] ?? "Filter aktiverat", btn);
     }
     onTypeFilterChange(next);
   }
@@ -892,6 +897,7 @@ export default function Header({
           left edge when hidden (same trick as marginBottom in the old
           horizontal layout). */}
       <div
+        ref={filterContainerRef}
         className="absolute flex flex-row items-center pointer-events-none select-none"
         style={{
           bottom: "calc(var(--safe-bottom, 0px) + 225px)",
@@ -922,7 +928,7 @@ export default function Header({
         >
           {/* Modifier buttons — T-bana, Öppet, Glas (top) */}
           <button
-            onClick={() => { if (!showMetro) showToast("Visar ställen nära tunnelbana"); onToggleMetro(); }}
+            onClick={(e) => { if (!showMetro) showToast("Visar ställen nära tunnelbana", e.currentTarget); onToggleMetro(); }}
             title="Tunnelbana" aria-label="Visa tunnelbanenät" aria-pressed={showMetro}
             className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
             style={{
@@ -944,7 +950,7 @@ export default function Header({
           </button>
 
           <button
-            onClick={() => { if (!openNowFilter) showToast("Visar ställen öppna just nu"); onOpenNowFilterChange(!openNowFilter); }}
+            onClick={(e) => { if (!openNowFilter) showToast("Visar ställen öppna just nu", e.currentTarget); onOpenNowFilterChange(!openNowFilter); }}
             title="Öppet just nu" aria-label="Filter Öppet just nu" aria-pressed={openNowFilter}
             className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
             style={{
@@ -964,7 +970,7 @@ export default function Header({
           </button>
 
           <button
-            onClick={() => { if (!alcoholOnly) showToast("Visar ställen med serveringstillstånd"); onAlcoholOnlyChange(!alcoholOnly); }}
+            onClick={(e) => { if (!alcoholOnly) showToast("Visar ställen med serveringstillstånd", e.currentTarget); onAlcoholOnlyChange(!alcoholOnly); }}
             title="Bara ställen med serveringstillstånd"
             aria-label="Filter Glas — serveringstillstånd"
             aria-pressed={alcoholOnly}
@@ -992,7 +998,7 @@ export default function Header({
             return (
               <button
                 key={type}
-                onClick={() => toggleType(type)}
+                onClick={(e) => toggleType(type, e.currentTarget)}
                 title={label}
                 aria-label={`Filter ${label}`}
                 aria-pressed={typeFilter.has(type)}
@@ -1061,7 +1067,7 @@ export default function Header({
 
         {/* Filter toast — fades in/out to the right of the arrow */}
         {filterToast && (
-          <div style={{ position: "absolute", left: "calc(100% + 10px)", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 30 }}>
+          <div style={{ position: "absolute", left: "calc(100% + 10px)", top: filterToast.y, transform: "translateY(-50%)", pointerEvents: "none", zIndex: 30 }}>
             <div
               key={filterToast.key}
               style={{

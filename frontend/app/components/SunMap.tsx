@@ -3524,9 +3524,9 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
         <div style={{
           position: "absolute",
           // Sänkt så att pillen hamnar UNDER "Sök i detta område"-knappen
-          // (~164px + ~34px höjd) istället för bakom den. Båda kan vara
+          // (204px start + ~34px höjd + 8px gap = ~246px). Båda kan vara
           // synliga samtidigt när man precis togglat Öppet.
-          top: "calc(208px + var(--safe-top, 0px))",
+          top: "calc(246px + var(--safe-top, 0px))",
           left: "50%",
           transform: "translateX(-50%)",
           zIndex: 1085,
