@@ -6,8 +6,6 @@ import { type VenueType, type SunRange } from "./SunMap";
 import { METRO_STATIONS, type MetroStation } from "../data/metro-stations";
 import FavoritesPanel from "./FavoritesPanel";
 import { getFavorites } from "../lib/favorites";
-import { type WeatherData, type HourlyWeather } from "../lib/weather";
-import DirectionGauges from "./DirectionGauges";
 
 const LINE_COLORS: Record<string, string> = {
   red: "#e3000b",
@@ -137,9 +135,7 @@ interface HeaderProps {
   venues: { id: string; name: string; type: string; address: string; lat: number; lng: number }[];
   onSelectVenue: (id: string) => void;
   hour: number;
-  date: Date;
   dateKey: string;
-  weather: WeatherData | null;
   getStatus: (venue: any, dateKey: string, hour: number) => string | undefined;
   getClosestDateKey: (date: Date) => string;
 }
@@ -795,7 +791,7 @@ export default function Header({
   metroStation, onMetroStationChange,
   openNowFilter, onOpenNowFilterChange,
   alcoholOnly, onAlcoholOnlyChange,
-  venues, onSelectVenue, hour, date, dateKey, weather, getStatus, getClosestDateKey,
+  venues, onSelectVenue, hour, dateKey, getStatus, getClosestDateKey,
 }: HeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(true);
   // Favoriter-panelen styrs nu från SettingsButton-dropdown (menyposten
@@ -868,252 +864,186 @@ export default function Header({
         onControlledClose={() => setFavoritesOpen(false)}
       />
 
-      {/* Bottom area — filter row + DirectionGauges above TimeSlider.
-          Anchored from bottom so the chevron stays just above the slider
-          regardless of filter open/collapsed state. */}
+      {/* Vertical filter sidebar — left side, below menu button.
+          Flex-row: [button column] [collapse arrow].
+          Negative marginRight on the column collapses the arrow to the
+          left edge when hidden (same trick as marginBottom in the old
+          horizontal layout). */}
       <div
-        className="absolute flex flex-col items-start pointer-events-none select-none"
+        className="absolute flex flex-row items-center pointer-events-none select-none"
         style={{
-          bottom: "calc(var(--safe-bottom, 0px) + 162px)",
+          top: "calc(var(--safe-top, 0px) + 66px)",
           left: "calc(var(--safe-left, 0px) + 12px)",
           zIndex: 20,
-          gap: 8,
+          gap: 6,
+          fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
         }}
       >
-        {/* Sol/temp/vind — ovanför filterknapparna */}
-        <div className="pointer-events-none">
-          <DirectionGauges
-            hour={hour}
-            date={date}
-            currentWeather={(weather?.hourly?.[hour] ?? null) as HourlyWeather | null}
-          />
-        </div>
+        {/* Button column */}
+        <div
+          data-onboarding="filter-row"
+          className="pointer-events-auto"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 6,
+            opacity: filtersOpen ? 1 : 0,
+            visibility: filtersOpen ? "visible" : "hidden",
+            transform: filtersOpen ? "translateX(0)" : "translateX(-4px)",
+            marginRight: filtersOpen ? 0 : -(50 + 6),
+            pointerEvents: filtersOpen ? "auto" : "none",
+            transition:
+              "margin-right 0.26s ease, opacity 0.22s ease, transform 0.24s ease, " +
+              "visibility 0s linear " + (filtersOpen ? "0s" : "0.24s"),
+          }}
+        >
+          {TYPE_BUTTONS.map(({ type, label, svg }) => {
+            const active = typeFilter.has(type);
+            return (
+              <button
+                key={type}
+                onClick={() => toggleType(type)}
+                title={label}
+                aria-label={`Filter ${label}`}
+                aria-pressed={typeFilter.has(type)}
+                className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: 9999,
+                  background: active ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+                  backdropFilter: "blur(18px) saturate(1.6)",
+                  WebkitBackdropFilter: "blur(18px) saturate(1.6)",
+                  border: active ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
+                  boxShadow: active ? FILTER_BTN_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
+                  color: active ? FILTER_BTN_ACTIVE_ICON_COLOR : "#475569",
+                  opacity: active ? 1 : 0.82,
+                  transform: "translateZ(0)",
+                  isolation: "isolate",
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  dangerouslySetInnerHTML={{ __html: svg }}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
+                />
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: active ? "#fff" : "#111827" }}>
+                  {label}
+                </span>
+              </button>
+            );
+          })}
 
-        {/* Filter row + collapse chevron */}
-        <div className="pointer-events-auto" style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
-          {/* marginBottom collapse — no overflow:hidden so backdrop-filter has no ghost box and buttons aren't clipped */}
-          <div
-            data-onboarding="filter-row"
-            style={{
-              display: "flex",
-              gap: 6,
-              fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
-              opacity: filtersOpen ? 1 : 0,
-              visibility: filtersOpen ? "visible" : "hidden",
-              transform: filtersOpen ? "translateY(0)" : "translateY(4px)",
-              marginBottom: filtersOpen ? 0 : -50,
-              pointerEvents: filtersOpen ? "auto" : "none",
-              transition:
-                "margin-bottom 0.26s ease, opacity 0.22s ease, transform 0.24s ease, " +
-                "visibility 0s linear " + (filtersOpen ? "0s" : "0.24s"),
-            }}
-          >
-            {TYPE_BUTTONS.map(({ type, label, svg }) => {
-                const active = typeFilter.has(type);
-                return (
-                  <button
-                    key={type}
-                    onClick={() => toggleType(type)}
-                    title={label}
-                    aria-label={`Filter ${label}`}
-                    aria-pressed={typeFilter.has(type)}
-                    className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
-                    style={{
-                      width: 50,
-                      height: 50,
-                      borderRadius: 9999,
-                      background: active ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
-                      backdropFilter: "blur(18px) saturate(1.6)",
-                      WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                      border: active ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                      boxShadow: active ? FILTER_BTN_ACTIVE_SHADOW : FILTER_BTN_SHADOW,
-                      color: active ? FILTER_BTN_ACTIVE_ICON_COLOR : "#475569",
-                      opacity: active ? 1 : 0.82,
-                      transform: "translateZ(0)",
-                      isolation: "isolate",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <span
-                      dangerouslySetInnerHTML={{ __html: svg }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        lineHeight: 1,
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        letterSpacing: "0.05em",
-                        lineHeight: 1,
-                        color: active ? "#fff" : "#111827",
-                      }}
-                    >
-                      {label}
-                    </span>
-                  </button>
-                );
-              })}
+          {/* Horizontal divider between category and modifier buttons */}
+          <div aria-hidden style={{ height: 1, width: 36, marginBlock: 2, background: "rgba(15,23,42,0.38)" }} />
 
-            {/* Divider — signalerar att nästa knapp (Glas) är en modifier
-                snarare än en till huvudkategori. Tunn vertikal linje med
-                lite marginal så filterraden inte ser uppdelad ut, bara
-                grupperad. */}
-            <div
-              aria-hidden
-              style={{
-                width: 1,
-                alignSelf: "stretch",
-                marginInline: 2,
-                background: "rgba(15,23,42,0.38)",
-              }}
-            />
-
-            {/* Glas — AND-modifier för serveringstillstånd (servesAlcohol).
-                Snävar in övriga urvalet, lägger inte till — därför blå styling
-                som de andra modifierarna (Öppet, T-bana) och divider:n innan. */}
-            <button
-              onClick={() => onAlcoholOnlyChange(!alcoholOnly)}
-              title="Bara ställen med serveringstillstånd"
-              aria-label="Filter Glas — serveringstillstånd"
-              aria-pressed={alcoholOnly}
-              className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
-              style={{
-                width: 50,
-                height: 50,
-                borderRadius: 9999,
-                background: alcoholOnly ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
-                backdropFilter: "blur(18px) saturate(1.6)",
-                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                border: alcoholOnly ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                boxShadow: alcoholOnly ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
-                color: alcoholOnly ? "#fff" : "#475569",
-                opacity: alcoholOnly ? 1 : 0.82,
-                transform: "translateZ(0)",
-                isolation: "isolate",
-                flexShrink: 0,
-              }}
-            >
-              <span
-                dangerouslySetInnerHTML={{ __html: ALCOHOL_MODIFIER_SVG }}
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
-              />
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: alcoholOnly ? "#fff" : "#111827" }}>
-                Glas
-              </span>
-            </button>
-
-            {/* Öppet nu-knapp — kräver att hours fetchas för viewport-venues,
-                så markörer kan dröja någon sekund innan stängda försvinner. */}
-            <button
-              onClick={() => onOpenNowFilterChange(!openNowFilter)}
-              title="Öppet just nu"
-              aria-label="Filter Öppet just nu"
-              aria-pressed={openNowFilter}
-              className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
-              style={{
-                width: 50,
-                height: 50,
-                borderRadius: 9999,
-                background: openNowFilter ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
-                backdropFilter: "blur(18px) saturate(1.6)",
-                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                border: openNowFilter ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                boxShadow: openNowFilter ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
-                color: openNowFilter ? "#fff" : "#475569",
-                opacity: openNowFilter ? 1 : 0.82,
-                transform: "translateZ(0)",
-                isolation: "isolate",
-                flexShrink: 0,
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7v5l3 2" />
-              </svg>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: openNowFilter ? "#fff" : "#111827" }}>
-                Öppet
-              </span>
-            </button>
-
-            {/* T-bana-knapp — togglar metro-overlay */}
-            <button
-              onClick={() => onToggleMetro()}
-              title="Tunnelbana"
-              aria-label="Visa tunnelbanenät"
-              aria-pressed={showMetro}
-              className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
-              style={{
-                width: 50,
-                height: 50,
-                borderRadius: 9999,
-                background: showMetro ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
-                backdropFilter: "blur(18px) saturate(1.6)",
-                WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-                border: showMetro ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
-                boxShadow: showMetro ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
-                color: showMetro ? "#fff" : "#475569",
-                opacity: showMetro ? 1 : 0.82,
-                transform: "translateZ(0)",
-                isolation: "isolate",
-                flexShrink: 0,
-              }}
-            >
-              <span style={{ display: "flex", alignItems: "center", gap: 2, lineHeight: 1 }}>
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#e3000b" }} />
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#00a14e" }} />
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#0065bd" }} />
-              </span>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: showMetro ? "#fff" : "#111827" }}>
-                T-bana
-              </span>
-            </button>
-          </div>
-
-          {/* Collapse / expand toggle — ∧ when open (collapse), ∨ when closed (expand upward) */}
           <button
-            onClick={() => setFiltersOpen((v) => !v)}
-            title={filtersOpen ? "Dölj filter" : "Visa filter"}
-            aria-label={filtersOpen ? "Dölj filterraden" : "Visa filterraden"}
-            aria-expanded={filtersOpen}
+            onClick={() => onAlcoholOnlyChange(!alcoholOnly)}
+            title="Bara ställen med serveringstillstånd"
+            aria-label="Filter Glas — serveringstillstånd"
+            aria-pressed={alcoholOnly}
+            className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
             style={{
-              background: "rgba(255,255,255,0.28)",
-              backdropFilter: "blur(14px) saturate(1.3)",
-              WebkitBackdropFilter: "blur(14px) saturate(1.3)",
-              border: "0.5px solid rgba(255,255,255,0.55)",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-              borderRadius: 999,
-              width: 28,
-              height: 16,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              transform: "translateZ(0)",
-              isolation: "isolate",
+              width: 50, height: 50, borderRadius: 9999,
+              background: alcoholOnly ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+              backdropFilter: "blur(18px) saturate(1.6)", WebkitBackdropFilter: "blur(18px) saturate(1.6)",
+              border: alcoholOnly ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
+              boxShadow: alcoholOnly ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
+              color: alcoholOnly ? "#fff" : "#475569", opacity: alcoholOnly ? 1 : 0.82,
+              transform: "translateZ(0)", isolation: "isolate", flexShrink: 0,
             }}
           >
-            <svg
-              width="10"
-              height="6"
-              viewBox="0 0 10 6"
-              fill="none"
-              stroke="#64748b"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{
-                transform: filtersOpen ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.25s ease",
-              }}
-            >
-              <path d="M1 1l4 4 4-4" />
+            <span dangerouslySetInnerHTML={{ __html: ALCOHOL_MODIFIER_SVG }} style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }} />
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: alcoholOnly ? "#fff" : "#111827" }}>Glas</span>
+          </button>
+
+          <button
+            onClick={() => onOpenNowFilterChange(!openNowFilter)}
+            title="Öppet just nu" aria-label="Filter Öppet just nu" aria-pressed={openNowFilter}
+            className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+            style={{
+              width: 50, height: 50, borderRadius: 9999,
+              background: openNowFilter ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+              backdropFilter: "blur(18px) saturate(1.6)", WebkitBackdropFilter: "blur(18px) saturate(1.6)",
+              border: openNowFilter ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
+              boxShadow: openNowFilter ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
+              color: openNowFilter ? "#fff" : "#475569", opacity: openNowFilter ? 1 : 0.82,
+              transform: "translateZ(0)", isolation: "isolate", flexShrink: 0,
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
             </svg>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: openNowFilter ? "#fff" : "#111827" }}>Öppet</span>
+          </button>
+
+          <button
+            onClick={() => onToggleMetro()}
+            title="Tunnelbana" aria-label="Visa tunnelbanenät" aria-pressed={showMetro}
+            className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
+            style={{
+              width: 50, height: 50, borderRadius: 9999,
+              background: showMetro ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
+              backdropFilter: "blur(18px) saturate(1.6)", WebkitBackdropFilter: "blur(18px) saturate(1.6)",
+              border: showMetro ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
+              boxShadow: showMetro ? "0 2px 10px rgba(60,70,160,0.30)" : FILTER_BTN_SHADOW,
+              color: showMetro ? "#fff" : "#475569", opacity: showMetro ? 1 : 0.82,
+              transform: "translateZ(0)", isolation: "isolate", flexShrink: 0,
+            }}
+          >
+            <span style={{ display: "flex", alignItems: "center", gap: 2, lineHeight: 1 }}>
+              <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#e3000b" }} />
+              <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#00a14e" }} />
+              <span style={{ width: 5, height: 5, borderRadius: 999, background: showMetro ? "rgba(255,255,255,0.85)" : "#0065bd" }} />
+            </span>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: showMetro ? "#fff" : "#111827" }}>T-bana</span>
           </button>
         </div>
+
+        {/* Collapse arrow — always visible, centered vertically by flex parent.
+            ◁ when open (collapse), ▷ when closed (expand). */}
+        <button
+          className="pointer-events-auto"
+          onClick={() => setFiltersOpen((v) => !v)}
+          title={filtersOpen ? "Dölj filter" : "Visa filter"}
+          aria-label={filtersOpen ? "Dölj filterkolumnen" : "Visa filterkolumnen"}
+          aria-expanded={filtersOpen}
+          style={{
+            background: "rgba(255,255,255,0.28)",
+            backdropFilter: "blur(14px) saturate(1.3)",
+            WebkitBackdropFilter: "blur(14px) saturate(1.3)",
+            border: "0.5px solid rgba(255,255,255,0.55)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+            borderRadius: 999,
+            width: 16,
+            height: 28,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            transform: "translateZ(0)",
+            isolation: "isolate",
+            flexShrink: 0,
+          }}
+        >
+          <svg
+            width="6"
+            height="10"
+            viewBox="0 0 6 10"
+            fill="none"
+            stroke="#64748b"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              transform: filtersOpen ? "rotate(0deg)" : "rotate(180deg)",
+              transition: "transform 0.25s ease",
+            }}
+          >
+            <path d="M5 1L1 5L5 9" />
+          </svg>
+        </button>
       </div>
     </div>
   );
