@@ -1771,6 +1771,13 @@ html, body {
   100% { transform: translateY(0)    scale(1);    opacity: 1; }
 }
 
+@keyframes filter-toast {
+  0%   { opacity: 0; transform: translateX(-6px); }
+  14%  { opacity: 1; transform: translateX(0);    }
+  72%  { opacity: 1; transform: translateX(0);    }
+  100% { opacity: 0; transform: translateX(5px);  }
+}
+
 /* Respect users who've asked for less motion. Almost everything fades to a
    single static frame; loading spinners are kept rotating but slowed so the
    user still gets the "something is happening" cue. Hard-killing all

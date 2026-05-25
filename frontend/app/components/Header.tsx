@@ -283,8 +283,8 @@ function SettingsButton({
         aria-haspopup="menu"
         className="flex items-center justify-center transition-all relative active:scale-95"
         style={{
-          width: 44,
-          height: 44,
+          width: 52,
+          height: 52,
           borderRadius: 9999,
           background: "rgba(255,255,255,0.55)",
           border: "0.5px solid rgba(255,255,255,0.7)",
@@ -299,8 +299,8 @@ function SettingsButton({
         <Image
           src="/soldryck_pin.png"
           alt="Soldryck"
-          width={44}
-          height={44}
+          width={52}
+          height={52}
           priority
           style={{
             width: "100%",
@@ -807,10 +807,32 @@ export default function Header({
     return () => window.removeEventListener("soldryck-favorites-changed", read);
   }, []);
 
+  const [filterToast, setFilterToast] = useState<{ text: string; key: number } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
+
+  const showToast = (text: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setFilterToast({ text, key: Date.now() });
+    toastTimerRef.current = setTimeout(() => setFilterToast(null), 2200);
+  };
+
+  const TYPE_TOAST: Record<string, string> = {
+    restaurant: "Visar restauranger",
+    cafe: "Visar kaféer",
+    bar: "Visar barer & pubar",
+    rooftop: "Visar takbarer",
+  };
+
   function toggleType(type: VenueType) {
     vibrate();
     const next = new Set(typeFilter);
-    if (next.has(type)) next.delete(type); else next.add(type);
+    if (next.has(type)) {
+      next.delete(type);
+    } else {
+      next.add(type);
+      showToast(TYPE_TOAST[type] ?? "Filter aktiverat");
+    }
     onTypeFilterChange(next);
   }
 
@@ -820,7 +842,7 @@ export default function Header({
       <div
         className="absolute pointer-events-auto select-none"
         style={{
-          top: "calc(var(--safe-top, 0px) + 14px)",
+          top: "calc(var(--safe-top, 0px) + 20px)",
           left: "calc(var(--safe-left, 0px) + 12px)",
           zIndex: 20,
         }}
@@ -900,7 +922,7 @@ export default function Header({
         >
           {/* Modifier buttons — T-bana, Öppet, Glas (top) */}
           <button
-            onClick={() => onToggleMetro()}
+            onClick={() => { if (!showMetro) showToast("Visar ställen nära tunnelbana"); onToggleMetro(); }}
             title="Tunnelbana" aria-label="Visa tunnelbanenät" aria-pressed={showMetro}
             className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
             style={{
@@ -922,7 +944,7 @@ export default function Header({
           </button>
 
           <button
-            onClick={() => onOpenNowFilterChange(!openNowFilter)}
+            onClick={() => { if (!openNowFilter) showToast("Visar ställen öppna just nu"); onOpenNowFilterChange(!openNowFilter); }}
             title="Öppet just nu" aria-label="Filter Öppet just nu" aria-pressed={openNowFilter}
             className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
             style={{
@@ -942,7 +964,7 @@ export default function Header({
           </button>
 
           <button
-            onClick={() => onAlcoholOnlyChange(!alcoholOnly)}
+            onClick={() => { if (!alcoholOnly) showToast("Visar ställen med serveringstillstånd"); onAlcoholOnlyChange(!alcoholOnly); }}
             title="Bara ställen med serveringstillstånd"
             aria-label="Filter Glas — serveringstillstånd"
             aria-pressed={alcoholOnly}
@@ -1036,6 +1058,31 @@ export default function Header({
             <path d="M5 1L1 5L5 9" />
           </svg>
         </button>
+
+        {/* Filter toast — fades in/out to the right of the arrow */}
+        {filterToast && (
+          <div style={{ position: "absolute", left: "calc(100% + 10px)", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 30 }}>
+            <div
+              key={filterToast.key}
+              style={{
+                animation: "filter-toast 2.2s ease forwards",
+                background: "rgba(255,255,255,0.72)",
+                backdropFilter: "blur(16px) saturate(1.3)",
+                WebkitBackdropFilter: "blur(16px) saturate(1.3)",
+                border: "0.5px solid rgba(255,255,255,0.7)",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                borderRadius: 10,
+                padding: "6px 10px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#0f172a",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {filterToast.text}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
