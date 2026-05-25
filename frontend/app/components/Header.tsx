@@ -819,7 +819,7 @@ export default function Header({
   }
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-[1100] pointer-events-none">
+    <div className="absolute inset-0 z-[1100] pointer-events-none">
       {/* Top-left meny-knapp — standard övre vänster hörn, ovanför filterraden. */}
       <div
         className="absolute pointer-events-auto select-none"
