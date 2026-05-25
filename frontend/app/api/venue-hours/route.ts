@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import fs from "fs";
+import path from "path";
 
 type DaySegment = { open: string; close: string };
 type HoursInfo = {
@@ -6,9 +8,53 @@ type HoursInfo = {
   closesAt: string | null;
   week: DaySegment[][] | null;
 };
+type CacheEntry = { info: HoursInfo; ts: number };
 
-const cache = new Map<string, { info: HoursInfo; ts: number }>();
-const CACHE_TTL = 1000 * 60 * 60 * 24 * 30; // 30 days
+// 90 days — opening hours rarely change, this triples cost-efficiency vs 30d
+const CACHE_TTL = 1000 * 60 * 60 * 24 * 90;
+
+// Resolve cache file path from the same Railway volume as shadow-data.
+// Returns null in dev (no volume mounted) → falls back to in-memory only.
+function cacheFilePath(): string | null {
+  const dir = process.env.SHADOW_DATA_PATH;
+  if (!dir) return null;
+  return path.join(dir, "venue-hours-cache.json");
+}
+
+// In-memory layer — fast lookup, also the write buffer.
+const cache = new Map<string, CacheEntry>();
+let loaded = false;
+
+function loadFromDisk(): void {
+  if (loaded) return;
+  loaded = true;
+  const p = cacheFilePath();
+  if (!p) return;
+  try {
+    if (!fs.existsSync(p)) return;
+    const data = JSON.parse(fs.readFileSync(p, "utf-8")) as Record<string, CacheEntry>;
+    for (const [id, entry] of Object.entries(data)) cache.set(id, entry);
+    console.log(`[venue-hours] loaded ${cache.size} entries from disk cache`);
+  } catch {
+    console.warn("[venue-hours] disk cache unreadable — starting fresh");
+  }
+}
+
+// Write the full cache to disk asynchronously (fire-and-forget).
+// Writes to a tmp file then renames to avoid corruption on crash.
+function saveToDisk(): void {
+  const p = cacheFilePath();
+  if (!p) return;
+  const tmp = p + ".tmp";
+  const data: Record<string, CacheEntry> = {};
+  for (const [id, entry] of cache.entries()) data[id] = entry;
+  fs.writeFile(tmp, JSON.stringify(data), "utf-8", (err) => {
+    if (err) { console.warn("[venue-hours] cache write error:", err); return; }
+    fs.rename(tmp, p, (err2) => {
+      if (err2) console.warn("[venue-hours] cache rename error:", err2);
+    });
+  });
+}
 
 function emptyInfo(): HoursInfo {
   return { openNow: null, closesAt: null, week: null };
@@ -49,7 +95,6 @@ const FIELD_MASK =
   "places.id,places.regularOpeningHours.periods,places.currentOpeningHours.openNow,places.currentOpeningHours.periods";
 
 async function findPlace(apiKey: string, name: string, lat: number, lng: number, venueType: string): Promise<any | null> {
-  // 1. Text search by name — works when OSM name matches Google
   const textRes = await fetch("https://places.googleapis.com/v1/places:searchText", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": FIELD_MASK },
@@ -64,7 +109,6 @@ async function findPlace(apiKey: string, name: string, lat: number, lng: number,
     if (data.places?.[0]) return data.places[0];
   }
 
-  // 2. Fallback: nearby search by coordinates — finds whatever is actually there
   const nearbyRes = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": FIELD_MASK },
@@ -83,6 +127,8 @@ async function findPlace(apiKey: string, name: string, lat: number, lng: number,
 }
 
 export async function GET(req: NextRequest) {
+  loadFromDisk();
+
   const key = process.env.GOOGLE_PLACES_API_KEY;
   if (!key) return Response.json(emptyInfo());
 
@@ -103,6 +149,7 @@ export async function GET(req: NextRequest) {
     if (!place) {
       const info = emptyInfo();
       cache.set(id, { info, ts: Date.now() });
+      saveToDisk();
       return Response.json(info);
     }
 
@@ -125,11 +172,13 @@ export async function GET(req: NextRequest) {
 
     const info: HoursInfo = { openNow, closesAt, week };
     cache.set(id, { info, ts: Date.now() });
+    saveToDisk();
     return Response.json(info);
   } catch (err) {
     console.error("venue-hours error:", err);
     const info = emptyInfo();
     cache.set(id, { info, ts: Date.now() });
+    saveToDisk();
     return Response.json(info);
   }
 }
