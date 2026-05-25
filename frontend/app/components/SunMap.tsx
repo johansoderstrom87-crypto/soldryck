@@ -1578,7 +1578,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     } else {
       // Mobile: skip pan when fully expanded — sheet covers the map.
       if (sheetSnap === "full") return;
-      const targetY = Math.max(80, size.y * 0.28);
+      const targetY = Math.max(80, size.y * 0.20);
       target = L.point(size.x / 2, targetY);
     }
 
