@@ -925,7 +925,7 @@ export default function Header({
             opacity: filtersOpen ? 1 : 0,
             visibility: filtersOpen ? "visible" : "hidden",
             transform: filtersOpen ? "translateX(0)" : "translateX(-4px)",
-            marginRight: filtersOpen ? 0 : -(50 + 6),
+            marginRight: filtersOpen ? 0 : -(44 + 6),
             pointerEvents: filtersOpen ? "auto" : "none",
             transition:
               "margin-right 0.26s ease, opacity 0.22s ease, transform 0.24s ease, " +
@@ -938,7 +938,7 @@ export default function Header({
             title="Tunnelbana" aria-label="Visa tunnelbanenät" aria-pressed={showMetro}
             className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
             style={{
-              width: 50, height: 50, borderRadius: 9999,
+              width: 44, height: 44, borderRadius: 9999,
               background: showMetro ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
               backdropFilter: "blur(18px) saturate(1.6)", WebkitBackdropFilter: "blur(18px) saturate(1.6)",
               border: showMetro ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
@@ -961,7 +961,7 @@ export default function Header({
             title="Öppet just nu" aria-label="Filter Öppet just nu" aria-pressed={openNowFilter}
             className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
             style={{
-              width: 50, height: 50, borderRadius: 9999,
+              width: 44, height: 44, borderRadius: 9999,
               background: openNowFilter ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
               backdropFilter: "blur(18px) saturate(1.6)", WebkitBackdropFilter: "blur(18px) saturate(1.6)",
               border: openNowFilter ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
@@ -984,7 +984,7 @@ export default function Header({
             aria-pressed={alcoholOnly}
             className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
             style={{
-              width: 50, height: 50, borderRadius: 9999,
+              width: 44, height: 44, borderRadius: 9999,
               background: alcoholOnly ? MODIFIER_BTN_ACTIVE_BG : FILTER_BTN_BG,
               backdropFilter: "blur(18px) saturate(1.6)", WebkitBackdropFilter: "blur(18px) saturate(1.6)",
               border: alcoholOnly ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
@@ -998,7 +998,7 @@ export default function Header({
           </button>
 
           {/* Horizontal divider between modifier and category buttons */}
-          <div aria-hidden style={{ height: 1, width: 36, marginBlock: 2, background: "rgba(15,23,42,0.38)" }} />
+          <div aria-hidden style={{ height: 1, width: 30, marginBlock: 2, background: "rgba(15,23,42,0.38)" }} />
 
           {/* Category buttons — Takbar, Bar, Fika, Äta (bottom) */}
           {[...TYPE_BUTTONS].reverse().map(({ type, label, svg }) => {
@@ -1012,7 +1012,7 @@ export default function Header({
                 aria-pressed={typeFilter.has(type)}
                 className="transition-all duration-200 flex flex-col items-center justify-center gap-0.5"
                 style={{
-                  width: 50, height: 50, borderRadius: 9999,
+                  width: 44, height: 44, borderRadius: 9999,
                   background: active ? FILTER_BTN_ACTIVE_BG : FILTER_BTN_BG,
                   backdropFilter: "blur(18px) saturate(1.6)", WebkitBackdropFilter: "blur(18px) saturate(1.6)",
                   border: active ? FILTER_BTN_ACTIVE_BORDER : FILTER_BTN_BORDER,
