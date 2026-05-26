@@ -103,6 +103,12 @@ const BLUE_GLOW_TEXT_SHADOW = "0 0 6px rgba(96,165,250,0.50)";
 // "Hund/Glutenfri — paused" för planen att återuppta.
 const DOG_GLUTEN_FILTERS_ENABLED = false;
 
+// Öppet-filter dolt tills vi har råd att pre-warma cachen. Öppettider
+// hämtas ändå per venue när användaren öppnar en popup eller listar ställen.
+// Flippa till true + sätt openNowFilter-default till true i page.tsx för att
+// återaktivera kartefiltret.
+const OPEN_NOW_FILTER_ENABLED = false;
+
 const vibrate = (ms = 6) => {
   if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ms);
 };
@@ -949,6 +955,7 @@ export default function Header({
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: showMetro ? "#fff" : "#111827" }}>T-bana</span>
           </button>
 
+          {OPEN_NOW_FILTER_ENABLED && (
           <button
             onClick={(e) => { if (!openNowFilter) showToast("Visar ställen öppna just nu", e.currentTarget); onOpenNowFilterChange(!openNowFilter); }}
             title="Öppet just nu" aria-label="Filter Öppet just nu" aria-pressed={openNowFilter}
@@ -968,6 +975,7 @@ export default function Header({
             </svg>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", lineHeight: 1, color: openNowFilter ? "#fff" : "#111827" }}>Öppet</span>
           </button>
+          )}
 
           <button
             onClick={(e) => { if (!alcoholOnly) showToast("Visar ställen med serveringstillstånd", e.currentTarget); onAlcoholOnlyChange(!alcoholOnly); }}
