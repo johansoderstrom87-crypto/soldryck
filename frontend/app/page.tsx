@@ -73,7 +73,7 @@ export default function Home() {
   const [sunRange, setSunRange] = useState<SunRange>(null);
   const [focusVenueId, setFocusVenueId] = useState<string | null>(initialVenue);
   const [metroStation, setMetroStation] = useState<MetroStation | null>(null);
-  const [openNowFilter, setOpenNowFilter] = useState(true);
+  const [openNowFilter, setOpenNowFilter] = useState(false);
   const [alcoholOnly, setAlcoholOnly] = useState(false);
   const [dogFriendlyOnly, setDogFriendlyOnly] = useState(false);
   const [glutenFreeOnly, setGlutenFreeOnly] = useState(false);
