@@ -921,11 +921,11 @@ export default function Header({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 6,
+            gap: 8,
             opacity: filtersOpen ? 1 : 0,
             visibility: filtersOpen ? "visible" : "hidden",
             transform: filtersOpen ? "translateX(0)" : "translateX(-4px)",
-            marginRight: filtersOpen ? 0 : -(44 + 6),
+            marginRight: filtersOpen ? 0 : -(44 + 8),
             pointerEvents: filtersOpen ? "auto" : "none",
             transition:
               "margin-right 0.26s ease, opacity 0.22s ease, transform 0.24s ease, " +
@@ -998,7 +998,7 @@ export default function Header({
           </button>
 
           {/* Horizontal divider between modifier and category buttons */}
-          <div aria-hidden style={{ height: 1, width: 30, marginBlock: 2, background: "rgba(15,23,42,0.38)" }} />
+          <div aria-hidden style={{ height: 1, width: 30, marginBlock: 5, background: "rgba(15,23,42,0.38)" }} />
 
           {/* Category buttons — Takbar, Bar, Fika, Äta (bottom) */}
           {[...TYPE_BUTTONS].reverse().map(({ type, label, svg }) => {
