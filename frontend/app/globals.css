@@ -412,18 +412,18 @@ html, body {
   display: none;
   position: absolute;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  border: 0.5px solid rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.50);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  border: 0.75px solid rgba(0, 0, 0, 0.22);
   border-radius: var(--r-full);
-  padding: 5px 12px 5px 5px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+  padding: 3px 8px 3px 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
   pointer-events: auto;
   cursor: pointer;
   font-family: var(--font-inter), var(--font-sans), system-ui, sans-serif;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .show-badges .marker-badge {
@@ -445,8 +445,8 @@ html, body {
 }
 
 .marker-badge-icon {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.04);
   display: flex;
@@ -463,15 +463,15 @@ html, body {
 }
 
 .marker-badge-name {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: #222;
 }
 
 .marker-badge-sun {
-  font-size: 9px;
-  font-weight: 400;
-  color: #6b5630;
+  font-size: 8.5px;
+  font-weight: 500;
+  color: #d97706;
 }
 
 /* Arrow — repositioned per badge placement */
