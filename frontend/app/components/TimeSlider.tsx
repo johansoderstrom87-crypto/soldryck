@@ -478,7 +478,7 @@ export default function TimeSlider({
                 width: 20,
                 fontSize: 18,
                 lineHeight: 1,
-                transform: `scale(${isSelected ? 1.8 : 1})`,
+                transform: `scale(${isSelected ? 2.07 : 1})`,
                 transformOrigin: "bottom center",
                 opacity: past ? 0.55 : 1,
                 filter: past

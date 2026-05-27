@@ -54,14 +54,15 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
 
       {/* Sun direction arrow — bold filled, orange, rotates to sun direction */}
       {hasSun && (
-        <svg
-          width="22" height="22"
-          viewBox="-11 -11 22 22"
-          style={{ display: "block", flexShrink: 0, transform: `rotate(${lightDeg}deg)`, overflow: "visible" }}
-        >
-          {/* Bold notched arrowhead pointing up */}
-          <polygon points="0,-11 -6,5 0,1 6,5" fill="#f97316" />
-        </svg>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, flexShrink: 0 }}>
+          <svg
+            width="22" height="22"
+            viewBox="-11 -11 22 22"
+            style={{ display: "block", transform: `rotate(${lightDeg}deg)`, overflow: "visible", filter: "drop-shadow(0 0 4px rgba(249,115,22,0.85)) drop-shadow(0 0 9px rgba(249,115,22,0.4))" }}
+          >
+            <polygon points="0,-11 -6,5 0,1 6,5" fill="#f97316" />
+          </svg>
+        </div>
       )}
 
       {/* Temperature */}
@@ -78,13 +79,15 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
 
       {/* Wind direction arrow — bold filled, blue */}
       {hasWind && windSpeed > 0 && windDir !== undefined && (
-        <svg
-          width="22" height="22"
-          viewBox="-11 -11 22 22"
-          style={{ display: "block", flexShrink: 0, transform: `rotate(${windArrowDeg}deg)`, overflow: "visible" }}
-        >
-          <polygon points="0,-11 -6,5 0,1 6,5" fill="#2563eb" />
-        </svg>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, flexShrink: 0 }}>
+          <svg
+            width="22" height="22"
+            viewBox="-11 -11 22 22"
+            style={{ display: "block", transform: `rotate(${windArrowDeg}deg)`, overflow: "visible", filter: "drop-shadow(0 0 4px rgba(37,99,235,0.85)) drop-shadow(0 0 9px rgba(37,99,235,0.4))" }}
+          >
+            <polygon points="0,-11 -6,5 0,1 6,5" fill="#2563eb" />
+          </svg>
+        </div>
       )}
 
       {/* Wind speed */}
