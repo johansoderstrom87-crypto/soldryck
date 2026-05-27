@@ -2894,7 +2894,13 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
 
     // Capture bounds and draw rectangle only on first open (not on filter/dateKey re-runs)
     if (!searchBoundsRef.current) {
-      searchBoundsRef.current = map.getBounds();
+      const full = map.getBounds();
+      const latInset = (full.getNorth() - full.getSouth()) * 0.07;
+      const lngInset = (full.getEast() - full.getWest()) * 0.07;
+      searchBoundsRef.current = L.latLngBounds(
+        [full.getSouth() + latInset, full.getWest() + lngInset],
+        [full.getNorth() - latInset, full.getEast() - lngInset],
+      );
       searchAreaRectRef.current = L.rectangle(searchBoundsRef.current, {
         color: "#f59e0b",
         weight: 2,
