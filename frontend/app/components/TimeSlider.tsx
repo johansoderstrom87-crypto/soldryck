@@ -442,9 +442,9 @@ export default function TimeSlider({
             style={{
               position: "absolute",
               bottom: 28,
-              left: Math.max(70, Math.min(
+              left: Math.max(85, Math.min(
                 12 + ((displayHour - 7 + 0.5) / HOURS.length) * trackWidth,
-                trackWidth + 12 - 70,
+                trackWidth + 12 - 85,
               )),
               transform: "translateX(-50%)",
               transition: dragging ? "none" : "left 0.22s ease-out",
