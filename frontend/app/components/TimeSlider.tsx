@@ -441,7 +441,7 @@ export default function TimeSlider({
           <div
             style={{
               position: "absolute",
-              bottom: 36,
+              bottom: 28,
               left: Math.max(70, Math.min(
                 12 + ((displayHour - 7 + 0.5) / HOURS.length) * trackWidth,
                 trackWidth + 12 - 70,

@@ -56,14 +56,13 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
         alignItems: "center",
         gap: 8,
         whiteSpace: "nowrap",
-        filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.55)) drop-shadow(0 0 6px rgba(0,0,0,0.25))",
       }}
     >
       {/* Sun direction arrow — sun circle sits at the tail, arrowhead points toward sun */}
       {hasSun && (
         <svg
-          width="24"
-          height="24"
+          width="30"
+          height="30"
           viewBox="-10 -10 20 20"
           style={{ display: "block", flexShrink: 0, transform: `rotate(${lightDeg}deg)`, overflow: "visible" }}
         >
@@ -111,8 +110,8 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
         <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
           {windSpeed > 0 && windDir !== undefined && (
             <svg
-              width="13"
-              height="13"
+              width="17"
+              height="17"
               viewBox="-5 -5 10 10"
               style={{ display: "block", flexShrink: 0, transform: `rotate(${windArrowDeg}deg)`, overflow: "visible" }}
             >
@@ -120,9 +119,9 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
               <polygon points="0,-5 -2,-1 2,-1" fill="#2563eb" />
             </svg>
           )}
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#1e3a8a", lineHeight: 1 }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "#1e3a8a", lineHeight: 1 }}>
             {Math.round(windSpeed)}
-            <span style={{ fontSize: 11, fontWeight: 500 }}> m/s</span>
+            <span style={{ fontSize: 13, fontWeight: 500 }}> m/s</span>
           </span>
         </div>
       )}
