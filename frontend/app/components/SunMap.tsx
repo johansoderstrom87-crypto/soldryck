@@ -1403,12 +1403,12 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // actually changes (store fills in, or fallback flips). Without memo the
   // array would be recomputed on every render — including hour scrubs —
   // and the build effect would rebuild markers on every tick.
-  const allVenues: ComputedVenue[] = useMemo(() =>
-    storeVenues.length > 0
+  const allVenues: ComputedVenue[] = useMemo(() => {
+    const base = storeVenues.length > 0
       ? storeVenues
-      : (mockVenuesModule.mockVenues as unknown as ComputedVenue[]),
-    [storeVenues],
-  );
+      : (mockVenuesModule.mockVenues as unknown as ComputedVenue[]);
+    return base.filter((v) => v.name !== "Okänd");
+  }, [storeVenues]);
 
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
