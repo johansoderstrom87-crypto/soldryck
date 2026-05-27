@@ -434,13 +434,28 @@ export default function TimeSlider({
         paddingRight: "calc(12px + var(--safe-right))",
       }}
     >
-      {/* Sol/temp/vind — centrerat ovanför timreglaget */}
-      <div className="max-w-md mx-auto mb-2 flex justify-center pointer-events-none">
-        <DirectionGauges hour={displayHour} date={date} currentWeather={currentWeather} />
-      </div>
-
       {/* Weather icons — pixel-aligned with slider via trackWidth to match each hour exactly */}
       <div className="relative max-w-md mx-auto" style={{ height: 34, overflow: "visible" }}>
+        {/* Compact weather info — floats above the selected hour's icon */}
+        {trackWidth > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 42,
+              left: Math.max(60, Math.min(
+                12 + ((displayHour - 7 + 0.5) / HOURS.length) * trackWidth,
+                trackWidth + 12 - 60,
+              )),
+              transform: "translateX(-50%)",
+              transition: dragging ? "none" : "left 0.22s ease-out",
+              pointerEvents: "none",
+              zIndex: 5,
+            }}
+          >
+            <DirectionGauges hour={displayHour} date={date} currentWeather={currentWeather} />
+          </div>
+        )}
+
         {HOURS.map((h) => {
           const hw = getHourWeather(h);
           const hwSymbol = hw ? getSymbolInfo(hw.symbolCode) : null;
