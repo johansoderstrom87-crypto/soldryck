@@ -54,22 +54,15 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: 6,
-        padding: "3px 8px",
-        borderRadius: 12,
-        background: "rgba(255,255,255,0.82)",
-        backdropFilter: "blur(12px) saturate(1.3)",
-        WebkitBackdropFilter: "blur(12px) saturate(1.3)",
-        border: "0.5px solid rgba(255,255,255,0.75)",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.14)",
+        gap: 8,
         whiteSpace: "nowrap",
       }}
     >
       {/* Sun direction arrow — sun circle sits at the tail, arrowhead points toward sun */}
       {hasSun && (
         <svg
-          width="18"
-          height="18"
+          width="24"
+          height="24"
           viewBox="-10 -10 20 20"
           style={{ display: "block", flexShrink: 0, transform: `rotate(${lightDeg}deg)`, overflow: "visible" }}
         >
@@ -97,28 +90,29 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
         </svg>
       )}
 
-      {/* Temperature — just the number, no icon */}
+      {/* Temperature — number + °C, no icon */}
       {hasTemp && (
         <span
           style={{
-            fontSize: 13,
+            fontSize: 16,
             fontWeight: 800,
             color: "#1c1917",
             letterSpacing: "-0.02em",
             lineHeight: 1,
+            textShadow: "0 1px 4px rgba(255,255,255,0.9), 0 0 8px rgba(255,255,255,0.7)",
           }}
         >
-          {Math.round(temperature)}°
+          {Math.round(temperature)}°C
         </span>
       )}
 
       {/* Wind — small direction arrow + speed text */}
       {hasWind && (
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
           {windSpeed > 0 && windDir !== undefined && (
             <svg
-              width="10"
-              height="10"
+              width="13"
+              height="13"
               viewBox="-5 -5 10 10"
               style={{ display: "block", flexShrink: 0, transform: `rotate(${windArrowDeg}deg)`, overflow: "visible" }}
             >
@@ -126,9 +120,9 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
               <polygon points="0,-5 -2,-1 2,-1" fill="#2563eb" />
             </svg>
           )}
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#1e3a8a", lineHeight: 1 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#1e3a8a", lineHeight: 1, textShadow: "0 1px 4px rgba(255,255,255,0.9), 0 0 8px rgba(255,255,255,0.7)" }}>
             {Math.round(windSpeed)}
-            <span style={{ fontSize: 9, fontWeight: 500 }}> m/s</span>
+            <span style={{ fontSize: 11, fontWeight: 500 }}> m/s</span>
           </span>
         </div>
       )}
