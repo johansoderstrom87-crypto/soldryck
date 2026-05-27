@@ -3216,6 +3216,173 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           gap: 8,
         }}
       >
+      {/* GPS locate button — top of right-side stack.
+          Row layout so the GPS-hint tooltip sits to the LEFT of the button. */}
+      <div data-onboarding="locate-btn" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {showTooltip && geoState === "idle" && (
+          <div
+            onAnimationEnd={() => setShowTooltip(false)}
+            style={{
+              ...glassStyle,
+              borderRadius: 12,
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#0f172a",
+              whiteSpace: "nowrap",
+              animation: "gps-tip 4.5s ease forwards",
+              fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
+            }}
+          >
+            Aktivera GPS för att se din position
+          </div>
+        )}
+
+        <button
+          onClick={() => { setShowTooltip(false); handleLocate(); }}
+          title={geoState === "located" ? "Dölj min position" : "Visa min position"}
+          aria-label={geoState === "located" ? "Dölj min position på kartan" : "Visa min position på kartan"}
+          aria-pressed={geoState === "located"}
+          aria-busy={geoState === "locating"}
+          style={{
+            ...glassStyle,
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: locateBtnColor,
+            flexShrink: 0,
+          }}
+        >
+          {geoState === "locating" ? (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 1s linear infinite" }}>
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill={geoState === "located" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+              <circle cx="12" cy="12" r="8" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* Hitta solen FAB — middle of right-side stack.
+          `position: relative` so the discovery pulse and result toast
+          (both `position: absolute`) anchor against this wrapper. */}
+      <div data-onboarding="locate-btn" style={{ position: "relative" }}>
+        {/* First-time-discovery pulse — fires three rings on first map view
+            then never again (localStorage flag). Sits behind the FAB and
+            ignores pointer events, so the button still receives clicks. */}
+        {findSunPulse && findSunState === "idle" && (
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: -2,
+              borderRadius: "50%",
+              border: "2px solid rgba(251,146,60,0.65)",
+              pointerEvents: "none",
+              animation: "find-sun-pulse 1.4s ease-out 3",
+            }}
+          />
+        )}
+
+        {/* Result toast — explains the "none" / "error" state in plain text.
+            Previously the user only saw the FAB icon change color, with the
+            actual reason buried in the title= attribute (invisible on mobile). */}
+        {(findSunState === "none" || findSunState === "error") && (
+          <div
+            role="status"
+            style={{
+              position: "absolute",
+              right: "calc(100% + 10px)",
+              top: "50%",
+              transform: "translateY(-50%)",
+              ...glassStyle,
+              padding: "8px 12px",
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: 500,
+              color: findSunState === "error" ? "#991b1b" : "#475569",
+              maxWidth: 200,
+              whiteSpace: "normal",
+              lineHeight: 1.35,
+              animation: "ios-install-in 0.25s ease-out",
+              pointerEvents: "none",
+            }}
+          >
+            {findSunState === "error"
+              ? (findSunMsg ?? "Kunde inte hämta position")
+              : (findSunMsg ?? "Inga öppna ställen med sol nära dig just nu — bläddra på kartan istället.")}
+          </div>
+        )}
+        <button
+          onClick={() => { setFindSunPulse(false); handleFindSun(); }}
+          disabled={findSunState === "locating"}
+          title={
+            findSunState === "locating" ? "Letar efter sol..." :
+            findSunState === "none" ? (findSunMsg ?? "Ingen sol nära dig just nu") :
+            findSunState === "error" ? (findSunMsg ?? "Kunde inte hämta position") :
+            "Hitta närmaste uteservering med sol"
+          }
+          aria-label={
+            findSunState === "locating" ? "Letar efter närmaste sol…" :
+            "Hitta närmaste uteservering med sol"
+          }
+          aria-busy={findSunState === "locating"}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            border: "none",
+            cursor: findSunState === "locating" ? "wait" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: findSunState === "error"
+              ? "rgba(239,68,68,0.88)"
+              : findSunState === "none"
+              ? "rgba(100,116,139,0.45)"
+              : "radial-gradient(ellipse at 50% 38%, #ffc896 0%, #fb9040 48%, #ef6e2c 100%)",
+            backdropFilter: findSunState === "none" ? "blur(14px) saturate(1.3)" : undefined,
+            WebkitBackdropFilter: findSunState === "none" ? "blur(14px) saturate(1.3)" : undefined,
+            boxShadow: findSunState === "idle"
+              ? "0 4px 20px rgba(242,114,96,0.50), 0 2px 8px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.25)"
+              : "0 2px 8px rgba(0,0,0,0.12)",
+            color: "#fff",
+            transition: "background 0.3s ease, box-shadow 0.3s ease",
+          }}
+        >
+          {findSunState === "locating" ? (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ animation: "spin 1s linear infinite" }}>
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.35" />
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+          ) : findSunState === "none" ? (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+            </svg>
+          ) : findSunState === "error" ? (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
+            </svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "find-sun-idle 3s ease-in-out infinite" }}>
+              <circle cx="12" cy="12" r="4" fill="currentColor" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* Sök — bottom of right-side stack so the results dropdown has
+          maximum vertical room to expand upward. */}
       <div
         ref={searchRef}
         style={{ display: "flex", alignItems: "center", gap: 8 }}
@@ -3340,177 +3507,6 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="7" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          )}
-        </button>
-      </div>
-
-      {/* Hitta solen FAB — middle of right-side stack.
-          `position: relative` so the discovery pulse and result toast
-          (both `position: absolute`) anchor against this wrapper. */}
-      <div data-onboarding="locate-btn" style={{ position: "relative" }}>
-        {/* First-time-discovery pulse — fires three rings on first map view
-            then never again (localStorage flag). Sits behind the FAB and
-            ignores pointer events, so the button still receives clicks. */}
-        {findSunPulse && findSunState === "idle" && (
-          <span
-            aria-hidden
-            style={{
-              position: "absolute",
-              inset: -2,
-              borderRadius: "50%",
-              border: "2px solid rgba(251,146,60,0.65)",
-              pointerEvents: "none",
-              animation: "find-sun-pulse 1.4s ease-out 3",
-            }}
-          />
-        )}
-
-        {/* Result toast — explains the "none" / "error" state in plain text.
-            Previously the user only saw the FAB icon change color, with the
-            actual reason buried in the title= attribute (invisible on mobile). */}
-        {(findSunState === "none" || findSunState === "error") && (
-          <div
-            role="status"
-            style={{
-              position: "absolute",
-              right: "calc(100% + 10px)",
-              top: "50%",
-              transform: "translateY(-50%)",
-              ...glassStyle,
-              padding: "8px 12px",
-              borderRadius: 12,
-              fontSize: 12,
-              fontWeight: 500,
-              color: findSunState === "error" ? "#991b1b" : "#475569",
-              maxWidth: 200,
-              whiteSpace: "normal",
-              lineHeight: 1.35,
-              animation: "ios-install-in 0.25s ease-out",
-              pointerEvents: "none",
-            }}
-          >
-            {findSunState === "error"
-              ? (findSunMsg ?? "Kunde inte hämta position")
-              : (findSunMsg ?? "Inga öppna ställen med sol nära dig just nu — bläddra på kartan istället.")}
-          </div>
-        )}
-        <button
-          onClick={() => { setFindSunPulse(false); handleFindSun(); }}
-          disabled={findSunState === "locating"}
-          title={
-            findSunState === "locating" ? "Letar efter sol..." :
-            findSunState === "none" ? (findSunMsg ?? "Ingen sol nära dig just nu") :
-            findSunState === "error" ? (findSunMsg ?? "Kunde inte hämta position") :
-            "Hitta närmaste uteservering med sol"
-          }
-          aria-label={
-            findSunState === "locating" ? "Letar efter närmaste sol…" :
-            "Hitta närmaste uteservering med sol"
-          }
-          aria-busy={findSunState === "locating"}
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: "50%",
-            border: "none",
-            cursor: findSunState === "locating" ? "wait" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: findSunState === "error"
-              ? "rgba(239,68,68,0.88)"
-              : findSunState === "none"
-              ? "rgba(100,116,139,0.45)"
-              : "radial-gradient(ellipse at 50% 38%, #ffc896 0%, #fb9040 48%, #ef6e2c 100%)",
-            backdropFilter: findSunState === "none" ? "blur(14px) saturate(1.3)" : undefined,
-            WebkitBackdropFilter: findSunState === "none" ? "blur(14px) saturate(1.3)" : undefined,
-            boxShadow: findSunState === "idle"
-              ? "0 4px 20px rgba(242,114,96,0.50), 0 2px 8px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.25)"
-              : "0 2px 8px rgba(0,0,0,0.12)",
-            color: "#fff",
-            transition: "background 0.3s ease, box-shadow 0.3s ease",
-          }}
-        >
-          {findSunState === "locating" ? (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ animation: "spin 1s linear infinite" }}>
-              <circle cx="12" cy="12" r="10" strokeOpacity="0.35" />
-              <path d="M12 2a10 10 0 0 1 10 10" />
-            </svg>
-          ) : findSunState === "none" ? (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
-            </svg>
-          ) : findSunState === "error" ? (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
-            </svg>
-          ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "find-sun-idle 3s ease-in-out infinite" }}>
-              <circle cx="12" cy="12" r="4" fill="currentColor" />
-              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-            </svg>
-          )}
-        </button>
-      </div>
-
-      {/* GPS locate button — bottom of right-side stack.
-          Row layout so the GPS-hint tooltip sits to the LEFT of the button. */}
-      <div data-onboarding="locate-btn" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {/* Tooltip — fades in then out, only when idle. onAnimationEnd
-            avmonterar tooltipen efter fade-out så den inte ligger kvar i
-            DOM:en (opacity:0 via animation-fill-mode:forwards är osynlig
-            men fortfarande klickbar — bredden ~210 px gjorde att hela
-            höger-knapp-stacken expanderade vänsterut och blockerade
-            kart-pan i en stor osynlig zon mitt i viewporten). */}
-        {showTooltip && geoState === "idle" && (
-          <div
-            onAnimationEnd={() => setShowTooltip(false)}
-            style={{
-              ...glassStyle,
-              borderRadius: 12,
-              padding: "7px 12px",
-              fontSize: 12,
-              fontWeight: 500,
-              color: "#0f172a",
-              whiteSpace: "nowrap",
-              animation: "gps-tip 4.5s ease forwards",
-              fontFamily: "var(--font-outfit), var(--font-inter), system-ui, sans-serif",
-            }}
-          >
-            Aktivera GPS för att se din position
-          </div>
-        )}
-
-        <button
-          onClick={() => { setShowTooltip(false); handleLocate(); }}
-          title={geoState === "located" ? "Dölj min position" : "Visa min position"}
-          aria-label={geoState === "located" ? "Dölj min position på kartan" : "Visa min position på kartan"}
-          aria-pressed={geoState === "located"}
-          aria-busy={geoState === "locating"}
-          style={{
-            ...glassStyle,
-            width: 44,
-            height: 44,
-            borderRadius: "50%",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: locateBtnColor,
-            flexShrink: 0,
-          }}
-        >
-          {geoState === "locating" ? (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 1s linear infinite" }}>
-              <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
-              <path d="M12 2a10 10 0 0 1 10 10" />
-            </svg>
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill={geoState === "located" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-              <circle cx="12" cy="12" r="8" />
             </svg>
           )}
         </button>
