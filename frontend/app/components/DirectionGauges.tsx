@@ -52,24 +52,6 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
 
-      {/* Classic sun icon */}
-      {hasSun && (
-        <svg width="26" height="26" viewBox="-13 -13 26 26" style={{ display: "block", flexShrink: 0 }}>
-          {Array.from({ length: 8 }, (_, i) => {
-            const a = (i * Math.PI) / 4;
-            return (
-              <line
-                key={i}
-                x1={Math.cos(a) * 6.5} y1={Math.sin(a) * 6.5}
-                x2={Math.cos(a) * 10.5} y2={Math.sin(a) * 10.5}
-                stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round"
-              />
-            );
-          })}
-          <circle cx="0" cy="0" r="5.5" fill="#f59e0b" />
-        </svg>
-      )}
-
       {/* Sun direction arrow — bold filled, orange, rotates to sun direction */}
       {hasSun && (
         <svg
