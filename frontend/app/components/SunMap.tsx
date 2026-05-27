@@ -3209,7 +3209,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
           position: "absolute",
           bottom: "calc(225px + var(--safe-bottom, 0px))",
           right: "calc(12px + var(--safe-right, 0px))",
-          zIndex: 1001,
+          zIndex: 1200,
           display: "flex",
           flexDirection: "column",
           alignItems: "flex-end",
