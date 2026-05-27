@@ -56,6 +56,7 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
         alignItems: "center",
         gap: 8,
         whiteSpace: "nowrap",
+        filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.55)) drop-shadow(0 0 6px rgba(0,0,0,0.25))",
       }}
     >
       {/* Sun direction arrow — sun circle sits at the tail, arrowhead points toward sun */}
@@ -99,7 +100,6 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
             color: "#1c1917",
             letterSpacing: "-0.02em",
             lineHeight: 1,
-            textShadow: "0 1px 4px rgba(255,255,255,0.9), 0 0 8px rgba(255,255,255,0.7)",
           }}
         >
           {Math.round(temperature)}°C
@@ -120,7 +120,7 @@ export default function DirectionGauges({ hour, date, currentWeather }: Directio
               <polygon points="0,-5 -2,-1 2,-1" fill="#2563eb" />
             </svg>
           )}
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#1e3a8a", lineHeight: 1, textShadow: "0 1px 4px rgba(255,255,255,0.9), 0 0 8px rgba(255,255,255,0.7)" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#1e3a8a", lineHeight: 1 }}>
             {Math.round(windSpeed)}
             <span style={{ fontSize: 11, fontWeight: 500 }}> m/s</span>
           </span>
