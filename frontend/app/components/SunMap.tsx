@@ -799,9 +799,17 @@ function computeMarkerState(
 function applyMarkerVisualState(marker: L.Marker, state: { className: string; visible: boolean }) {
   const iconEl = (marker as any)._icon as HTMLElement | undefined;
   if (!iconEl) return;
+  // Skip no-op writes. During an hour scrub most markers keep the same sun/
+  // shade status from one hour to the next, so re-assigning an identical
+  // className / display would invalidate style for zero visual change —
+  // measurable when a few hundred markers are attached at low zoom.
   const dot = iconEl.firstElementChild as HTMLElement | null;
-  if (dot) dot.className = `marker-dot ${state.className}`;
-  iconEl.style.display = state.visible ? "" : "none";
+  if (dot) {
+    const next = `marker-dot ${state.className}`;
+    if (dot.className !== next) dot.className = next;
+  }
+  const nextDisplay = state.visible ? "" : "none";
+  if (iconEl.style.display !== nextDisplay) iconEl.style.display = nextDisplay;
 }
 
 /**
@@ -1420,8 +1428,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
   // effekten och läses av cullToViewport så att markörer som faller bort
   // p.g.a. ett filter inte attachas till kartan ens om de är i viewport.
   const staticPassRef = useRef<Set<string>>(new Set());
-  // Weather snapshot read by the hour-update effect (avoids making `weather`
-  // a dep of the cheap update path — only the build effect rebuilds on weather).
+  // Live weather snapshot read by the non-React paths that can't take `weather`
+  // as a dep: cullToViewport (paints a marker the moment it re-enters the
+  // viewport) and the open-now hours fetcher. The hour-update effect itself
+  // now depends on `weather` directly so a weather change repaints markers
+  // cheaply without a full rebuild.
   const weatherRef = useRef<WeatherData | null>(null);
   weatherRef.current = weather;
   // Latest hour for popup handlers (e.g. share-link) attached at build time.
@@ -2478,13 +2489,15 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     return () => {
       map.off("zoomend moveend", handleViewportChange);
     };
-    // Build-effekten beror NU bara på dateKey/weather/allVenues. Statiska
-    // filter (typeFilter/sunRange/metroStation/alcoholOnly/wheelchairOnly)
-    // hanteras av static-filter-effekten nedan utan att riva markörerna.
-    // typeFilter/sunRange/metroStation/alcoholOnly/wheelchairOnly läses
-    // ändå i den initiala passes-loopen ovan — disable för deps-warning.
+    // Build-effekten beror NU bara på dateKey/allVenues — INTE weather.
+    // Weather flyttades till den billiga hour-update-effekten ovan så att en
+    // väderuppdatering bara målar om regn-klassen på befintliga markörer
+    // istället för att riva + bygga om alla ~2 843 markörer. Statiska filter
+    // (typeFilter/sunRange/metroStation/alcoholOnly/wheelchairOnly) hanteras
+    // av static-filter-effekten nedan utan att riva markörerna; de läses ändå
+    // i den initiala passes-loopen ovan — disable för deps-warning.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateKey, weather, allVenues]);
+  }, [dateKey, allVenues]);
 
   // Static-filter fast path — när användaren togglar typeFilter, sunRange,
   // metroStation, alcoholOnly eller wheelchairOnly räknar vi om setet av
@@ -2549,7 +2562,7 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
       if (!(marker as L.Marker & { _map?: L.Map })._map) continue;
       applyMarkerVisualState(
         marker,
-        computeMarkerState(venue, dateKey, hour, filter, weatherRef.current, openNowFilter),
+        computeMarkerState(venue, dateKey, hour, filter, weather, openNowFilter),
       );
       // Happy-hour glow — toggled on the marker root (sibling of marker-dot).
       // Cheap: reads from a module-level Record and a fixed pair of ints, so
@@ -2569,7 +2582,11 @@ export default function SunMap({ hour: hourProp, date, filter, typeFilter, sunRa
     // claimedVer is in deps so this whole effect re-fires when the claimed-
     // venues map arrives async from the API.
     void claimedVer;
-  }, [hour, dateKey, filter, openNowFilter, claimedVer]);
+    // `weather` is a dep so a weather change (initial SMHI load, 30-min
+    // refresh, or date change) repaints rain-classes on the existing markers
+    // via this cheap path — instead of tearing down + rebuilding all ~2 843
+    // markers in the build effect, which is where weather used to live.
+  }, [hour, dateKey, filter, weather, openNowFilter, claimedVer]);
 
   // Open-now hours fetcher — when the chip is on, fan out per-venue hours
   // requests for the ~50 nearest in-viewport venues that don't already have

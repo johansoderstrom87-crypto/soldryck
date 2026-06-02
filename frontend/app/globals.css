@@ -214,7 +214,11 @@ html, body {
   border-radius: 50%;
   box-sizing: border-box;
   filter: saturate(1.25) var(--marker-dot-filter, brightness(1));
-  transition: filter 0.8s ease;
+  /* 0.35s istället för 0.8s: vid gryning/skymning byter --marker-dot-filter
+     per timsteg, och varje synlig prick animerar då sitt filter. En kortare
+     övergång kortar ner kompositerings-bursten (hundratals prickar samtidigt)
+     märkbart utan att dimningen känns hoppig. */
+  transition: filter 0.35s ease;
 }
 
 .marker-root:not(.marker-unconfirmed) .marker-dot {
@@ -230,10 +234,12 @@ html, body {
 .marker-dot.marker-sun {
   background: radial-gradient(circle at 50% 50%,
     #ffffff 0%, #fffbeb 28%, #fef9c3 52%, #fde047 70%, #fbbf24 86%, #f97316 100%);
-  box-shadow:
-    0 0 6px rgba(251, 146, 60, 0.65),
-    0 0 12px rgba(251, 191, 36, 0.40),
-    0 2px 4px rgba(120, 53, 15, 0.22);
+  /* Singel-lager glow vid utzoomat läge: hundratals sol-prickar målas
+     samtidigt, och varje extra box-shadow-lager mångdubblar rasteringen av
+     marker-panen vid pan/zoom. På en 9px-prick bland hundratals är ett lager
+     visuellt i princip identiskt med tre. Den rika fler-lagers-glöden finns
+     kvar i .show-badges-regeln nedan (zoom >= 17, ~20 synliga prickar). */
+  box-shadow: 0 0 5px rgba(251, 146, 60, 0.60);
 }
 .show-badges .marker-dot.marker-sun {
   box-shadow:
