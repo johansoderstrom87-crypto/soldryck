@@ -855,7 +855,10 @@ export default function Header({
         style={{
           top: "calc(var(--safe-top, 0px) + 20px)",
           left: "calc(var(--safe-left, 0px) + 12px)",
-          zIndex: 20,
+          // Måste ligga över filter-sidebaren (zIndex 20). Annars stängs
+          // dropdown-menyns interna z-[2000] inne i den här stacking-
+          // contexten och filter-kolumnen (senare i DOM) målas ovanpå den.
+          zIndex: 40,
         }}
       >
         <SettingsButton

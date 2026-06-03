@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import TimeSlider from "./components/TimeSlider";
 import Header from "./components/Header";
 import FeedbackModal from "./components/FeedbackModal";
+import FeedbackButton from "./components/FeedbackButton";
 import SplashScreen from "./components/SplashScreen";
 import Onboarding from "./components/Onboarding";
 import OffSeasonBanner from "./components/OffSeasonBanner";
@@ -171,6 +172,7 @@ export default function Home() {
       {offSeason && splashDone && <OffSeasonBanner snappedDate={initialDate} />}
       {splashDone && <IosInstallHint />}
       {splashDone && <VenuesLoadingPill loading={!venuesLoaded} />}
+      {splashDone && <FeedbackButton />}
       <Header
         filter={filter}
         onFilterChange={setFilter}
