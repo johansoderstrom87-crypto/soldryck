@@ -770,13 +770,12 @@ function computeMarkerState(
   openNowFilter: boolean = false,
 ): { className: string; visible: boolean } {
   const status = normalize(getStatus(venue, dateKey, hour));
-  const wSymbol = weather?.hourly[hour]?.symbolCode;
-  const isRain = wSymbol !== undefined && getSymbolInfo(wSymbol).category === "rain";
 
-  let className: string;
-  if (isRain) className = "marker-rain";
-  else if (status === "sun") className = "marker-sun";
-  else className = "marker-shade";
+  // Markörerna visar alltid sol/skugga — även när det regnar. Regn signaleras
+  // av regn-overlayen (.weather-fx) ovanpå kartan, så att tvinga alla prickar
+  // blå när det regnar skulle dubbel-signalera och dölja vilka platser som
+  // ändå får sol i en uppehållslucka. (Tidigare sattes marker-rain här.)
+  const className = status === "sun" ? "marker-sun" : "marker-shade";
 
   let visible =
     filter === "all" ||

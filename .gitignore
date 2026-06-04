@@ -5,3 +5,7 @@ __pycache__/
 pipeline/data/
 frontend/public/shadows/
 .claude/
+
+# Local scratch/test files
+frontend/probe.mjs
+frontend/tmp-test.mjs
