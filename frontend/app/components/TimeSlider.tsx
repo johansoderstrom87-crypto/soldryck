@@ -357,13 +357,28 @@ export default function TimeSlider({
     if (wasTap) {
       const h = clientXToHour(pointerDownXRef.current ?? e.clientX);
       if (rangeMode && sunRange) {
-        // Tap på en handle → kollapsa tillbaka till enkelt-läge
         const distFrom = Math.abs(h - sunRange.from);
         const distTo = Math.abs(h - sunRange.to);
-        const collapseHour = distFrom <= distTo ? sunRange.from : sunRange.to;
-        onSunRangeChange(null);
-        dispatchHour(collapseHour);
-        vibrate(10);
+        if (h === sunRange.from || h === sunRange.to) {
+          // Tap rakt på en handle → kollapsa tillbaka till enkelt-läge
+          const collapseHour = distFrom <= distTo ? sunRange.from : sunRange.to;
+          onSunRangeChange(null);
+          dispatchHour(collapseHour);
+          vibrate(10);
+        } else {
+          // Tap någon annanstans på spåret → flytta närmaste handle dit så
+          // användaren kan ställa in intervallet (t.ex. 14→18) istället för
+          // att intervallet kollapsar och alla platser dyker upp igen.
+          if (distFrom <= distTo) {
+            const newFrom = Math.min(h, sunRange.to - 1);
+            onSunRangeChange({ from: newFrom, to: sunRange.to });
+            dispatchHour(newFrom);
+          } else {
+            const newTo = Math.max(h, sunRange.from + 1);
+            onSunRangeChange({ from: sunRange.from, to: newTo });
+          }
+          vibrate(6);
+        }
       } else if (h === displayHour) {
         // Tap på knappen → dela upp i två handtag
         const to = Math.min(displayHour + 3, 22);
