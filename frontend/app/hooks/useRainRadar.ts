@@ -1,11 +1,21 @@
 import { useEffect } from "react";
 import type L from "leaflet";
 
+// RainViewer's tile API only renders radar data up to zoom 7 — every tile
+// requested past that returns the same "zoom level not supported"
+// placeholder image, regardless of {x}/{y}. Confirmed by diffing tile
+// bytes directly: z8 through z18 are byte-identical.
+const RAIN_RADAR_MAX_ZOOM = 7;
+
 /**
  * Toggleable RainViewer radar overlay. Pulls the public weather-maps.json
  * metadata, attaches the latest frame as a tile layer, and refreshes every
  * 5 min (their frames update every 10 min) until the toggle goes off or
  * the component unmounts.
+ *
+ * While active, clamps the map to RAIN_RADAR_MAX_ZOOM (zooming out first
+ * if the user was already closer in) so radar tiles always resolve, and
+ * restores the map's normal zoom ceiling on deactivate/unmount.
  *
  * Lives in its own hook because the effect is self-contained — only the
  * map ref + a single boolean prop are needed. The same extraction pattern
@@ -22,11 +32,21 @@ export function useRainRadar(
     let rainLayer: L.TileLayer | null = null;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let previousMaxZoom: number | null = null;
 
     async function refresh() {
       if (cancelled) return;
       const m = mapRef.current;
       if (!m) return;
+
+      if (previousMaxZoom === null) {
+        previousMaxZoom = m.getMaxZoom();
+        m.setMaxZoom(RAIN_RADAR_MAX_ZOOM);
+        if (m.getZoom() > RAIN_RADAR_MAX_ZOOM) {
+          m.setZoom(RAIN_RADAR_MAX_ZOOM);
+        }
+      }
+
       try {
         const res = await fetch("https://api.rainviewer.com/public/weather-maps.json");
         if (!res.ok) return;
@@ -64,6 +84,10 @@ export function useRainRadar(
       cancelled = true;
       if (timer) clearTimeout(timer);
       if (rainLayer) rainLayer.remove();
+      const m = mapRef.current;
+      if (m && previousMaxZoom !== null) {
+        m.setMaxZoom(previousMaxZoom);
+      }
     };
   }, [showRain, mapRef]);
 }
